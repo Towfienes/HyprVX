@@ -1,0 +1,12 @@
+build/
+cmake-build-*/
+.cache/
+*.log
+*.tmp
+*.swp
+*.swo
+compile_commands.json
+.DS_Store
+
+benchmarks/local/
+local/
