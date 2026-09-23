@@ -158,6 +158,58 @@ void CameraHistory::clear() noexcept {
     forwardStack_.clear();
 }
 
+CameraHistoryTransaction::
+CameraHistoryTransaction(
+    CameraHistory& history
+) noexcept
+    : history_(&history) {
+}
+
+void CameraHistoryTransaction::begin(
+    CameraView start
+) {
+    validateCameraView(start);
+
+    if (startView_.has_value()) {
+        return;
+    }
+
+    startView_ = start;
+}
+
+bool CameraHistoryTransaction::finish(
+    CameraView end
+) {
+    validateCameraView(end);
+
+    if (!startView_.has_value()) {
+        return false;
+    }
+
+    const CameraView start =
+        *startView_;
+
+    startView_.reset();
+
+    if (
+        sameCameraView(
+            start,
+            end
+        )
+    ) {
+        return false;
+    }
+
+    history_->record(start);
+
+    return true;
+}
+
+void CameraHistoryTransaction::cancel()
+    noexcept {
+    startView_.reset();
+}
+
 bool ZoneStore::set(
     Zone zone
 ) {

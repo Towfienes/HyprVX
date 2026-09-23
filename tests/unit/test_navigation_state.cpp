@@ -279,3 +279,241 @@ TEST(ZoneStoreTest, RejectsInvalidZone) {
         std::invalid_argument
     );
 }
+
+
+TEST(
+    CameraHistoryTransactionTest,
+    ChangedViewRecordsSingleHistoryEntry
+) {
+    CameraHistory history;
+
+    CameraHistoryTransaction transaction{
+        history
+    };
+
+    const CameraView start{
+        {100.0, 200.0},
+        1.0
+    };
+
+    const CameraView end{
+        {900.0, -300.0},
+        0.75
+    };
+
+    transaction.begin(start);
+
+    EXPECT_TRUE(
+        transaction.finish(end)
+    );
+
+    EXPECT_EQ(
+        history.backSize(),
+        1u
+    );
+
+    const auto back =
+        history.back(end);
+
+    ASSERT_TRUE(
+        back.has_value()
+    );
+
+    EXPECT_DOUBLE_EQ(
+        back->position.x,
+        start.position.x
+    );
+
+    EXPECT_DOUBLE_EQ(
+        back->position.y,
+        start.position.y
+    );
+
+    EXPECT_DOUBLE_EQ(
+        back->zoom,
+        start.zoom
+    );
+}
+
+TEST(
+    CameraHistoryTransactionTest,
+    RepeatedBeginPreservesOriginalStart
+) {
+    CameraHistory history;
+
+    CameraHistoryTransaction transaction{
+        history
+    };
+
+    const CameraView first{
+        {0.0, 0.0},
+        1.0
+    };
+
+    const CameraView middle{
+        {500.0, 500.0},
+        0.9
+    };
+
+    const CameraView end{
+        {1200.0, 800.0},
+        0.7
+    };
+
+    transaction.begin(first);
+    transaction.begin(middle);
+
+    EXPECT_TRUE(
+        transaction.finish(end)
+    );
+
+    const auto back =
+        history.back(end);
+
+    ASSERT_TRUE(
+        back.has_value()
+    );
+
+    EXPECT_DOUBLE_EQ(
+        back->position.x,
+        first.position.x
+    );
+
+    EXPECT_DOUBLE_EQ(
+        back->position.y,
+        first.position.y
+    );
+
+    EXPECT_DOUBLE_EQ(
+        back->zoom,
+        first.zoom
+    );
+}
+
+TEST(
+    CameraHistoryTransactionTest,
+    UnchangedViewDoesNotCreateHistory
+) {
+    CameraHistory history;
+
+    CameraHistoryTransaction transaction{
+        history
+    };
+
+    const CameraView view{
+        {100.0, 200.0},
+        1.0
+    };
+
+    transaction.begin(view);
+
+    EXPECT_FALSE(
+        transaction.finish(view)
+    );
+
+    EXPECT_FALSE(
+        history.canGoBack()
+    );
+
+    EXPECT_FALSE(
+        transaction.active()
+    );
+}
+
+TEST(
+    CameraHistoryTransactionTest,
+    CancelCreatesNoHistory
+) {
+    CameraHistory history;
+
+    CameraHistoryTransaction transaction{
+        history
+    };
+
+    transaction.begin({
+        {100.0, 200.0},
+        1.0
+    });
+
+    EXPECT_TRUE(
+        transaction.active()
+    );
+
+    transaction.cancel();
+
+    EXPECT_FALSE(
+        transaction.active()
+    );
+
+    EXPECT_FALSE(
+        history.canGoBack()
+    );
+}
+
+TEST(
+    CameraHistoryTransactionTest,
+    MultipleMotionSamplesStillCreateOneEntry
+) {
+    CameraHistory history;
+
+    CameraHistoryTransaction transaction{
+        history
+    };
+
+    const CameraView start{
+        {-1000.0, 500.0},
+        1.25
+    };
+
+    transaction.begin(start);
+
+    for (
+        int i = 0;
+        i < 500;
+        ++i
+    ) {
+        transaction.begin({
+            {
+                static_cast<double>(i),
+                static_cast<double>(i * 2)
+            },
+            1.0
+        });
+    }
+
+    const CameraView end{
+        {5000.0, -2000.0},
+        0.6
+    };
+
+    EXPECT_TRUE(
+        transaction.finish(end)
+    );
+
+    EXPECT_EQ(
+        history.backSize(),
+        1u
+    );
+
+    const auto back =
+        history.back(end);
+
+    ASSERT_TRUE(
+        back.has_value()
+    );
+
+    EXPECT_DOUBLE_EQ(
+        back->position.x,
+        start.position.x
+    );
+
+    EXPECT_DOUBLE_EQ(
+        back->position.y,
+        start.position.y
+    );
+
+    EXPECT_DOUBLE_EQ(
+        back->zoom,
+        start.zoom
+    );
+}

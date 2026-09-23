@@ -77,6 +77,39 @@ private:
     std::vector<CameraView> forwardStack_{};
 };
 
+class CameraHistoryTransaction {
+public:
+    explicit CameraHistoryTransaction(
+        CameraHistory& history
+    ) noexcept;
+
+    void begin(
+        CameraView start
+    );
+
+    [[nodiscard]]
+    bool finish(
+        CameraView end
+    );
+
+    void cancel() noexcept;
+
+    [[nodiscard]]
+    bool active() const noexcept {
+        return startView_.has_value();
+    }
+
+    [[nodiscard]]
+    const std::optional<CameraView>&
+    startView() const noexcept {
+        return startView_;
+    }
+
+private:
+    CameraHistory* history_{};
+    std::optional<CameraView> startView_{};
+};
+
 class ZoneStore {
 public:
     bool set(Zone zone);
