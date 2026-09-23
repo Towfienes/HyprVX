@@ -19,6 +19,7 @@ add_library(hyprvx_core STATIC
     core/src/ViewportFraming.cpp
     core/src/NavigationState.cpp
     core/src/OutputState.cpp
+    core/src/OutputTopology.cpp
     core/src/World.cpp
 )
 
@@ -127,6 +128,7 @@ if(BUILD_TESTING AND HYPRVX_BUILD_TESTS)
         tests/unit/test_viewport_framing.cpp
         tests/unit/test_navigation_state.cpp
         tests/unit/test_output_state.cpp
+        tests/unit/test_output_topology.cpp
         tests/unit/test_world.cpp
         tests/unit/test_world_ownership.cpp
     )
