@@ -12,6 +12,7 @@
 #include "hyprvx/core/CameraMotion.hpp"
 #include "hyprvx/core/Island.hpp"
 #include "hyprvx/core/SpatialNavigation.hpp"
+#include "hyprvx/core/NavigationState.hpp"
 #include "hyprvx/core/ViewportFraming.hpp"
 #include "hyprvx/core/World.hpp"
 
@@ -849,6 +850,45 @@ void finishLeftDrag(
 }
 
 
+
+hyprvx::CameraView currentCameraView(
+    const hyprvx::Camera& camera
+) {
+    return {
+        camera.position(),
+        camera.zoom()
+    };
+}
+
+void flyToCameraView(
+    hyprvx::CameraController& controller,
+    const hyprvx::CameraView& view
+) {
+    controller.flyToView(
+        view.position,
+        view.zoom
+    );
+}
+
+std::optional<hyprvx::ZoneId>
+zoneIdFromKey(
+    SDL_Keycode key
+) {
+    switch (key) {
+        case SDLK_1:
+            return 1;
+
+        case SDLK_2:
+            return 2;
+
+        case SDLK_3:
+            return 3;
+
+        default:
+            return std::nullopt;
+    }
+}
+
 std::optional<hyprvx::WindowId>
 windowAtPoint(
     const hyprvx::World& world,
@@ -1133,6 +1173,36 @@ int main() {
 
     SpatialNavigator spatialNavigator;
 
+    CameraHistory cameraHistory{64};
+    ZoneStore zones;
+
+    zones.set({
+        1,
+        "Home",
+        {
+            {0.0, 0.0},
+            1.0
+        }
+    });
+
+    zones.set({
+        2,
+        "Code",
+        {
+            {2500.0, -1450.0},
+            1.0
+        }
+    });
+
+    zones.set({
+        3,
+        "Notes",
+        {
+            {-2200.0, 750.0},
+            1.0
+        }
+    });
+
     std::optional<WindowId>
         focusedWindow{};
 
@@ -1160,6 +1230,9 @@ int main() {
         << "  Wheel         : zoom around cursor\n"
         << "  F             : fly to CODE island\n"
         << "  Shift+H/J/K/L : spatial focus navigation\n"
+        << "  Alt+Left/Right: camera history back/forward\n"
+        << "  1 / 2 / 3     : go to Zone\n"
+        << "  Ctrl+1/2/3    : save current view to Zone\n"
         << "  R / Home      : smooth Go Home\n"
         << "  Esc           : quit\n\n";
 
@@ -1201,25 +1274,67 @@ int main() {
                             current.type ==
                             SDL_EVENT_KEY_DOWN;
 
+                        const bool modifiedArrow =
+                            (
+                                current.key.mod &
+                                (
+                                    SDL_KMOD_SHIFT |
+                                    SDL_KMOD_ALT |
+                                    SDL_KMOD_CTRL
+                                )
+                            ) != 0;
+
                         switch (current.key.key) {
                             case SDLK_W:
-                            case SDLK_UP:
                                 input.up = pressed;
                                 break;
 
                             case SDLK_S:
-                            case SDLK_DOWN:
                                 input.down = pressed;
                                 break;
 
                             case SDLK_A:
-                            case SDLK_LEFT:
                                 input.left = pressed;
                                 break;
 
                             case SDLK_D:
-                            case SDLK_RIGHT:
                                 input.right = pressed;
+                                break;
+
+                            case SDLK_UP:
+                                if (
+                                    !modifiedArrow ||
+                                    !pressed
+                                ) {
+                                    input.up = pressed;
+                                }
+                                break;
+
+                            case SDLK_DOWN:
+                                if (
+                                    !modifiedArrow ||
+                                    !pressed
+                                ) {
+                                    input.down = pressed;
+                                }
+                                break;
+
+                            case SDLK_LEFT:
+                                if (
+                                    !modifiedArrow ||
+                                    !pressed
+                                ) {
+                                    input.left = pressed;
+                                }
+                                break;
+
+                            case SDLK_RIGHT:
+                                if (
+                                    !modifiedArrow ||
+                                    !pressed
+                                ) {
+                                    input.right = pressed;
+                                }
                                 break;
 
                             default:
@@ -1235,6 +1350,18 @@ int main() {
                                 (
                                     current.key.mod &
                                     SDL_KMOD_SHIFT
+                                ) != 0;
+
+                            const bool altHeld =
+                                (
+                                    current.key.mod &
+                                    SDL_KMOD_ALT
+                                ) != 0;
+
+                            const bool ctrlHeld =
+                                (
+                                    current.key.mod &
+                                    SDL_KMOD_CTRL
                                 ) != 0;
 
                             std::optional<
@@ -1288,6 +1415,12 @@ int main() {
                                         << result->windowId
                                         << "\n";
 
+                                    cameraHistory.record(
+                                        currentCameraView(
+                                            camera
+                                        )
+                                    );
+
                                     focusedWindow =
                                         result->windowId;
 
@@ -1307,6 +1440,137 @@ int main() {
                                         << "\n";
                                 }
                             }
+
+                            if (
+                                altHeld &&
+                                current.key.key ==
+                                    SDLK_LEFT
+                            ) {
+                                const auto target =
+                                    cameraHistory.back(
+                                        currentCameraView(
+                                            camera
+                                        )
+                                    );
+
+                                if (target.has_value()) {
+                                    flyToCameraView(
+                                        controller,
+                                        *target
+                                    );
+
+                                    std::cout
+                                        << "History: back"
+                                        << std::endl;
+
+                                    dirty = true;
+                                } else {
+                                    std::cout
+                                        << "History: no back entry"
+                                        << std::endl;
+                                }
+                            }
+
+                            if (
+                                altHeld &&
+                                current.key.key ==
+                                    SDLK_RIGHT
+                            ) {
+                                const auto target =
+                                    cameraHistory.forward(
+                                        currentCameraView(
+                                            camera
+                                        )
+                                    );
+
+                                if (target.has_value()) {
+                                    flyToCameraView(
+                                        controller,
+                                        *target
+                                    );
+
+                                    std::cout
+                                        << "History: forward"
+                                        << std::endl;
+
+                                    dirty = true;
+                                } else {
+                                    std::cout
+                                        << "History: no forward entry"
+                                        << std::endl;
+                                }
+                            }
+
+                            const auto zoneId =
+                                zoneIdFromKey(
+                                    current.key.key
+                                );
+
+                            if (
+                                zoneId.has_value() &&
+                                ctrlHeld
+                            ) {
+                                const Zone* existing =
+                                    zones.find(
+                                        *zoneId
+                                    );
+
+                                std::string name =
+                                    existing != nullptr
+                                    ? existing->name
+                                    : (
+                                        "Zone " +
+                                        std::to_string(
+                                            *zoneId
+                                        )
+                                    );
+
+                                zones.set({
+                                    *zoneId,
+                                    std::move(name),
+                                    currentCameraView(
+                                        camera
+                                    )
+                                });
+
+                                std::cout
+                                    << "Zone "
+                                    << *zoneId
+                                    << " saved"
+                                    << std::endl;
+                            } else if (
+                                zoneId.has_value() &&
+                                !altHeld &&
+                                !shiftHeld
+                            ) {
+                                const Zone* zone =
+                                    zones.find(
+                                        *zoneId
+                                    );
+
+                                if (zone != nullptr) {
+                                    cameraHistory.record(
+                                        currentCameraView(
+                                            camera
+                                        )
+                                    );
+
+                                    flyToCameraView(
+                                        controller,
+                                        zone->view
+                                    );
+
+                                    std::cout
+                                        << "Zone "
+                                        << zone->id
+                                        << ": "
+                                        << zone->name
+                                        << std::endl;
+
+                                    dirty = true;
+                                }
+                            }
+
                             if (
                                 current.key.key ==
                                 SDLK_ESCAPE
@@ -1320,10 +1584,21 @@ int main() {
                                 current.key.key ==
                                     SDLK_HOME
                             ) {
-                                controller.flyToView(
-                                    {0.0, 0.0},
-                                    1.0
+                                cameraHistory.record(
+                                    currentCameraView(
+                                        camera
+                                    )
                                 );
+
+                                const Zone* home =
+                                    zones.find(1);
+
+                                if (home != nullptr) {
+                                    flyToCameraView(
+                                        controller,
+                                        home->view
+                                    );
+                                }
 
                                 dirty = true;
                             }
@@ -1332,10 +1607,21 @@ int main() {
                                 current.key.key ==
                                 SDLK_F
                             ) {
-                                controller.flyTo({
-                                    2500.0,
-                                    -1450.0
-                                });
+                                cameraHistory.record(
+                                    currentCameraView(
+                                        camera
+                                    )
+                                );
+
+                                const Zone* code =
+                                    zones.find(2);
+
+                                if (code != nullptr) {
+                                    flyToCameraView(
+                                        controller,
+                                        code->view
+                                    );
+                                }
 
                                 dirty = true;
                             }
