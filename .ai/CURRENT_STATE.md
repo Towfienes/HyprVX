@@ -60,6 +60,31 @@ No HyprVX compositor plugin is loaded.
 
 No production Hyprland or Caelestia configuration has been modified.
 
+## Phase 1B.1 validation
+
+Build:
+PASS
+
+Unit tests:
+20 / 20 PASS
+
+Camera motion:
+PASS
+
+Validated:
+- frame-rate-independent manual motion at 60 / 120 / 210 Hz
+- frame-rate-independent inertia
+- frame-rate-independent target flight
+- no target overshoot
+- normalized pan input
+- velocity limiting
+- zoom clamping
+- cursor-anchor-preserving zoom
+- invalid delta rejection
+
+Observed simulator frame-rate delta 60 -> 210 Hz:
+0.000000
+
 ## Next
 
-Phase 1B - camera motion and interactive world simulator.
+Phase 1B.2 - interactive visual world simulator.

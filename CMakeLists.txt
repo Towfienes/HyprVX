@@ -12,6 +12,7 @@ option(HYPRVX_BUILD_TESTS "Build HyprVX tests" ON)
 
 add_library(hyprvx_core STATIC
     core/src/Camera.cpp
+    core/src/CameraMotion.cpp
     core/src/Island.cpp
     core/src/World.cpp
 )
@@ -67,6 +68,7 @@ if(BUILD_TESTING AND HYPRVX_BUILD_TESTS)
 
         tests/unit/test_geometry.cpp
         tests/unit/test_camera.cpp
+        tests/unit/test_camera_motion.cpp
         tests/unit/test_island.cpp
         tests/unit/test_world.cpp
     )

@@ -1,62 +1,58 @@
 # HyprVX Next Task
 
-## Phase 1B
+## Phase 1B.2
 
-Build the first interactive spatial simulator without connecting to Hyprland.
+Build an interactive visual simulator for the spatial world.
 
-## Goals
+The simulator remains completely independent from the production Hyprland session.
 
-Implement:
+## Required behavior
 
-- camera velocity
-- frame-rate-independent camera movement
-- acceleration
-- damping
-- target-based camera flight
-- zoom limits
-- cursor-centered zoom behavior
-- viewport representation
-- world object rendering in simulator
-- free window visualization
-- island visualization
-- input-independent semantic camera actions
+Display:
+- viewport
+- free windows
+- islands
+- island members
+- world coordinates
+- camera position
+- zoom level
 
-## Input simulation
+Interaction:
+- keyboard camera pan
+- mouse middle-button drag pan
+- mouse wheel or modifier zoom
+- smooth camera inertia
+- reset/Home action
+- target camera flight demonstration
 
-The simulator may emulate:
+## Engineering requirements
 
-- keyboard camera movement
-- mouse-style drag pan
-- zoom input
+Rendering and physics must remain separated.
 
-Do not read real Hyprland input yet.
+The visual simulator is only a frontend over libhyprvx-core.
 
-## Performance rule
+Do not place GUI toolkit types into the core library.
 
-Physics updates must use delta time.
-
-Do not implement a permanent busy loop.
-
-Interactive rendering may run only while the simulator is active.
+Do not use a busy loop when the window is idle if the selected toolkit provides event waiting.
 
 ## Pass criteria
 
-- deterministic physics tests
-- equivalent motion at different simulated frame rates
-- no unstable overshoot
-- camera can move in all directions
-- camera can smoothly travel to a target
-- zoom anchor remains stable
-- free windows and islands map correctly through camera transforms
-- headless core remains independent of Hyprland
+- smooth pan
+- predictable inertia
+- cursor-centered zoom
+- world objects retain correct spatial positions
+- islands render from member local coordinates
+- camera coordinate display matches core state
+- no Hyprland integration
+- no modification to production Caelestia
+- no compositor reload
 
 ## Not yet
 
 Do not implement:
-
-- native Hyprland plugin
-- production trackpad capture
-- Caelestia UI
-- Island join/detach UX
-- persistence daemon
-- true compositor rendering zoom
+- Hyprland plugin
+- real global trackpad capture
+- island join/detach
+- Caelestia minimap
+- production persistence
+- compositor true zoom
