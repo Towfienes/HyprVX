@@ -47,6 +47,12 @@ public:
     }
 
     [[nodiscard]]
+    const std::unordered_map<IslandId, Island>&
+    islands() const noexcept {
+        return islands_;
+    }
+
+    [[nodiscard]]
     std::size_t freeWindowCount() const noexcept {
         return freeWindows_.size();
     }

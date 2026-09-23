@@ -15,6 +15,7 @@ add_library(hyprvx_core STATIC
     core/src/CameraMotion.cpp
     core/src/Island.cpp
     core/src/IslandInteraction.cpp
+    core/src/SpatialNavigation.cpp
     core/src/World.cpp
 )
 
@@ -100,6 +101,7 @@ if(BUILD_TESTING AND HYPRVX_BUILD_TESTS)
         tests/unit/test_camera_motion.cpp
         tests/unit/test_island.cpp
         tests/unit/test_island_interaction.cpp
+        tests/unit/test_spatial_navigation.cpp
         tests/unit/test_world.cpp
         tests/unit/test_world_ownership.cpp
     )
