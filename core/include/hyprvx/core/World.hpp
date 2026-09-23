@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <unordered_map>
 
 #include "Island.hpp"
@@ -19,6 +20,11 @@ public:
     const WorldWindow* freeWindow(
         WindowId id
     ) const noexcept;
+
+    [[nodiscard]]
+    WorldWindow* freeWindow(
+        WindowId id
+    ) noexcept;
 
     bool addIsland(Island island);
 
@@ -44,7 +50,31 @@ public:
         return islands_.size();
     }
 
+    [[nodiscard]]
+    bool windowExists(
+        WindowId id
+    ) const noexcept;
+
+    [[nodiscard]]
+    std::optional<IslandId> islandForWindow(
+        WindowId id
+    ) const noexcept;
+
+    bool joinFreeWindowToIsland(
+        WindowId windowId,
+        IslandId islandId
+    );
+
+    bool detachWindowFromIsland(
+        WindowId windowId,
+        IslandId islandId
+    );
+
 private:
+    [[nodiscard]]
+    bool windowExistsInIslands(
+        WindowId id
+    ) const noexcept;
     std::unordered_map<WindowId, WorldWindow> freeWindows_{};
     std::unordered_map<IslandId, Island> islands_{};
 };

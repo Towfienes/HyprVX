@@ -7,6 +7,10 @@ namespace hyprvx {
 bool World::addFreeWindow(
     WorldWindow window
 ) {
+    if (windowExists(window.id)) {
+        return false;
+    }
+
     return
         freeWindows_
         .emplace(
@@ -43,9 +47,42 @@ const WorldWindow* World::freeWindow(
         : &it->second;
 }
 
+WorldWindow* World::freeWindow(
+    WindowId id
+) noexcept {
+
+    const auto it =
+        freeWindows_.find(id);
+
+    return
+        it == freeWindows_.end()
+        ? nullptr
+        : &it->second;
+}
+
 bool World::addIsland(
     Island island
 ) {
+    if (
+        islands_.contains(
+            island.id()
+        )
+    ) {
+        return false;
+    }
+
+    for (
+        const auto& member :
+        island.members()
+    ) {
+        if (
+            freeWindows_.contains(member.id) ||
+            windowExistsInIslands(member.id)
+        ) {
+            return false;
+        }
+    }
+
     return
         islands_
         .emplace(
@@ -86,6 +123,168 @@ Island* World::island(
         it == islands_.end()
         ? nullptr
         : &it->second;
+}
+
+
+bool World::windowExistsInIslands(
+    WindowId id
+) const noexcept {
+
+    for (
+        const auto& [islandId, islandValue] :
+        islands_
+    ) {
+        static_cast<void>(islandId);
+
+        if (
+            islandValue.findMember(id) !=
+            nullptr
+        ) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool World::windowExists(
+    WindowId id
+) const noexcept {
+
+    return
+        freeWindows_.contains(id) ||
+        windowExistsInIslands(id);
+}
+
+std::optional<IslandId>
+World::islandForWindow(
+    WindowId id
+) const noexcept {
+
+    for (
+        const auto& [islandId, islandValue] :
+        islands_
+    ) {
+        if (
+            islandValue.findMember(id) !=
+            nullptr
+        ) {
+            return islandId;
+        }
+    }
+
+    return std::nullopt;
+}
+
+bool World::joinFreeWindowToIsland(
+    WindowId windowId,
+    IslandId islandId
+) {
+    auto windowIt =
+        freeWindows_.find(windowId);
+
+    auto islandIt =
+        islands_.find(islandId);
+
+    if (
+        windowIt == freeWindows_.end() ||
+        islandIt == islands_.end()
+    ) {
+        return false;
+    }
+
+    const WorldWindow window =
+        windowIt->second;
+
+    const Vec2 localPosition =
+        window.geometry.position -
+        islandIt->second.origin();
+
+    IslandMember member{
+        window.id,
+        {
+            localPosition,
+            window.geometry.size
+        }
+    };
+
+    if (
+        !islandIt->second.addMember(
+            member
+        )
+    ) {
+        return false;
+    }
+
+    freeWindows_.erase(windowIt);
+
+    return true;
+}
+
+bool World::detachWindowFromIsland(
+    WindowId windowId,
+    IslandId islandId
+) {
+    auto islandIt =
+        islands_.find(islandId);
+
+    if (
+        islandIt == islands_.end() ||
+        freeWindows_.contains(windowId)
+    ) {
+        return false;
+    }
+
+    const IslandMember* member =
+        islandIt->second.findMember(
+            windowId
+        );
+
+    if (member == nullptr) {
+        return false;
+    }
+
+    const IslandMember memberCopy =
+        *member;
+
+    const auto worldGeometry =
+        islandIt->second
+            .memberWorldGeometry(
+                windowId
+            );
+
+    if (!worldGeometry.has_value()) {
+        return false;
+    }
+
+    if (
+        !islandIt->second.removeMember(
+            windowId
+        )
+    ) {
+        return false;
+    }
+
+    const bool inserted =
+        freeWindows_
+        .emplace(
+            windowId,
+            WorldWindow{
+                windowId,
+                *worldGeometry
+            }
+        )
+        .second;
+
+    if (!inserted) {
+        islandIt->second.addMember(
+            memberCopy
+        );
+
+        return false;
+    }
+
+    return true;
 }
 
 }
