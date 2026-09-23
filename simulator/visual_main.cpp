@@ -33,6 +33,22 @@ struct InputState {
     Clock::time_point lastDragTime{};
 };
 
+struct ManualHistoryInput {
+    bool keyboard{};
+    bool middle{};
+    bool wheelBurst{};
+
+    Clock::time_point lastWheelEvent{};
+
+    [[nodiscard]]
+    bool active() const noexcept {
+        return
+            keyboard ||
+            middle ||
+            wheelBurst;
+    }
+};
+
 enum class DragKind {
     None,
     FreeWindow,
@@ -1174,6 +1190,15 @@ int main() {
     SpatialNavigator spatialNavigator;
 
     CameraHistory cameraHistory{64};
+
+    CameraHistoryTransaction
+        manualHistory{
+            cameraHistory
+        };
+
+    ManualHistoryInput
+        manualHistoryInput;
+
     ZoneStore zones;
 
     zones.set({
@@ -1241,6 +1266,7 @@ int main() {
             keyboardActive(input) ||
             input.middleDragging ||
             windowDrag.active() ||
+            manualHistoryInput.wheelBurst ||
             controller.isFlying() ||
             controller.velocity()
                 .lengthSquared() > 0.01;
@@ -1273,6 +1299,9 @@ int main() {
                         const bool pressed =
                             current.type ==
                             SDL_EVENT_KEY_DOWN;
+
+                        const bool keyboardWasActive =
+                            keyboardActive(input);
 
                         const bool modifiedArrow =
                             (
@@ -1339,6 +1368,50 @@ int main() {
 
                             default:
                                 break;
+                        }
+
+                        const bool keyboardNowActive =
+                            keyboardActive(input);
+
+                        if (
+                            !keyboardWasActive &&
+                            keyboardNowActive
+                        ) {
+                            manualHistoryInput.keyboard =
+                                true;
+
+                            if (!manualHistory.active()) {
+                                manualHistory.begin(
+                                    currentCameraView(
+                                        camera
+                                    )
+                                );
+                            }
+                        }
+
+                        if (
+                            keyboardWasActive &&
+                            !keyboardNowActive
+                        ) {
+                            manualHistoryInput.keyboard =
+                                false;
+
+                            if (
+                                !manualHistoryInput.middle &&
+                                !manualHistoryInput.wheelBurst
+                            ) {
+                                if (
+                                    manualHistory.finish(
+                                        currentCameraView(
+                                            camera
+                                        )
+                                    )
+                                ) {
+                                    std::cout
+                                        << "Manual history: keyboard recorded"
+                                        << std::endl;
+                                }
+                            }
                         }
 
                         if (
@@ -1638,6 +1711,17 @@ int main() {
                         ) {
                             input.middleDragging = true;
 
+                            manualHistoryInput.middle =
+                                true;
+
+                            if (!manualHistory.active()) {
+                                manualHistory.begin(
+                                    currentCameraView(
+                                        camera
+                                    )
+                                );
+                            }
+
                             controller.cancelFlight();
 
                             input.lastDragTime =
@@ -1695,6 +1779,27 @@ int main() {
                             SDL_BUTTON_MIDDLE
                         ) {
                             input.middleDragging = false;
+
+                            manualHistoryInput.middle =
+                                false;
+
+                            if (
+                                !manualHistoryInput.keyboard &&
+                                !manualHistoryInput.wheelBurst
+                            ) {
+                                if (
+                                    manualHistory.finish(
+                                        currentCameraView(
+                                            camera
+                                        )
+                                    )
+                                ) {
+                                    std::cout
+                                        << "Manual history: MMB recorded"
+                                        << std::endl;
+                                }
+                            }
+
                             dirty = true;
                         }
 
@@ -1759,6 +1864,24 @@ int main() {
                         break;
 
                     case SDL_EVENT_MOUSE_WHEEL: {
+                        if (
+                            !manualHistoryInput.wheelBurst
+                        ) {
+                            manualHistoryInput.wheelBurst =
+                                true;
+
+                            if (!manualHistory.active()) {
+                                manualHistory.begin(
+                                    currentCameraView(
+                                        camera
+                                    )
+                                );
+                            }
+                        }
+
+                        manualHistoryInput.lastWheelEvent =
+                            Clock::now();
+
                         float mouseX{};
                         float mouseY{};
 
@@ -1830,6 +1953,42 @@ int main() {
 
         const auto now =
             Clock::now();
+
+        if (
+            manualHistoryInput.wheelBurst
+        ) {
+            const double wheelIdleSeconds =
+                std::chrono::duration<double>(
+                    now -
+                    manualHistoryInput
+                        .lastWheelEvent
+                ).count();
+
+            if (
+                wheelIdleSeconds >=
+                0.18
+            ) {
+                manualHistoryInput.wheelBurst =
+                    false;
+
+                if (
+                    !manualHistoryInput.keyboard &&
+                    !manualHistoryInput.middle
+                ) {
+                    if (
+                        manualHistory.finish(
+                            currentCameraView(
+                                camera
+                            )
+                        )
+                    ) {
+                        std::cout
+                            << "Manual history: wheel recorded"
+                            << std::endl;
+                    }
+                }
+            }
+        }
 
         double deltaSeconds =
             std::chrono::duration<double>(
