@@ -176,6 +176,42 @@ World::islandForWindow(
     return std::nullopt;
 }
 
+
+std::optional<Rect>
+World::windowGeometry(
+    WindowId id
+) const noexcept {
+
+    const auto freeIt =
+        freeWindows_.find(id);
+
+    if (
+        freeIt !=
+        freeWindows_.end()
+    ) {
+        return
+            freeIt->second.geometry;
+    }
+
+    for (
+        const auto& [islandId, islandValue] :
+        islands_
+    ) {
+        static_cast<void>(islandId);
+
+        const auto geometry =
+            islandValue.memberWorldGeometry(
+                id
+            );
+
+        if (geometry.has_value()) {
+            return geometry;
+        }
+    }
+
+    return std::nullopt;
+}
+
 bool World::joinFreeWindowToIsland(
     WindowId windowId,
     IslandId islandId

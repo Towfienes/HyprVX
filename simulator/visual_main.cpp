@@ -11,6 +11,8 @@
 #include "hyprvx/core/Camera.hpp"
 #include "hyprvx/core/CameraMotion.hpp"
 #include "hyprvx/core/Island.hpp"
+#include "hyprvx/core/SpatialNavigation.hpp"
+#include "hyprvx/core/ViewportFraming.hpp"
 #include "hyprvx/core/World.hpp"
 
 namespace {
@@ -372,7 +374,8 @@ void drawWorld(
     SDL_Renderer* renderer,
     const hyprvx::Camera& camera,
     const hyprvx::World& world,
-    const WindowDrag& drag
+    const WindowDrag& drag,
+    const std::optional<hyprvx::WindowId>& focusedWindow
 ) {
     const hyprvx::Island* island =
         world.island(codeIslandId);
@@ -463,9 +466,14 @@ void drawWorld(
                 renderer,
                 *geometry,
                 camera,
-                drag.active() &&
-                    drag.windowId ==
-                    member.id,
+                (
+                    focusedWindow.has_value() &&
+                    *focusedWindow == member.id
+                ) ||
+                (
+                    drag.active() &&
+                    drag.windowId == member.id
+                ),
                 true
             );
         }
@@ -479,8 +487,14 @@ void drawWorld(
             renderer,
             window.geometry,
             camera,
-            drag.active() &&
-                drag.windowId == id,
+            (
+                focusedWindow.has_value() &&
+                *focusedWindow == id
+            ) ||
+            (
+                drag.active() &&
+                drag.windowId == id
+            ),
             false
         );
     }
@@ -834,11 +848,73 @@ void finishLeftDrag(
     drag.clear();
 }
 
+
+std::optional<hyprvx::WindowId>
+windowAtPoint(
+    const hyprvx::World& world,
+    hyprvx::Vec2 worldPoint
+) {
+    if (
+        const auto member =
+            hitIslandMember(
+                world,
+                worldPoint
+            )
+    ) {
+        return member->second;
+    }
+
+    return hitFreeWindow(
+        world,
+        worldPoint
+    );
+}
+
+void flyToWindow(
+    SDL_Window* window,
+    const hyprvx::World& world,
+    hyprvx::WindowId windowId,
+    hyprvx::Camera& camera,
+    hyprvx::CameraController& controller
+) {
+    const auto geometry =
+        world.windowGeometry(windowId);
+
+    if (!geometry.has_value()) {
+        return;
+    }
+
+    int width{};
+    int height{};
+
+    SDL_GetWindowSizeInPixels(
+        window,
+        &width,
+        &height
+    );
+
+    const hyprvx::FramedView view =
+        hyprvx::frameRectInViewport(
+            *geometry,
+            {
+                static_cast<double>(width),
+                static_cast<double>(height)
+            },
+            camera.zoom()
+        );
+
+    controller.flyToView(
+        view.cameraPosition,
+        view.zoom
+    );
+}
+
 void updateWindowTitle(
     SDL_Window* window,
     const hyprvx::Camera& camera,
     const hyprvx::CameraController& controller,
-    const WindowDrag& drag
+    const WindowDrag& drag,
+    const std::optional<hyprvx::WindowId>& focusedWindow
 ) {
     std::ostringstream stream;
 
@@ -855,6 +931,12 @@ void updateWindowTitle(
 
     if (controller.isFlying()) {
         stream << " | FLYING";
+    }
+
+    if (focusedWindow.has_value()) {
+        stream
+            << " | FOCUS "
+            << *focusedWindow;
     }
 
     if (drag.candidate) {
@@ -886,7 +968,8 @@ void render(
     const hyprvx::Camera& camera,
     const hyprvx::CameraController& controller,
     const hyprvx::World& world,
-    const WindowDrag& drag
+    const WindowDrag& drag,
+    const std::optional<hyprvx::WindowId>& focusedWindow
 ) {
     int width{};
     int height{};
@@ -918,7 +1001,8 @@ void render(
         renderer,
         camera,
         world,
-        drag
+        drag,
+        focusedWindow
     );
 
     SDL_RenderPresent(renderer);
@@ -927,7 +1011,8 @@ void render(
         window,
         camera,
         controller,
-        drag
+        drag,
+        focusedWindow
     );
 }
 
@@ -1046,6 +1131,11 @@ int main() {
     InputState input;
     WindowDrag windowDrag;
 
+    SpatialNavigator spatialNavigator;
+
+    std::optional<WindowId>
+        focusedWindow{};
+
     bool running = true;
     bool dirty = true;
 
@@ -1058,7 +1148,8 @@ int main() {
         camera,
         controller,
         world,
-        windowDrag
+        windowDrag,
+        focusedWindow
     );
 
     std::cout
@@ -1068,6 +1159,7 @@ int main() {
         << "  WASD / arrows : pan camera\n"
         << "  Wheel         : zoom around cursor\n"
         << "  F             : fly to CODE island\n"
+        << "  Shift+H/J/K/L : spatial focus navigation\n"
         << "  R / Home      : smooth Go Home\n"
         << "  Esc           : quit\n\n";
 
@@ -1139,6 +1231,82 @@ int main() {
                                 SDL_EVENT_KEY_DOWN &&
                             !current.key.repeat
                         ) {
+                            const bool shiftHeld =
+                                (
+                                    current.key.mod &
+                                    SDL_KMOD_SHIFT
+                                ) != 0;
+
+                            std::optional<
+                                SpatialDirection
+                            > spatialDirection{};
+
+                            if (shiftHeld) {
+                                switch (current.key.key) {
+                                    case SDLK_H:
+                                        spatialDirection =
+                                            SpatialDirection::Left;
+                                        break;
+
+                                    case SDLK_L:
+                                        spatialDirection =
+                                            SpatialDirection::Right;
+                                        break;
+
+                                    case SDLK_K:
+                                        spatialDirection =
+                                            SpatialDirection::Up;
+                                        break;
+
+                                    case SDLK_J:
+                                        spatialDirection =
+                                            SpatialDirection::Down;
+                                        break;
+
+                                    default:
+                                        break;
+                                }
+                            }
+
+                            if (
+                                spatialDirection.has_value() &&
+                                focusedWindow.has_value()
+                            ) {
+                                const auto result =
+                                    spatialNavigator
+                                        .findNeighbor(
+                                            world,
+                                            *focusedWindow,
+                                            *spatialDirection
+                                        );
+
+                                if (result.has_value()) {
+                                    std::cout
+                                        << "Spatial focus: "
+                                        << *focusedWindow
+                                        << " -> "
+                                        << result->windowId
+                                        << "\n";
+
+                                    focusedWindow =
+                                        result->windowId;
+
+                                    flyToWindow(
+                                        window,
+                                        world,
+                                        *focusedWindow,
+                                        camera,
+                                        controller
+                                    );
+
+                                    dirty = true;
+                                } else {
+                                    std::cout
+                                        << "Spatial focus: no candidate from "
+                                        << *focusedWindow
+                                        << "\n";
+                                }
+                            }
                             if (
                                 current.key.key ==
                                 SDLK_ESCAPE
@@ -1197,6 +1365,31 @@ int main() {
                             SDL_BUTTON_LEFT
                         ) {
                             controller.cancelFlight();
+
+                            const Vec2 clickWorld =
+                                camera.screenToWorld({
+                                    static_cast<double>(
+                                        current.button.x
+                                    ),
+                                    static_cast<double>(
+                                        current.button.y
+                                    )
+                                });
+
+                            if (
+                                const auto clicked =
+                                    windowAtPoint(
+                                        world,
+                                        clickWorld
+                                    )
+                            ) {
+                                focusedWindow = *clicked;
+
+                                std::cout
+                                    << "Focused window: "
+                                    << *focusedWindow
+                                    << std::endl;
+                            }
 
                             beginLeftDrag(
                                 world,
@@ -1394,7 +1587,8 @@ int main() {
                 camera,
                 controller,
                 world,
-                windowDrag
+                windowDrag,
+                focusedWindow
             );
 
             dirty = false;

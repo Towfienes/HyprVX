@@ -72,6 +72,11 @@ public:
         WindowId id
     ) const noexcept;
 
+    [[nodiscard]]
+    std::optional<Rect> windowGeometry(
+        WindowId id
+    ) const noexcept;
+
     bool joinFreeWindowToIsland(
         WindowId windowId,
         IslandId islandId
