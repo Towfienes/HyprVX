@@ -111,6 +111,25 @@ set_target_properties(
         OUTPUT_NAME hyprvx-multi-output-sim
 )
 
+
+add_executable(
+    hyprvx_topology_simulator
+    simulator/topology_main.cpp
+)
+
+target_link_libraries(
+    hyprvx_topology_simulator
+    PRIVATE
+        hyprvx_core
+        PkgConfig::SDL3
+)
+
+set_target_properties(
+    hyprvx_topology_simulator
+    PROPERTIES
+        OUTPUT_NAME hyprvx-topology-sim
+)
+
 include(CTest)
 
 if(BUILD_TESTING AND HYPRVX_BUILD_TESTS)
