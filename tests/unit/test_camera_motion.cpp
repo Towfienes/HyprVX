@@ -368,3 +368,150 @@ TEST(CameraMotionTest, InvalidDeltaDoesNothing) {
         60.0
     );
 }
+
+
+TEST(CameraMotionTest, SmoothViewFlightMovesPositionAndZoom) {
+    Camera camera{
+        {1000.0, 500.0},
+        2.0
+    };
+
+    CameraController controller{
+        camera
+    };
+
+    controller.flyToView(
+        {0.0, 0.0},
+        1.0
+    );
+
+    controller.update(
+        1.0 / 120.0
+    );
+
+    EXPECT_GT(
+        camera.position().x,
+        0.0
+    );
+
+    EXPECT_LT(
+        camera.position().x,
+        1000.0
+    );
+
+    EXPECT_GT(
+        camera.zoom(),
+        1.0
+    );
+
+    EXPECT_LT(
+        camera.zoom(),
+        2.0
+    );
+
+    for (int i = 0; i < 600; ++i) {
+        controller.update(
+            1.0 / 120.0
+        );
+    }
+
+    EXPECT_NEAR(
+        camera.position().x,
+        0.0,
+        1e-6
+    );
+
+    EXPECT_NEAR(
+        camera.position().y,
+        0.0,
+        1e-6
+    );
+
+    EXPECT_NEAR(
+        camera.zoom(),
+        1.0,
+        1e-6
+    );
+
+    EXPECT_FALSE(
+        controller.isFlying()
+    );
+}
+
+TEST(CameraMotionTest, ViewFlightIsFrameRateIndependent) {
+    auto run =
+        [](int refreshRate) {
+            Camera camera{
+                {5000.0, -3000.0},
+                2.2
+            };
+
+            CameraController controller{
+                camera
+            };
+
+            controller.flyToView(
+                {-1200.0, 900.0},
+                0.75
+            );
+
+            const double dt =
+                1.0 /
+                static_cast<double>(
+                    refreshRate
+                );
+
+            for (
+                int i = 0;
+                i < refreshRate;
+                ++i
+            ) {
+                controller.update(dt);
+            }
+
+            return std::pair{
+                camera.position(),
+                camera.zoom()
+            };
+        };
+
+    const auto at60 = run(60);
+    const auto at120 = run(120);
+    const auto at210 = run(210);
+
+    EXPECT_NEAR(
+        at60.first.x,
+        at120.first.x,
+        1e-8
+    );
+
+    EXPECT_NEAR(
+        at60.first.y,
+        at120.first.y,
+        1e-8
+    );
+
+    EXPECT_NEAR(
+        at60.second,
+        at120.second,
+        1e-10
+    );
+
+    EXPECT_NEAR(
+        at60.first.x,
+        at210.first.x,
+        1e-8
+    );
+
+    EXPECT_NEAR(
+        at60.first.y,
+        at210.first.y,
+        1e-8
+    );
+
+    EXPECT_NEAR(
+        at60.second,
+        at210.second,
+        1e-10
+    );
+}

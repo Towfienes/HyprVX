@@ -58,6 +58,34 @@ set_target_properties(
         OUTPUT_NAME hyprvx-sim
 )
 
+
+find_package(PkgConfig REQUIRED)
+
+pkg_check_modules(
+    SDL3
+    REQUIRED
+    IMPORTED_TARGET
+    sdl3
+)
+
+add_executable(
+    hyprvx_visual_simulator
+    simulator/visual_main.cpp
+)
+
+target_link_libraries(
+    hyprvx_visual_simulator
+    PRIVATE
+        hyprvx_core
+        PkgConfig::SDL3
+)
+
+set_target_properties(
+    hyprvx_visual_simulator
+    PROPERTIES
+        OUTPUT_NAME hyprvx-visual-sim
+)
+
 include(CTest)
 
 if(BUILD_TESTING AND HYPRVX_BUILD_TESTS)

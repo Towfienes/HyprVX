@@ -164,18 +164,45 @@ void CameraController::setVelocity(
 void CameraController::stop() noexcept {
     velocity_ = {};
     panInput_ = {};
-    flightTarget_.reset();
+    cancelFlight();
 }
 
 void CameraController::flyTo(
     Vec2 target
 ) {
     flightTarget_ = target;
+    flightZoomTarget_.reset();
+    panInput_ = {};
+}
+
+void CameraController::flyToView(
+    Vec2 targetPosition,
+    double targetZoom
+) {
+    if (
+        !std::isfinite(targetZoom) ||
+        !(targetZoom > 0.0)
+    ) {
+        throw std::invalid_argument(
+            "flight zoom must be finite and positive"
+        );
+    }
+
+    flightTarget_ = targetPosition;
+
+    flightZoomTarget_ =
+        std::clamp(
+            targetZoom,
+            config_.minZoom,
+            config_.maxZoom
+        );
+
     panInput_ = {};
 }
 
 void CameraController::cancelFlight() noexcept {
     flightTarget_.reset();
+    flightZoomTarget_.reset();
 }
 
 void CameraController::setZoomLimits(
@@ -219,6 +246,8 @@ void CameraController::zoomByFactorAroundScreenPoint(
         );
     }
 
+    cancelFlight();
+
     const double targetZoom =
         std::clamp(
             camera_.zoom() * factor,
@@ -242,7 +271,7 @@ void CameraController::update(
         return;
     }
 
-    if (flightTarget_.has_value()) {
+    if (isFlying()) {
         updateFlight(deltaSeconds);
         return;
     }
@@ -320,52 +349,79 @@ void CameraController::updateManualMotion(
 void CameraController::updateFlight(
     double deltaSeconds
 ) {
-    const Vec2 target =
-        *flightTarget_;
-
-    const Vec2 before =
-        camera_.position();
-
-    const Vec2 difference =
-        before - target;
-
-    if (
-        nearlyZero(
-            difference,
-            config_.flightEpsilon
-        )
-    ) {
-        camera_.setPosition(target);
-        velocity_ = {};
-        flightTarget_.reset();
-        return;
-    }
-
     const double decay =
         std::exp(
             -config_.flightResponse *
             deltaSeconds
         );
 
-    const Vec2 after =
-        target +
-        difference * decay;
+    if (flightTarget_.has_value()) {
+        const Vec2 target =
+            *flightTarget_;
 
-    camera_.setPosition(after);
+        const Vec2 before =
+            camera_.position();
 
-    velocity_ =
-        (after - before) /
-        deltaSeconds;
+        const Vec2 difference =
+            before - target;
 
-    if (
-        nearlyZero(
-            after - target,
-            config_.flightEpsilon
-        )
-    ) {
-        camera_.setPosition(target);
+        if (
+            nearlyZero(
+                difference,
+                config_.flightEpsilon
+            )
+        ) {
+            camera_.setPosition(target);
+            velocity_ = {};
+            flightTarget_.reset();
+        } else {
+            const Vec2 after =
+                target +
+                difference * decay;
+
+            camera_.setPosition(after);
+
+            velocity_ =
+                (after - before) /
+                deltaSeconds;
+
+            if (
+                nearlyZero(
+                    after - target,
+                    config_.flightEpsilon
+                )
+            ) {
+                camera_.setPosition(target);
+                velocity_ = {};
+                flightTarget_.reset();
+            }
+        }
+    } else {
         velocity_ = {};
-        flightTarget_.reset();
+    }
+
+    if (flightZoomTarget_.has_value()) {
+        const double targetZoom =
+            *flightZoomTarget_;
+
+        const double beforeZoom =
+            camera_.zoom();
+
+        const double afterZoom =
+            targetZoom +
+            (beforeZoom - targetZoom) *
+            decay;
+
+        camera_.setZoom(afterZoom);
+
+        if (
+            std::abs(
+                afterZoom - targetZoom
+            ) <= 1e-5
+        ) {
+            camera_.setZoom(targetZoom);
+            flightZoomTarget_.reset();
+        }
     }
 }
 

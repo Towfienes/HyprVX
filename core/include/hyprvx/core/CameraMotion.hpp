@@ -45,16 +45,28 @@ public:
 
     void flyTo(Vec2 target);
 
+    void flyToView(
+        Vec2 targetPosition,
+        double targetZoom
+    );
+
     void cancelFlight() noexcept;
 
     [[nodiscard]]
     bool isFlying() const noexcept {
-        return flightTarget_.has_value();
+        return
+            flightTarget_.has_value() ||
+            flightZoomTarget_.has_value();
     }
 
     [[nodiscard]]
     const std::optional<Vec2>& flightTarget() const noexcept {
         return flightTarget_;
+    }
+
+    [[nodiscard]]
+    const std::optional<double>& flightZoomTarget() const noexcept {
+        return flightZoomTarget_;
     }
 
     void setZoomLimits(
@@ -86,6 +98,7 @@ private:
     Vec2 velocity_{};
 
     std::optional<Vec2> flightTarget_{};
+    std::optional<double> flightZoomTarget_{};
 };
 
 }
