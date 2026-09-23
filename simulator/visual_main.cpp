@@ -5,6 +5,7 @@
 #include <cmath>
 #include <iomanip>
 #include <iostream>
+#include <optional>
 #include <sstream>
 
 #include "hyprvx/core/Camera.hpp"
@@ -16,6 +17,8 @@ namespace {
 
 using Clock = std::chrono::steady_clock;
 
+constexpr hyprvx::IslandId codeIslandId = 10;
+
 struct InputState {
     bool up{};
     bool down{};
@@ -25,6 +28,41 @@ struct InputState {
     bool middleDragging{};
 
     Clock::time_point lastDragTime{};
+};
+
+enum class DragKind {
+    None,
+    FreeWindow,
+    IslandMember
+};
+
+struct WindowDrag {
+    DragKind kind{DragKind::None};
+
+    hyprvx::WindowId windowId{};
+    hyprvx::IslandId islandId{};
+
+    bool candidate{};
+    bool ready{};
+
+    Clock::time_point candidateSince{};
+
+    std::optional<hyprvx::Rect>
+        detachReferenceBounds{};
+
+    [[nodiscard]]
+    bool active() const noexcept {
+        return kind != DragKind::None;
+    }
+
+    void clear() noexcept {
+        kind = DragKind::None;
+        windowId = 0;
+        islandId = 0;
+        candidate = false;
+        ready = false;
+        detachReferenceBounds.reset();
+    }
 };
 
 hyprvx::Vec2 keyboardDirection(
@@ -59,6 +97,19 @@ bool keyboardActive(
         input.down ||
         input.left ||
         input.right;
+}
+
+hyprvx::Rect expanded(
+    hyprvx::Rect rect,
+    double amount
+) {
+    rect.position.x -= amount;
+    rect.position.y -= amount;
+
+    rect.size.x += amount * 2.0;
+    rect.size.y += amount * 2.0;
+
+    return rect;
 }
 
 SDL_FRect toScreenRect(
@@ -142,35 +193,25 @@ void drawGrid(
             static_cast<double>(height)
         });
 
-    const double left =
-        visible.left();
-
-    const double right =
-        visible.right();
-
-    const double top =
-        visible.top();
-
-    const double bottom =
-        visible.bottom();
-
     const double startX =
-        std::floor(left / gridSize) *
-        gridSize;
+        std::floor(
+            visible.left() / gridSize
+        ) * gridSize;
 
     const double startY =
-        std::floor(top / gridSize) *
-        gridSize;
+        std::floor(
+            visible.top() / gridSize
+        ) * gridSize;
 
     for (
         double x = startX;
-        x <= right;
+        x <= visible.right();
         x += gridSize
     ) {
         const auto screen =
             camera.worldToScreen({
                 x,
-                top
+                visible.top()
             });
 
         SDL_FRect line{
@@ -192,12 +233,12 @@ void drawGrid(
 
     for (
         double y = startY;
-        y <= bottom;
+        y <= visible.bottom();
         y += gridSize
     ) {
         const auto screen =
             camera.worldToScreen({
-                left,
+                visible.left(),
                 y
             });
 
@@ -224,23 +265,14 @@ void drawGrid(
             0.0
         });
 
-    SDL_FRect vertical{
-        static_cast<float>(origin.x),
-        0.0F,
-        2.0F,
-        static_cast<float>(height)
-    };
-
-    SDL_FRect horizontal{
-        0.0F,
-        static_cast<float>(origin.y),
-        static_cast<float>(width),
-        2.0F
-    };
-
     fillRect(
         renderer,
-        vertical,
+        {
+            static_cast<float>(origin.x),
+            0.0F,
+            2.0F,
+            static_cast<float>(height)
+        },
         90,
         100,
         120,
@@ -249,7 +281,12 @@ void drawGrid(
 
     fillRect(
         renderer,
-        horizontal,
+        {
+            0.0F,
+            static_cast<float>(origin.y),
+            static_cast<float>(width),
+            2.0F
+        },
         90,
         100,
         120,
@@ -257,21 +294,38 @@ void drawGrid(
     );
 }
 
-void drawWorld(
+void drawWindowBody(
     SDL_Renderer* renderer,
+    const hyprvx::Rect& worldGeometry,
     const hyprvx::Camera& camera,
-    const hyprvx::World& world
+    bool selected,
+    bool islandMember
 ) {
-    if (
-        const auto* browser =
-            world.freeWindow(1)
-    ) {
-        const SDL_FRect rect =
-            toScreenRect(
-                browser->geometry,
-                camera
-            );
+    SDL_FRect rect =
+        toScreenRect(
+            worldGeometry,
+            camera
+        );
 
+    if (islandMember) {
+        fillRect(
+            renderer,
+            rect,
+            40,
+            84,
+            70,
+            255
+        );
+
+        outlineRect(
+            renderer,
+            rect,
+            selected ? 245 : 110,
+            selected ? 220 : 225,
+            selected ? 110 : 175,
+            255
+        );
+    } else {
         fillRect(
             renderer,
             rect,
@@ -284,166 +338,540 @@ void drawWorld(
         outlineRect(
             renderer,
             rect,
-            135,
-            175,
-            235,
+            selected ? 245 : 135,
+            selected ? 220 : 175,
+            selected ? 110 : 235,
             255
         );
+    }
+
+    SDL_FRect title{
+        rect.x,
+        rect.y,
+        rect.w,
+        std::max(
+            8.0F,
+            static_cast<float>(
+                38.0 *
+                camera.zoom()
+            )
+        )
+    };
+
+    fillRect(
+        renderer,
+        title,
+        islandMember ? 58 : 70,
+        islandMember ? 115 : 95,
+        islandMember ? 92 : 140,
+        255
+    );
+}
+
+void drawWorld(
+    SDL_Renderer* renderer,
+    const hyprvx::Camera& camera,
+    const hyprvx::World& world,
+    const WindowDrag& drag
+) {
+    const hyprvx::Island* island =
+        world.island(codeIslandId);
+
+    if (island != nullptr) {
+        const auto bounds =
+            island->worldBounds();
+
+        if (bounds.has_value()) {
+            hyprvx::Rect padded =
+                expanded(
+                    *bounds,
+                    80.0
+                );
+
+            padded.position.y -= 40.0;
+            padded.size.y += 40.0;
+
+            const SDL_FRect islandRect =
+                toScreenRect(
+                    padded,
+                    camera
+                );
+
+            fillRect(
+                renderer,
+                islandRect,
+                31,
+                47,
+                43,
+                255
+            );
+
+            Uint8 r = 85;
+            Uint8 g = 195;
+            Uint8 b = 150;
+
+            if (
+                drag.kind ==
+                DragKind::FreeWindow &&
+                drag.candidate
+            ) {
+                if (drag.ready) {
+                    r = 80;
+                    g = 240;
+                    b = 140;
+                } else {
+                    r = 245;
+                    g = 205;
+                    b = 85;
+                }
+            }
+
+            if (
+                drag.kind ==
+                DragKind::IslandMember &&
+                drag.candidate
+            ) {
+                r = 245;
+                g = 135;
+                b = 80;
+            }
+
+            outlineRect(
+                renderer,
+                islandRect,
+                r,
+                g,
+                b,
+                255
+            );
+        }
+
+        for (
+            const auto& member :
+            island->members()
+        ) {
+            const auto geometry =
+                island->memberWorldGeometry(
+                    member.id
+                );
+
+            if (!geometry.has_value()) {
+                continue;
+            }
+
+            drawWindowBody(
+                renderer,
+                *geometry,
+                camera,
+                drag.active() &&
+                    drag.windowId ==
+                    member.id,
+                true
+            );
+        }
+    }
+
+    for (
+        const auto& [id, window] :
+        world.freeWindows()
+    ) {
+        drawWindowBody(
+            renderer,
+            window.geometry,
+            camera,
+            drag.active() &&
+                drag.windowId == id,
+            false
+        );
+    }
+}
+
+std::optional<
+    std::pair<
+        hyprvx::IslandId,
+        hyprvx::WindowId
+    >
+>
+hitIslandMember(
+    const hyprvx::World& world,
+    hyprvx::Vec2 worldPoint
+) {
+    const hyprvx::Island* island =
+        world.island(codeIslandId);
+
+    if (island == nullptr) {
+        return std::nullopt;
+    }
+
+    for (
+        auto it =
+            island->members().rbegin();
+
+        it !=
+            island->members().rend();
+
+        ++it
+    ) {
+        const auto geometry =
+            island->memberWorldGeometry(
+                it->id
+            );
+
+        if (
+            geometry.has_value() &&
+            geometry->contains(
+                worldPoint
+            )
+        ) {
+            return std::pair{
+                island->id(),
+                it->id
+            };
+        }
+    }
+
+    return std::nullopt;
+}
+
+std::optional<hyprvx::WindowId>
+hitFreeWindow(
+    const hyprvx::World& world,
+    hyprvx::Vec2 worldPoint
+) {
+    for (
+        const auto& [id, window] :
+        world.freeWindows()
+    ) {
+        if (
+            window.geometry.contains(
+                worldPoint
+            )
+        ) {
+            return id;
+        }
+    }
+
+    return std::nullopt;
+}
+
+void beginLeftDrag(
+    hyprvx::World& world,
+    const hyprvx::Camera& camera,
+    float mouseX,
+    float mouseY,
+    WindowDrag& drag
+) {
+    const hyprvx::Vec2 worldPoint =
+        camera.screenToWorld({
+            static_cast<double>(mouseX),
+            static_cast<double>(mouseY)
+        });
+
+    if (
+        const auto member =
+            hitIslandMember(
+                world,
+                worldPoint
+            )
+    ) {
+        drag.clear();
+
+        drag.kind =
+            DragKind::IslandMember;
+
+        drag.islandId =
+            member->first;
+
+        drag.windowId =
+            member->second;
+
+        if (
+            const auto* island =
+                world.island(
+                    drag.islandId
+                )
+        ) {
+            drag.detachReferenceBounds =
+                island->worldBounds();
+        }
+
+        return;
     }
 
     if (
-        const auto* notes =
-            world.freeWindow(4)
+        const auto free =
+            hitFreeWindow(
+                world,
+                worldPoint
+            )
     ) {
-        const SDL_FRect rect =
-            toScreenRect(
-                notes->geometry,
-                camera
-            );
+        drag.clear();
 
-        fillRect(
-            renderer,
-            rect,
-            75,
-            65,
-            95,
-            255
-        );
+        drag.kind =
+            DragKind::FreeWindow;
 
-        outlineRect(
-            renderer,
-            rect,
-            175,
-            145,
-            225,
-            255
-        );
+        drag.windowId =
+            *free;
+    }
+}
+
+void updateFreeJoinCandidate(
+    const hyprvx::World& world,
+    WindowDrag& drag
+) {
+    if (
+        drag.kind !=
+        DragKind::FreeWindow
+    ) {
+        return;
     }
 
-    const hyprvx::Island* island =
-        world.island(10);
+    const auto* window =
+        world.freeWindow(
+            drag.windowId
+        );
 
-    if (island == nullptr) {
+    const auto* island =
+        world.island(
+            codeIslandId
+        );
+
+    if (
+        window == nullptr ||
+        island == nullptr
+    ) {
+        drag.candidate = false;
+        drag.ready = false;
         return;
     }
 
     const auto bounds =
         island->worldBounds();
 
-    if (bounds.has_value()) {
-        hyprvx::Rect padded =
-            *bounds;
+    if (!bounds.has_value()) {
+        drag.candidate = false;
+        drag.ready = false;
+        return;
+    }
 
-        padded.position.x -= 60.0;
-        padded.position.y -= 100.0;
-
-        padded.size.x += 120.0;
-        padded.size.y += 160.0;
-
-        const SDL_FRect islandRect =
-            toScreenRect(
-                padded,
-                camera
-            );
-
-        fillRect(
-            renderer,
-            islandRect,
-            31,
-            47,
-            43,
-            255
+    const hyprvx::Rect magnetic =
+        expanded(
+            *bounds,
+            220.0
         );
 
-        outlineRect(
-            renderer,
-            islandRect,
-            85,
-            195,
-            150,
-            255
+    const bool inside =
+        magnetic.contains(
+            window->geometry.center()
         );
+
+    if (!inside) {
+        drag.candidate = false;
+        drag.ready = false;
+        return;
+    }
+
+    if (!drag.candidate) {
+        drag.candidate = true;
+        drag.ready = false;
+
+        drag.candidateSince =
+            Clock::now();
+
+        return;
+    }
+
+    const double dwell =
+        std::chrono::duration<double>(
+            Clock::now() -
+            drag.candidateSince
+        ).count();
+
+    if (dwell >= 0.25) {
+        drag.ready = true;
+    }
+}
+
+void updateDetachCandidate(
+    const hyprvx::World& world,
+    WindowDrag& drag
+) {
+    if (
+        drag.kind !=
+            DragKind::IslandMember ||
+        !drag.detachReferenceBounds
+            .has_value()
+    ) {
+        return;
+    }
+
+    const auto* island =
+        world.island(
+            drag.islandId
+        );
+
+    if (island == nullptr) {
+        return;
+    }
+
+    const auto geometry =
+        island->memberWorldGeometry(
+            drag.windowId
+        );
+
+    if (!geometry.has_value()) {
+        return;
+    }
+
+    const hyprvx::Rect keepZone =
+        expanded(
+            *drag.detachReferenceBounds,
+            160.0
+        );
+
+    drag.candidate =
+        !keepZone.contains(
+            geometry->center()
+        );
+
+    drag.ready =
+        drag.candidate;
+}
+
+void moveDraggedWindow(
+    hyprvx::World& world,
+    const hyprvx::Camera& camera,
+    float xrel,
+    float yrel,
+    WindowDrag& drag
+) {
+    const hyprvx::Vec2 delta{
+        static_cast<double>(xrel) /
+            camera.zoom(),
+
+        static_cast<double>(yrel) /
+            camera.zoom()
+    };
+
+    if (
+        drag.kind ==
+        DragKind::FreeWindow
+    ) {
+        if (
+            auto* window =
+                world.freeWindow(
+                    drag.windowId
+                )
+        ) {
+            window->geometry.position +=
+                delta;
+        }
+
+        updateFreeJoinCandidate(
+            world,
+            drag
+        );
+
+        return;
     }
 
     if (
-        const auto member =
-            island->memberWorldGeometry(2)
+        drag.kind ==
+        DragKind::IslandMember
     ) {
-        const SDL_FRect rect =
-            toScreenRect(
-                *member,
-                camera
+        auto* island =
+            world.island(
+                drag.islandId
             );
 
-        fillRect(
-            renderer,
-            rect,
-            38,
-            82,
-            69,
-            255
-        );
+        if (island == nullptr) {
+            return;
+        }
 
-        outlineRect(
-            renderer,
-            rect,
-            110,
-            225,
-            175,
-            255
+        auto* member =
+            island->findMember(
+                drag.windowId
+            );
+
+        if (member == nullptr) {
+            return;
+        }
+
+        member->localGeometry.position +=
+            delta;
+
+        updateDetachCandidate(
+            world,
+            drag
         );
     }
+}
 
+void finishLeftDrag(
+    hyprvx::World& world,
+    WindowDrag& drag
+) {
     if (
-        const auto member =
-            island->memberWorldGeometry(3)
+        drag.kind ==
+            DragKind::FreeWindow &&
+        drag.ready
     ) {
-        const SDL_FRect rect =
-            toScreenRect(
-                *member,
-                camera
-            );
-
-        fillRect(
-            renderer,
-            rect,
-            42,
-            68,
-            59,
-            255
+        world.joinFreeWindowToIsland(
+            drag.windowId,
+            codeIslandId
         );
-
-        outlineRect(
-            renderer,
-            rect,
-            95,
-            205,
-            160,
-            255
+    } else if (
+        drag.kind ==
+            DragKind::IslandMember &&
+        drag.ready
+    ) {
+        world.detachWindowFromIsland(
+            drag.windowId,
+            drag.islandId
         );
     }
+
+    drag.clear();
 }
 
 void updateWindowTitle(
     SDL_Window* window,
     const hyprvx::Camera& camera,
-    const hyprvx::CameraController& controller
+    const hyprvx::CameraController& controller,
+    const WindowDrag& drag
 ) {
     std::ostringstream stream;
 
     stream
         << std::fixed
         << std::setprecision(1)
-        << "HyprVX Simulator  |  Camera "
+        << "HyprVX Simulator | Camera "
         << camera.position().x
         << ", "
         << camera.position().y
-        << "  |  Zoom "
+        << " | Zoom "
         << camera.zoom() * 100.0
         << "%";
 
     if (controller.isFlying()) {
-        stream << "  |  FLYING";
+        stream << " | FLYING";
+    }
+
+    if (drag.candidate) {
+        if (
+            drag.kind ==
+            DragKind::FreeWindow
+        ) {
+            stream
+                << (
+                    drag.ready
+                    ? " | RELEASE TO JOIN"
+                    : " | JOIN CANDIDATE"
+                );
+        } else {
+            stream
+                << " | RELEASE TO DETACH";
+        }
     }
 
     SDL_SetWindowTitle(
@@ -457,7 +885,8 @@ void render(
     SDL_Window* window,
     const hyprvx::Camera& camera,
     const hyprvx::CameraController& controller,
-    const hyprvx::World& world
+    const hyprvx::World& world,
+    const WindowDrag& drag
 ) {
     int width{};
     int height{};
@@ -488,7 +917,8 @@ void render(
     drawWorld(
         renderer,
         camera,
-        world
+        world,
+        drag
     );
 
     SDL_RenderPresent(renderer);
@@ -496,7 +926,8 @@ void render(
     updateWindowTitle(
         window,
         camera,
-        controller
+        controller,
+        drag
     );
 }
 
@@ -588,7 +1019,7 @@ int main() {
     });
 
     Island code{
-        10,
+        codeIslandId,
         {2600.0, -1300.0}
     };
 
@@ -613,6 +1044,7 @@ int main() {
     );
 
     InputState input;
+    WindowDrag windowDrag;
 
     bool running = true;
     bool dirty = true;
@@ -625,13 +1057,15 @@ int main() {
         window,
         camera,
         controller,
-        world
+        world,
+        windowDrag
     );
 
     std::cout
-        << "\nHyprVX visual simulator controls:\n"
+        << "\nHyprVX island simulator controls:\n"
+        << "  LMB drag      : move window / island member\n"
+        << "  Middle drag   : pan canvas\n"
         << "  WASD / arrows : pan camera\n"
-        << "  Middle drag   : direct canvas pan\n"
         << "  Wheel         : zoom around cursor\n"
         << "  F             : fly to CODE island\n"
         << "  R / Home      : smooth Go Home\n"
@@ -641,12 +1075,12 @@ int main() {
         const bool motionActive =
             keyboardActive(input) ||
             input.middleDragging ||
+            windowDrag.active() ||
             controller.isFlying() ||
             controller.velocity()
                 .lengthSquared() > 0.01;
 
         SDL_Event event{};
-
         bool receivedEvent{};
 
         if (motionActive) {
@@ -702,7 +1136,7 @@ int main() {
 
                         if (
                             current.type ==
-                            SDL_EVENT_KEY_DOWN &&
+                                SDL_EVENT_KEY_DOWN &&
                             !current.key.repeat
                         ) {
                             if (
@@ -713,8 +1147,10 @@ int main() {
                             }
 
                             if (
-                                current.key.key == SDLK_R ||
-                                current.key.key == SDLK_HOME
+                                current.key.key ==
+                                    SDLK_R ||
+                                current.key.key ==
+                                    SDLK_HOME
                             ) {
                                 controller.flyToView(
                                     {0.0, 0.0},
@@ -755,6 +1191,23 @@ int main() {
 
                             dirty = true;
                         }
+
+                        if (
+                            current.button.button ==
+                            SDL_BUTTON_LEFT
+                        ) {
+                            controller.cancelFlight();
+
+                            beginLeftDrag(
+                                world,
+                                camera,
+                                current.button.x,
+                                current.button.y,
+                                windowDrag
+                            );
+
+                            dirty = true;
+                        }
                         break;
 
                     case SDL_EVENT_MOUSE_BUTTON_UP:
@@ -763,6 +1216,18 @@ int main() {
                             SDL_BUTTON_MIDDLE
                         ) {
                             input.middleDragging = false;
+                            dirty = true;
+                        }
+
+                        if (
+                            current.button.button ==
+                            SDL_BUTTON_LEFT
+                        ) {
+                            finishLeftDrag(
+                                world,
+                                windowDrag
+                            );
+
                             dirty = true;
                         }
                         break;
@@ -797,6 +1262,18 @@ int main() {
                                     delta / dt
                                 );
                             }
+
+                            dirty = true;
+                        }
+
+                        if (windowDrag.active()) {
+                            moveDraggedWindow(
+                                world,
+                                camera,
+                                current.motion.xrel,
+                                current.motion.yrel,
+                                windowDrag
+                            );
 
                             dirty = true;
                         }
@@ -860,6 +1337,18 @@ int main() {
             break;
         }
 
+        if (
+            windowDrag.kind ==
+            DragKind::FreeWindow
+        ) {
+            updateFreeJoinCandidate(
+                world,
+                windowDrag
+            );
+
+            dirty = true;
+        }
+
         const auto now =
             Clock::now();
 
@@ -878,11 +1367,8 @@ int main() {
                 0.05
             );
 
-        const Vec2 direction =
-            keyboardDirection(input);
-
         controller.setPanInput(
-            direction
+            keyboardDirection(input)
         );
 
         if (!input.middleDragging) {
@@ -907,7 +1393,8 @@ int main() {
                 window,
                 camera,
                 controller,
-                world
+                world,
+                windowDrag
             );
 
             dirty = false;

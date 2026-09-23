@@ -41,6 +41,12 @@ public:
     ) noexcept;
 
     [[nodiscard]]
+    const std::unordered_map<WindowId, WorldWindow>&
+    freeWindows() const noexcept {
+        return freeWindows_;
+    }
+
+    [[nodiscard]]
     std::size_t freeWindowCount() const noexcept {
         return freeWindows_.size();
     }

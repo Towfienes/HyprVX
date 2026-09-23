@@ -61,6 +61,25 @@ const IslandMember* Island::findMember(
         : &*it;
 }
 
+IslandMember* Island::findMember(
+    WindowId windowId
+) noexcept {
+
+    const auto it =
+        std::find_if(
+            members_.begin(),
+            members_.end(),
+            [windowId](const IslandMember& member) {
+                return member.id == windowId;
+            }
+        );
+
+    return
+        it == members_.end()
+        ? nullptr
+        : &*it;
+}
+
 std::optional<Rect>
 Island::memberWorldGeometry(
     WindowId windowId

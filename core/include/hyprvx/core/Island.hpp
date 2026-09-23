@@ -48,6 +48,11 @@ public:
     ) const noexcept;
 
     [[nodiscard]]
+    IslandMember* findMember(
+        WindowId windowId
+    ) noexcept;
+
+    [[nodiscard]]
     std::optional<Rect> memberWorldGeometry(
         WindowId windowId
     ) const noexcept;
