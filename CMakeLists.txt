@@ -91,6 +91,25 @@ set_target_properties(
         OUTPUT_NAME hyprvx-visual-sim
 )
 
+
+add_executable(
+    hyprvx_multi_output_simulator
+    simulator/multi_output_main.cpp
+)
+
+target_link_libraries(
+    hyprvx_multi_output_simulator
+    PRIVATE
+        hyprvx_core
+        PkgConfig::SDL3
+)
+
+set_target_properties(
+    hyprvx_multi_output_simulator
+    PROPERTIES
+        OUTPUT_NAME hyprvx-multi-output-sim
+)
+
 include(CTest)
 
 if(BUILD_TESTING AND HYPRVX_BUILD_TESTS)
