@@ -1,38 +1,62 @@
 # HyprVX Next Task
 
-## Immediate task
+## Phase 1B
 
-Freeze the initial project brain and make the first Git commit.
+Build the first interactive spatial simulator without connecting to Hyprland.
 
-Then begin Phase 1A: core world model.
+## Goals
 
-## Phase 1A requirements
+Implement:
 
-Implement and test:
+- camera velocity
+- frame-rate-independent camera movement
+- acceleration
+- damping
+- target-based camera flight
+- zoom limits
+- cursor-centered zoom behavior
+- viewport representation
+- world object rendering in simulator
+- free window visualization
+- island visualization
+- input-independent semantic camera actions
 
-- Vec2 world coordinates
-- Rect geometry
-- Camera state
-- viewport transform
-- free window model
-- island model
-- local-to-world transforms
+## Input simulation
 
-Do not connect to Hyprland yet.
+The simulator may emulate:
+
+- keyboard camera movement
+- mouse-style drag pan
+- zoom input
+
+Do not read real Hyprland input yet.
+
+## Performance rule
+
+Physics updates must use delta time.
+
+Do not implement a permanent busy loop.
+
+Interactive rendering may run only while the simulator is active.
 
 ## Pass criteria
 
-- deterministic unit tests
-- no compositor dependency
-- camera math works with negative coordinates
-- island movement preserves member local positions
-- world coordinates support large distances without visible instability
+- deterministic physics tests
+- equivalent motion at different simulated frame rates
+- no unstable overshoot
+- camera can move in all directions
+- camera can smoothly travel to a target
+- zoom anchor remains stable
+- free windows and islands map correctly through camera transforms
+- headless core remains independent of Hyprland
 
 ## Not yet
 
 Do not implement:
-- Hyprland plugin
-- real trackpad gestures
-- true zoom
+
+- native Hyprland plugin
+- production trackpad capture
 - Caelestia UI
-- live thumbnails
+- Island join/detach UX
+- persistence daemon
+- true compositor rendering zoom
