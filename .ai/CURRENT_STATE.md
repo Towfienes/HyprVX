@@ -2,7 +2,7 @@
 
 ## Phase
 
-Phase 2A.3 complete - typed Hyprland window lifecycle events
+Phase 2A.5 complete - typed window-move and workspace-lifecycle events
 
 ## Completed
 
@@ -121,7 +121,25 @@ Validated lifecycle events:
 
 Hyprland-specific parsing remains isolated in the IPC adapter library.
 
+## Phase 2A.5 validation
+
+Build:
+PASS
+
+Full test suite:
+124 / 124 PASS
+
+Validated captured events:
+- movewindow and movewindowv2
+- createworkspace and createworkspacev2
+- destroyworkspace and destroyworkspacev2
+- v2 workspace names preserve commas after the required leading fields
+- malformed known workspace/move events remain UnknownEvent
+- uncaptured monitoraddedv2 remains UnknownEvent
+
+Timestamp-prefixed probe lines continue to parse.
+
 ## Next
 
-Phase 2A.4 - continue event-format discovery from captured Hyprland 0.56.2
+Phase 2A.6 - continue Hyprland 0.56.2 event-format discovery from captured
 socket2 output; add typed schemas only for newly captured formats.

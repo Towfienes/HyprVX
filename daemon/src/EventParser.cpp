@@ -187,6 +187,63 @@ std::optional<Event> EventParser::parse(std::string_view line) {
         return CloseWindowEvent{std::string(payload)};
     }
 
+    if (name == "movewindow") {
+        std::string_view address;
+        std::string_view workspace;
+        if (!splitFirst(payload, address, workspace) || address.empty() || workspace.empty()) {
+            return unknown();
+        }
+        return MoveWindowEvent{std::string(address), std::string(workspace)};
+    }
+
+    if (name == "movewindowv2") {
+        std::string_view address;
+        std::string_view remainder;
+        std::string_view workspaceIdValue;
+        std::string_view workspaceName;
+        if (!splitFirst(payload, address, remainder) ||
+            !splitFirst(remainder, workspaceIdValue, workspaceName) ||
+            address.empty() || workspaceName.empty()) {
+            return unknown();
+        }
+        const auto workspaceId = parseInteger(workspaceIdValue);
+        if (!workspaceId) {
+            return unknown();
+        }
+        return MoveWindowV2Event{
+            std::string(address), *workspaceId, std::string(workspaceName)};
+    }
+
+    if (name == "createworkspace") {
+        if (payload.empty() || payload.find(',') != std::string_view::npos) {
+            return unknown();
+        }
+        return CreateWorkspaceEvent{std::string(payload)};
+    }
+
+    if (name == "createworkspacev2" || name == "destroyworkspacev2") {
+        std::string_view workspaceIdValue;
+        std::string_view workspaceName;
+        if (!splitFirst(payload, workspaceIdValue, workspaceName) || workspaceName.empty()) {
+            return unknown();
+        }
+        const auto workspaceId = parseInteger(workspaceIdValue);
+        if (!workspaceId) {
+            return unknown();
+        }
+        if (name == "createworkspacev2") {
+            return CreateWorkspaceV2Event{*workspaceId, std::string(workspaceName)};
+        }
+        return DestroyWorkspaceV2Event{*workspaceId, std::string(workspaceName)};
+    }
+
+    if (name == "destroyworkspace") {
+        if (payload.empty() || payload.find(',') != std::string_view::npos) {
+            return unknown();
+        }
+        return DestroyWorkspaceEvent{std::string(payload)};
+    }
+
     return unknown();
 }
 

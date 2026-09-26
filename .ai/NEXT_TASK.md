@@ -1,6 +1,6 @@
 # HyprVX Next Task
 
-## Phase 2A.4
+## Phase 2A.6
 
 Continue Hyprland 0.56.2 socket2 event discovery using captured probe output.
 Only add typed schemas for event formats that have been observed and recorded.

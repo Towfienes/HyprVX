@@ -10,7 +10,13 @@ using hyprvx::hyprland::ActiveWindowEvent;
 using hyprvx::hyprland::ActiveWindowV2Event;
 using hyprvx::hyprland::ChangeFloatingModeEvent;
 using hyprvx::hyprland::CloseWindowEvent;
+using hyprvx::hyprland::CreateWorkspaceEvent;
+using hyprvx::hyprland::CreateWorkspaceV2Event;
+using hyprvx::hyprland::DestroyWorkspaceEvent;
+using hyprvx::hyprland::DestroyWorkspaceV2Event;
 using hyprvx::hyprland::EventParser;
+using hyprvx::hyprland::MoveWindowEvent;
+using hyprvx::hyprland::MoveWindowV2Event;
 using hyprvx::hyprland::OpenWindowEvent;
 using hyprvx::hyprland::UnknownEvent;
 using hyprvx::hyprland::WindowTitleEvent;
@@ -193,4 +199,111 @@ TEST(HyprlandEventParserLifecycleTest, KeepsUncapturedUrgentEventUnknown) {
     ASSERT_NE(parsed, nullptr);
     EXPECT_EQ(parsed->name, "urgent");
     EXPECT_EQ(parsed->payload, "55f003fc2bd0");
+}
+
+TEST(HyprlandEventParserWorkspaceTest, ParsesBasicMoveWindow) {
+    const auto event = EventParser::parse("movewindow>>55f003fc1510,2");
+    ASSERT_TRUE(event);
+    const auto* parsed = std::get_if<MoveWindowEvent>(&*event);
+    ASSERT_NE(parsed, nullptr);
+    EXPECT_EQ(parsed->address, "55f003fc1510");
+    EXPECT_EQ(parsed->workspace, "2");
+}
+
+TEST(HyprlandEventParserWorkspaceTest, ParsesTimestampPrefixedMoveWindow) {
+    const auto event = EventParser::parse("[10:11:12] movewindow>>55f003f27150,4");
+    ASSERT_TRUE(event);
+    const auto* parsed = std::get_if<MoveWindowEvent>(&*event);
+    ASSERT_NE(parsed, nullptr);
+    EXPECT_EQ(parsed->address, "55f003f27150");
+    EXPECT_EQ(parsed->workspace, "4");
+}
+
+TEST(HyprlandEventParserWorkspaceTest, PreservesMalformedMoveWindowAsUnknown) {
+    const auto event = EventParser::parse("movewindow>>55f003fc1510");
+    ASSERT_TRUE(event);
+    const auto* parsed = std::get_if<UnknownEvent>(&*event);
+    ASSERT_NE(parsed, nullptr);
+    EXPECT_EQ(parsed->name, "movewindow");
+    EXPECT_EQ(parsed->payload, "55f003fc1510");
+}
+
+TEST(HyprlandEventParserWorkspaceTest, ParsesBasicMoveWindowV2) {
+    const auto event = EventParser::parse("movewindowv2>>55f003fc1510,2,2");
+    ASSERT_TRUE(event);
+    const auto* parsed = std::get_if<MoveWindowV2Event>(&*event);
+    ASSERT_NE(parsed, nullptr);
+    EXPECT_EQ(parsed->address, "55f003fc1510");
+    EXPECT_EQ(parsed->workspaceId, 2);
+    EXPECT_EQ(parsed->workspaceName, "2");
+}
+
+TEST(HyprlandEventParserWorkspaceTest, MoveWindowV2PreservesRemainingWorkspaceName) {
+    const auto event = EventParser::parse("movewindowv2>>0xabc,7,desk, development");
+    ASSERT_TRUE(event);
+    const auto* parsed = std::get_if<MoveWindowV2Event>(&*event);
+    ASSERT_NE(parsed, nullptr);
+    EXPECT_EQ(parsed->workspaceId, 7);
+    EXPECT_EQ(parsed->workspaceName, "desk, development");
+}
+
+TEST(HyprlandEventParserWorkspaceTest, PreservesMalformedMoveWindowV2AsUnknown) {
+    const auto event = EventParser::parse("movewindowv2>>0xabc,not-an-id,desk");
+    ASSERT_TRUE(event);
+    const auto* parsed = std::get_if<UnknownEvent>(&*event);
+    ASSERT_NE(parsed, nullptr);
+    EXPECT_EQ(parsed->name, "movewindowv2");
+    EXPECT_EQ(parsed->payload, "0xabc,not-an-id,desk");
+}
+
+TEST(HyprlandEventParserWorkspaceTest, ParsesBasicCreateWorkspace) {
+    const auto event = EventParser::parse("createworkspace>>4");
+    ASSERT_TRUE(event);
+    const auto* parsed = std::get_if<CreateWorkspaceEvent>(&*event);
+    ASSERT_NE(parsed, nullptr);
+    EXPECT_EQ(parsed->workspace, "4");
+}
+
+TEST(HyprlandEventParserWorkspaceTest, ParsesBasicCreateWorkspaceV2) {
+    const auto event = EventParser::parse("createworkspacev2>>4,4");
+    ASSERT_TRUE(event);
+    const auto* parsed = std::get_if<CreateWorkspaceV2Event>(&*event);
+    ASSERT_NE(parsed, nullptr);
+    EXPECT_EQ(parsed->workspaceId, 4);
+    EXPECT_EQ(parsed->workspaceName, "4");
+}
+
+TEST(HyprlandEventParserWorkspaceTest, CreateWorkspaceV2PreservesRemainingWorkspaceName) {
+    const auto event = EventParser::parse("createworkspacev2>>8,work, docs");
+    ASSERT_TRUE(event);
+    const auto* parsed = std::get_if<CreateWorkspaceV2Event>(&*event);
+    ASSERT_NE(parsed, nullptr);
+    EXPECT_EQ(parsed->workspaceId, 8);
+    EXPECT_EQ(parsed->workspaceName, "work, docs");
+}
+
+TEST(HyprlandEventParserWorkspaceTest, ParsesBasicDestroyWorkspace) {
+    const auto event = EventParser::parse("destroyworkspace>>5");
+    ASSERT_TRUE(event);
+    const auto* parsed = std::get_if<DestroyWorkspaceEvent>(&*event);
+    ASSERT_NE(parsed, nullptr);
+    EXPECT_EQ(parsed->workspace, "5");
+}
+
+TEST(HyprlandEventParserWorkspaceTest, ParsesBasicDestroyWorkspaceV2) {
+    const auto event = EventParser::parse("destroyworkspacev2>>5,5");
+    ASSERT_TRUE(event);
+    const auto* parsed = std::get_if<DestroyWorkspaceV2Event>(&*event);
+    ASSERT_NE(parsed, nullptr);
+    EXPECT_EQ(parsed->workspaceId, 5);
+    EXPECT_EQ(parsed->workspaceName, "5");
+}
+
+TEST(HyprlandEventParserWorkspaceTest, KeepsUncapturedMonitorEventUnknown) {
+    const auto event = EventParser::parse("monitoraddedv2>>DP-1,2560x1440@144,0x0");
+    ASSERT_TRUE(event);
+    const auto* parsed = std::get_if<UnknownEvent>(&*event);
+    ASSERT_NE(parsed, nullptr);
+    EXPECT_EQ(parsed->name, "monitoraddedv2");
+    EXPECT_EQ(parsed->payload, "DP-1,2560x1440@144,0x0");
 }

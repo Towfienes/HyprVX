@@ -55,6 +55,35 @@ struct CloseWindowEvent {
     std::string address;
 };
 
+struct MoveWindowEvent {
+    std::string address;
+    std::string workspace;
+};
+
+struct MoveWindowV2Event {
+    std::string address;
+    int workspaceId;
+    std::string workspaceName;
+};
+
+struct CreateWorkspaceEvent {
+    std::string workspace;
+};
+
+struct CreateWorkspaceV2Event {
+    int workspaceId;
+    std::string workspaceName;
+};
+
+struct DestroyWorkspaceEvent {
+    std::string workspace;
+};
+
+struct DestroyWorkspaceV2Event {
+    int workspaceId;
+    std::string workspaceName;
+};
+
 struct UnknownEvent {
     std::string name;
     std::string payload;
@@ -71,6 +100,12 @@ using Event = std::variant<
     WindowTitleV2Event,
     OpenWindowEvent,
     CloseWindowEvent,
+    MoveWindowEvent,
+    MoveWindowV2Event,
+    CreateWorkspaceEvent,
+    CreateWorkspaceV2Event,
+    DestroyWorkspaceEvent,
+    DestroyWorkspaceV2Event,
     UnknownEvent>;
 
 class EventParser {
