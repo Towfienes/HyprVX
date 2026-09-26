@@ -44,6 +44,17 @@ struct WindowTitleV2Event {
     std::string title;
 };
 
+struct OpenWindowEvent {
+    std::string address;
+    std::string workspace;
+    std::string className;
+    std::string title;
+};
+
+struct CloseWindowEvent {
+    std::string address;
+};
+
 struct UnknownEvent {
     std::string name;
     std::string payload;
@@ -58,12 +69,15 @@ using Event = std::variant<
     WorkspaceV2Event,
     WindowTitleEvent,
     WindowTitleV2Event,
+    OpenWindowEvent,
+    CloseWindowEvent,
     UnknownEvent>;
 
 class EventParser {
 public:
     // Accepts raw socket2 lines and [HH:MM:SS]-prefixed probe output.
-    // Returns no event when framing or a known event's payload is malformed.
+    // Returns no event when framing is malformed. Malformed recognized payloads
+    // are preserved as UnknownEvent so callers can inspect the original data.
     [[nodiscard]] static std::optional<Event> parse(std::string_view line);
 };
 

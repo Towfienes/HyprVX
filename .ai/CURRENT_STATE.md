@@ -2,7 +2,7 @@
 
 ## Phase
 
-Phase 2A.1 complete - event probe and typed Hyprland event parser
+Phase 2A.3 complete - typed Hyprland window lifecycle events
 
 ## Completed
 
@@ -104,7 +104,24 @@ Validated event probe behavior:
 
 Production Hyprland and Caelestia configuration remain unmodified.
 
+## Phase 2A.3 validation
+
+Build:
+PASS
+
+Full test suite:
+112 / 112 PASS
+
+Validated lifecycle events:
+- openwindow fields split at the first three commas, preserving commas in titles
+- closewindow address parsing
+- timestamp-prefixed lifecycle events
+- malformed openwindow payload remains an UnknownEvent with original payload
+- urgent remains UnknownEvent because its schema has not been captured
+
+Hyprland-specific parsing remains isolated in the IPC adapter library.
+
 ## Next
 
-Phase 2A.2 - define the next Hyprland discovery/integration slice after reviewing
-the event probe output; do not modify production compositor configuration.
+Phase 2A.4 - continue event-format discovery from captured Hyprland 0.56.2
+socket2 output; add typed schemas only for newly captured formats.

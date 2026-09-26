@@ -1,25 +1,27 @@
 # HyprVX Next Task
 
-## Phase 2A.2
+## Phase 2A.4
 
-Continue Hyprland discovery using the Phase 2A.0 event probe, informed by
-captured event output and compatibility review.
+Continue Hyprland 0.56.2 socket2 event discovery using captured probe output.
+Only add typed schemas for event formats that have been observed and recorded.
 
 Keep the work isolated from the production Hyprland session.
 
 ## Required behavior
 
-Review observed events and Hyprland compatibility before selecting the next
-bounded implementation step. Keep event handling event-driven and avoid polling.
+Review observed event payloads and compatibility before selecting the next
+bounded parser extension. Keep event handling event-driven and avoid polling.
 
 ## Pass criteria
 
-- the next step is defined from actual probe observations
+- every new typed schema is backed by captured payload examples
+- unknown event names and payloads remain preserved
 - changes have automated coverage
 - no production Hyprland or Caelestia configuration changes
 - no compositor reload
 
 ## Not yet
 
-Do not add a native plugin or production integration until compatibility,
-failure containment and rollback are defined.
+Do not add typed schemas for uncaptured event formats. Do not add a native
+plugin or production integration until compatibility, failure containment and
+rollback are defined.

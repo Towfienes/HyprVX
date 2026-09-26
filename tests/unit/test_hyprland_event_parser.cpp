@@ -9,7 +9,9 @@ using hyprvx::hyprland::ActiveLayoutEvent;
 using hyprvx::hyprland::ActiveWindowEvent;
 using hyprvx::hyprland::ActiveWindowV2Event;
 using hyprvx::hyprland::ChangeFloatingModeEvent;
+using hyprvx::hyprland::CloseWindowEvent;
 using hyprvx::hyprland::EventParser;
+using hyprvx::hyprland::OpenWindowEvent;
 using hyprvx::hyprland::UnknownEvent;
 using hyprvx::hyprland::WindowTitleEvent;
 using hyprvx::hyprland::WindowTitleV2Event;
@@ -115,4 +117,80 @@ TEST(HyprlandEventParserTest, RejectsMalformedLinesAndInvalidProbePrefix) {
     EXPECT_FALSE(EventParser::parse("activewindow kitty,title"));
     EXPECT_FALSE(EventParser::parse("[yesterday] workspace>>1"));
     EXPECT_FALSE(EventParser::parse(">>payload"));
+}
+
+TEST(HyprlandEventParserLifecycleTest, ParsesBasicOpenWindow) {
+    const auto event = EventParser::parse("openwindow>>0xabc,2,foot,terminal");
+    ASSERT_TRUE(event);
+    const auto* parsed = std::get_if<OpenWindowEvent>(&*event);
+    ASSERT_NE(parsed, nullptr);
+    EXPECT_EQ(parsed->address, "0xabc");
+    EXPECT_EQ(parsed->workspace, "2");
+    EXPECT_EQ(parsed->className, "foot");
+    EXPECT_EQ(parsed->title, "terminal");
+}
+
+TEST(HyprlandEventParserLifecycleTest, ParsesCapturedThunarOpenWindow) {
+    const auto event = EventParser::parse(
+        "openwindow>>55f003fc2bd0,1,thunar,towfienes - Thunar");
+    ASSERT_TRUE(event);
+    const auto* parsed = std::get_if<OpenWindowEvent>(&*event);
+    ASSERT_NE(parsed, nullptr);
+    EXPECT_EQ(parsed->address, "55f003fc2bd0");
+    EXPECT_EQ(parsed->workspace, "1");
+    EXPECT_EQ(parsed->className, "thunar");
+    EXPECT_EQ(parsed->title, "towfienes - Thunar");
+}
+
+TEST(HyprlandEventParserLifecycleTest, PreservesCommasInOpenWindowTitle) {
+    const auto event = EventParser::parse("openwindow>>0xabc,1,app,one, two,three");
+    ASSERT_TRUE(event);
+    const auto* parsed = std::get_if<OpenWindowEvent>(&*event);
+    ASSERT_NE(parsed, nullptr);
+    EXPECT_EQ(parsed->title, "one, two,three");
+}
+
+TEST(HyprlandEventParserLifecycleTest, ParsesTimestampPrefixedOpenWindow) {
+    const auto event = EventParser::parse(
+        "[12:34:56] openwindow>>55f003fb29a0,1,foot,foot");
+    ASSERT_TRUE(event);
+    const auto* parsed = std::get_if<OpenWindowEvent>(&*event);
+    ASSERT_NE(parsed, nullptr);
+    EXPECT_EQ(parsed->address, "55f003fb29a0");
+    EXPECT_EQ(parsed->title, "foot");
+}
+
+TEST(HyprlandEventParserLifecycleTest, PreservesMalformedOpenWindowAsUnknown) {
+    constexpr auto line = "openwindow>>0xabc,1,foot";
+    const auto event = EventParser::parse(line);
+    ASSERT_TRUE(event);
+    const auto* parsed = std::get_if<UnknownEvent>(&*event);
+    ASSERT_NE(parsed, nullptr);
+    EXPECT_EQ(parsed->name, "openwindow");
+    EXPECT_EQ(parsed->payload, "0xabc,1,foot");
+}
+
+TEST(HyprlandEventParserLifecycleTest, ParsesBasicCloseWindow) {
+    const auto event = EventParser::parse("closewindow>>55f003fc2bd0");
+    ASSERT_TRUE(event);
+    const auto* parsed = std::get_if<CloseWindowEvent>(&*event);
+    ASSERT_NE(parsed, nullptr);
+    EXPECT_EQ(parsed->address, "55f003fc2bd0");
+}
+
+TEST(HyprlandEventParserLifecycleTest, ParsesTimestampPrefixedCloseWindow) {
+    const auto event = EventParser::parse("[08:07:06] closewindow>>55f003fb29a0");
+    ASSERT_TRUE(event);
+    const auto* parsed = std::get_if<CloseWindowEvent>(&*event);
+    ASSERT_NE(parsed, nullptr);
+    EXPECT_EQ(parsed->address, "55f003fb29a0");
+}
+
+TEST(HyprlandEventParserLifecycleTest, KeepsUncapturedUrgentEventUnknown) {
+    const auto event = EventParser::parse("urgent>>55f003fc2bd0");
+    ASSERT_TRUE(event);
+    const auto* parsed = std::get_if<UnknownEvent>(&*event);
+    ASSERT_NE(parsed, nullptr);
+    EXPECT_EQ(parsed->name, "urgent");
+    EXPECT_EQ(parsed->payload, "55f003fc2bd0");
 }

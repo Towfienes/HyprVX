@@ -83,6 +83,10 @@ std::optional<Event> EventParser::parse(std::string_view line) {
         return std::nullopt;
     }
 
+    const auto unknown = [&]() -> std::optional<Event> {
+        return UnknownEvent{std::string(name), std::string(payload)};
+    };
+
     if (name == "activewindow") {
         std::string_view className;
         std::string_view title;
@@ -156,7 +160,34 @@ std::optional<Event> EventParser::parse(std::string_view line) {
         return WindowTitleV2Event{std::string(address), std::string(title)};
     }
 
-    return UnknownEvent{std::string(name), std::string(payload)};
+    if (name == "openwindow") {
+        std::string_view address;
+        std::string_view remainder;
+        std::string_view workspace;
+        std::string_view remainderAfterWorkspace;
+        std::string_view className;
+        std::string_view title;
+        if (!splitFirst(payload, address, remainder) ||
+            !splitFirst(remainder, workspace, remainderAfterWorkspace) ||
+            !splitFirst(remainderAfterWorkspace, className, title) ||
+            address.empty() || workspace.empty() || className.empty()) {
+            return unknown();
+        }
+        return OpenWindowEvent{
+            std::string(address),
+            std::string(workspace),
+            std::string(className),
+            std::string(title)};
+    }
+
+    if (name == "closewindow") {
+        if (payload.empty() || payload.find(',') != std::string_view::npos) {
+            return unknown();
+        }
+        return CloseWindowEvent{std::string(payload)};
+    }
+
+    return unknown();
 }
 
 } // namespace hyprvx::hyprland
