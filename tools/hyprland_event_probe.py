@@ -9,14 +9,14 @@ import sys
 import time
 
 
-def socket_candidates():
-    signature = os.environ.get(
-        "HYPRLAND_INSTANCE_SIGNATURE"
-    )
+_ENV = object()
 
-    runtime = os.environ.get(
-        "XDG_RUNTIME_DIR"
-    )
+
+def socket_candidates(signature=_ENV, runtime=_ENV):
+    if signature is _ENV:
+        signature = os.environ.get("HYPRLAND_INSTANCE_SIGNATURE")
+    if runtime is _ENV:
+        runtime = os.environ.get("XDG_RUNTIME_DIR")
 
     if not signature:
         raise RuntimeError(
@@ -33,17 +33,15 @@ def socket_candidates():
             / ".socket2.sock"
         )
 
-    candidates.append(
-        pathlib.Path("/tmp/hypr")
-        / signature
-        / ".socket2.sock"
-    )
+    fallback = pathlib.Path("/tmp/hypr") / signature / ".socket2.sock"
+    if fallback not in candidates:
+        candidates.append(fallback)
 
     return candidates
 
 
-def find_socket():
-    candidates = socket_candidates()
+def find_socket(candidates=None):
+    candidates = socket_candidates() if candidates is None else candidates
 
     for candidate in candidates:
         if candidate.exists():
@@ -62,6 +60,35 @@ def find_socket():
     raise RuntimeError(
         "\n".join(message)
     )
+
+
+class EventLineBuffer:
+    """Turn arbitrary socket chunks into complete UTF-8 event lines."""
+
+    def __init__(self):
+        self._buffer = b""
+
+    def feed(self, chunk):
+        self._buffer += chunk
+        lines = []
+
+        while b"\n" in self._buffer:
+            raw, self._buffer = self._buffer.split(b"\n", 1)
+            if raw.endswith(b"\r"):
+                raw = raw[:-1]
+            lines.append(raw.decode("utf-8", errors="replace"))
+
+        return lines
+
+    def finish(self):
+        if not self._buffer:
+            return []
+
+        raw = self._buffer
+        self._buffer = b""
+        if raw.endswith(b"\r"):
+            raw = raw[:-1]
+        return [raw.decode("utf-8", errors="replace")]
 
 
 def main():
@@ -112,7 +139,7 @@ def main():
         + args.seconds
     )
 
-    buffer = b""
+    line_buffer = EventLineBuffer()
 
     output_file = None
 
@@ -150,19 +177,7 @@ def main():
             if not chunk:
                 break
 
-            buffer += chunk
-
-            while b"\n" in buffer:
-                raw, buffer = buffer.split(
-                    b"\n",
-                    1,
-                )
-
-                line = raw.decode(
-                    "utf-8",
-                    errors="replace",
-                )
-
+            for line in line_buffer.feed(chunk):
                 stamp = time.strftime(
                     "%H:%M:%S"
                 )
@@ -182,6 +197,14 @@ def main():
                     )
 
                     output_file.flush()
+
+        for line in line_buffer.finish():
+            stamp = time.strftime("%H:%M:%S")
+            rendered = f"[{stamp}] {line}"
+            print(rendered, flush=True)
+            if output_file:
+                output_file.write(rendered + "\n")
+                output_file.flush()
 
     finally:
         client.close()

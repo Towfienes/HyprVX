@@ -29,6 +29,34 @@ target_include_directories(
         core/include
 )
 
+add_library(hyprvx_hyprland_ipc STATIC
+    daemon/src/EventParser.cpp
+)
+
+target_include_directories(
+    hyprvx_hyprland_ipc
+    PUBLIC
+        daemon/include
+)
+
+target_compile_features(
+    hyprvx_hyprland_ipc
+    PUBLIC
+        cxx_std_20
+)
+
+target_compile_options(
+    hyprvx_hyprland_ipc
+    PRIVATE
+        $<$<CXX_COMPILER_ID:GNU,Clang>:
+            -Wall
+            -Wextra
+            -Wpedantic
+            -Wconversion
+            -Wshadow
+        >
+)
+
 target_compile_features(
     hyprvx_core
     PUBLIC
@@ -134,6 +162,7 @@ include(CTest)
 
 if(BUILD_TESTING AND HYPRVX_BUILD_TESTS)
     find_package(GTest REQUIRED)
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
     add_executable(
         hyprvx_core_tests
@@ -164,4 +193,45 @@ if(BUILD_TESTING AND HYPRVX_BUILD_TESTS)
     gtest_discover_tests(
         hyprvx_core_tests
     )
+
+    add_executable(
+        hyprvx_hyprland_ipc_tests
+        tests/unit/test_hyprland_event_parser.cpp
+    )
+
+    target_link_libraries(
+        hyprvx_hyprland_ipc_tests
+        PRIVATE
+            hyprvx_hyprland_ipc
+            GTest::gtest_main
+    )
+
+    gtest_discover_tests(
+        hyprvx_hyprland_ipc_tests
+    )
+
+    foreach(test_case IN ITEMS
+        SocketDiscoveryTest.test_runtime_socket_is_first_candidate
+        SocketDiscoveryTest.test_tmp_socket_is_fallback_candidate
+        SocketDiscoveryTest.test_duplicate_runtime_and_fallback_path_is_listed_once
+        SocketDiscoveryTest.test_missing_signature_raises_clear_error
+        SocketDiscoveryTest.test_find_socket_returns_first_existing_candidate
+        SocketDiscoveryTest.test_find_socket_error_lists_candidates
+        EventLineBufferTest.test_fragmented_event_waits_for_newline
+        EventLineBufferTest.test_multiple_events_in_single_chunk
+        EventLineBufferTest.test_empty_lines_are_preserved
+        EventLineBufferTest.test_crlf_delimiter_is_normalized
+        EventLineBufferTest.test_finish_returns_trailing_partial_event
+        EventLineBufferTest.test_finish_is_empty_after_complete_event
+        EventLineBufferTest.test_invalid_utf8_is_replaced
+    )
+        string(REPLACE "." "_" test_name "${test_case}")
+        add_test(
+            NAME "HyprlandEventProbe.${test_name}"
+            COMMAND
+                ${Python3_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/test_hyprland_event_probe.py
+                ${test_case}
+        )
+    endforeach()
 endif()

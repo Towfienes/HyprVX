@@ -2,7 +2,7 @@
 
 ## Phase
 
-Phase 1A complete - core world model foundation
+Phase 2A.1 complete - event probe and typed Hyprland event parser
 
 ## Completed
 
@@ -85,6 +85,26 @@ Validated:
 Observed simulator frame-rate delta 60 -> 210 Hz:
 0.000000
 
+## Phase 2A.1 validation
+
+Build:
+PASS
+
+Full test suite:
+104 / 104 PASS
+
+Validated event probe behavior:
+- explicit runtime socket discovery and `/tmp/hypr` fallback
+- candidate ordering, duplicate removal and actionable errors
+- fragmented and batched event lines
+- CRLF, invalid UTF-8 and trailing partial event handling
+- typed C++ parsing for the eight observed Hyprland 0.56.2 event formats
+- unknown event preservation and malformed event rejection
+- Hyprland IPC parser remains in a separate adapter library, outside hyprvx_core
+
+Production Hyprland and Caelestia configuration remain unmodified.
+
 ## Next
 
-Phase 1B.2 - interactive visual world simulator.
+Phase 2A.2 - define the next Hyprland discovery/integration slice after reviewing
+the event probe output; do not modify production compositor configuration.

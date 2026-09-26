@@ -1,0 +1,70 @@
+#pragma once
+
+#include <optional>
+#include <string>
+#include <string_view>
+#include <variant>
+
+namespace hyprvx::hyprland {
+
+struct ActiveWindowEvent {
+    std::string className;
+    std::string title;
+};
+
+struct ActiveWindowV2Event {
+    std::string address;
+};
+
+struct ActiveLayoutEvent {
+    std::string keyboardName;
+    std::string layoutName;
+};
+
+struct ChangeFloatingModeEvent {
+    bool floating;
+    std::string address;
+};
+
+struct WorkspaceEvent {
+    std::string name;
+};
+
+struct WorkspaceV2Event {
+    int id;
+    std::string name;
+};
+
+struct WindowTitleEvent {
+    std::string address;
+};
+
+struct WindowTitleV2Event {
+    std::string address;
+    std::string title;
+};
+
+struct UnknownEvent {
+    std::string name;
+    std::string payload;
+};
+
+using Event = std::variant<
+    ActiveWindowEvent,
+    ActiveWindowV2Event,
+    ActiveLayoutEvent,
+    ChangeFloatingModeEvent,
+    WorkspaceEvent,
+    WorkspaceV2Event,
+    WindowTitleEvent,
+    WindowTitleV2Event,
+    UnknownEvent>;
+
+class EventParser {
+public:
+    // Accepts raw socket2 lines and [HH:MM:SS]-prefixed probe output.
+    // Returns no event when framing or a known event's payload is malformed.
+    [[nodiscard]] static std::optional<Event> parse(std::string_view line);
+};
+
+} // namespace hyprvx::hyprland
