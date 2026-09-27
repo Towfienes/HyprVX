@@ -111,3 +111,48 @@ Workspace moves relocate projected geometry to the destination region and
 return a grouped member to free-window ownership. Repeated reconciliation is
 idempotent. Framing helpers use the core `ViewportFraming` logic but do not
 drive a camera automatically. The one-active-output policy remains unchanged.
+
+## Durable projection state
+
+The runtime integration stores versioned JSON in `~/.local/state/hyprvx/state.json`
+by default; callers and tests can provide another path. Schema v1 contains
+HyprVX workspace region assignments, placement counters, projected geometry,
+the active placement policy, WindowIds, and metadata hints. Restores retain that
+policy so future windows continue the saved grid and workspace spacing. It excludes socket buffers, descriptors,
+semantic event temporaries, cameras, and animation state.
+
+`ProjectionStateStore` writes a same-directory temporary file, fsyncs it,
+atomically renames it over the canonical state, and syncs the directory. A
+valid prior file becomes `.bak`. Invalid or unsupported state is not overwritten
+without an explicit replacement choice. A valid backup can recover a corrupt
+canonical file while the latter remains available for diagnosis. Corrupt
+inputs are preserved under collision-safe `.corrupt`, `.corrupt.1`, and
+subsequent names.
+
+All persisted unsigned 64-bit IDs and counters use canonical decimal strings,
+so JSON consumers with double-only number support cannot round them. The
+decoder accepts only unsigned decimal strings with no leading zeros (except
+`"0"`) and rejects signs, whitespace, fractions, exponents, overflow, and
+trailing characters. Persisted coordinates and extents are limited to a
+magnitude of `1e12` world units, an explicit storage safety bound; the live
+world model itself retains double-based large and negative coordinate support.
+
+Disk state never makes a window live. Restore candidates remain dormant until
+the current `RuntimeMirror` reports the address. Same-compositor restore uses
+the compositor instance signature and canonical address, rejects new-open
+events and conflicting known class/workspace hints, and ignores title changes.
+If that identity is unavailable, a candidate may match only when exact
+class/title/workspace metadata uniquely identifies one saved and one live
+window. Ambiguous candidates get fresh placement. Socket2 provides no stable
+application-instance identifier; a missed close and address reuse with
+indistinguishable metadata cannot be resolved perfectly.
+
+Connection epochs in `RuntimeBridge` reset transient mirror state on EOF and
+reconnect. `SpatialProjector::endEpoch` removes live windows from World while
+retaining dormant layout memory; a later reconciliation restores only windows
+seen in the new mirror. Reconnect is caller-driven, with no retry loop. State
+saving is explicit or debounced through `ProjectionStateManager` when the
+projector's spatial revision changes; title and focus churn do not schedule
+writes. The debounce has a configurable maximum dirty age, so continuous
+spatial changes cannot defer the save indefinitely; callers can save
+immediately during graceful shutdown.

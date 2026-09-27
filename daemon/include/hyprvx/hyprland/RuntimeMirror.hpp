@@ -20,6 +20,7 @@ struct ObservedWindowState {
     std::optional<int> workspaceId;
     std::optional<std::string> workspaceName;
     std::optional<bool> floating;
+    bool openedInCurrentEpoch{};
 };
 
 class RuntimeMirror {

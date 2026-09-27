@@ -1,0 +1,3 @@
+[12:05:00] windowtitlev2>>55f003fc2bd0,Home, Documents
+activewindowv2>>55f003fc2bd0
+movewindowv2>>55f003fc2bd0,2,2

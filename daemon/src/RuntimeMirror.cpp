@@ -95,6 +95,7 @@ bool RuntimeMirror::apply(const SemanticEvent& event) {
             }
             allowReopen(address);
             auto& state = ensureWindow(address);
+            state.openedInCurrentEpoch = true;
             if (!state.className) state.className = value.className;
             if (!state.title) state.title = value.title;
             if (!state.workspaceName) state.workspaceName = value.workspaceName;

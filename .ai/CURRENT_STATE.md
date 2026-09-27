@@ -2,7 +2,7 @@
 
 ## Phase
 
-Phase 2C complete - one-way read-only runtime spatial projection
+Phase 2D complete - durable one-way runtime spatial projection and epoch recovery
 
 ## Completed
 
@@ -189,7 +189,33 @@ Validated:
 
 No compositor mutation, plugin, polling, production config change, or multi-output expansion was introduced.
 
+## Phase 2D validation
+
+Configure/build: PASS
+
+Full CTest suite: 231 / 231 PASS
+
+Validated:
+- schema-v1 deterministic JSON save/load, strict geometry and identity validation, missing/corrupt/future-version handling, and stale temporary file tolerance
+- same-directory fsync/atomic rename, last-good `.bak`, corruption preservation, and explicit invalid-state replacement
+- same-compositor address restoration, address reuse rejection after new-open observation, title changes, unique metadata fallback, and ambiguous-match refusal
+- persisted numeric/named/special workspace positions and placement counters continue after reconstruction
+- disconnected bridge epochs clear mirror/tombstones; projector epoch end clears World while retaining dormant layouts
+- event-driven dirty revision and controllable debounce; metadata/focus churn does not schedule saves
+- CLI save/destroy/recreate/load/replay reproduced the same World summary and geometry
+
+## Phase 2D final audit hardening
+
+- all persisted uint64 IDs and counters use strict canonical decimal strings, preserving values through UINT64_MAX
+- corrupt diagnostic snapshots use unique `.corrupt.N` suffixes and preserve earlier files
+- state debounce uses a configurable maximum dirty age in addition to the normal quiet period
+- persistence bounds geometry and placement arithmetic to 1e12 world units; in-memory world coordinates remain double-based
+- direct projector restoration rejects inconsistent placement slots
+- full configure/build and CTest validation rerun after audit fixes
+
+No compositor commands, polling, plugin, production config changes, or automatic reconnect were added.
+
 ## Next
 
-Phase 2D - define persistence and recovery for the one-way projected spatial
-model before connecting user-driven camera or grouping controls.
+Phase 2E - define the first user-driven camera/navigation integration over the
+persisted one-way spatial model while retaining read-only compositor behavior.

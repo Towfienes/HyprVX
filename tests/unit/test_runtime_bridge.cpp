@@ -92,3 +92,17 @@ TEST(RuntimeBridgeTest, ResetProvidesCleanReconnectEpoch) {
     ASSERT_TRUE(bridge.processLine("windowtitlev2>>abc,title after reconnect"));
     EXPECT_NE(bridge.mirror().findWindow("abc"), nullptr);
 }
+
+TEST(RuntimeBridgeTest, DisconnectEndsEpochAndReconnectClearsOldTombstones) {
+    RuntimeBridge bridge;
+    const auto firstEpoch = bridge.connectionEpoch();
+    ASSERT_TRUE(bridge.processLine("closewindow>>abc"));
+    bridge.endEpoch();
+    EXPECT_FALSE(bridge.epochActive());
+    EXPECT_FALSE(bridge.processLine("windowtitlev2>>abc,ignored while disconnected"));
+    bridge.beginEpoch();
+    EXPECT_TRUE(bridge.epochActive());
+    EXPECT_GT(bridge.connectionEpoch(), firstEpoch);
+    ASSERT_TRUE(bridge.processLine("windowtitlev2>>abc,new epoch title"));
+    EXPECT_NE(bridge.mirror().findWindow("abc"), nullptr);
+}

@@ -105,3 +105,34 @@ monotonically per projector epoch from canonical addresses and are removed on
 close; workspace and placement slot assignments remain reserved for the epoch
 to keep unrelated window lifecycle events from shifting existing geometry.
 The primary runtime target remains one active output.
+
+## D013 - Versioned durable spatial projection state
+
+Status: accepted
+
+Persisted state is HyprVX-owned spatial memory, not compositor truth. Schema v1
+stores workspace regions, next workspace/placement counters, projected geometry,
+the active `InitialPlacementPolicy`, WindowIds, and metadata hints. Restores
+continue using that saved placement policy so later windows cannot overlap old
+regions when process configuration changes. `RuntimeMirror` remains the source of truth for
+which windows are currently alive. Recovery never creates World windows from
+disk alone. Same-compositor restoration uses the instance signature plus
+canonical address, excludes windows observed opening in the new connection,
+and rejects conflicting class/workspace hints. Cross-address restoration uses
+an exact, unique class/title/workspace fingerprint only; ambiguous candidates
+receive fresh placements. Socket2 does not expose a stable app-instance ID, so
+indistinguishable windows after missed close/open events remain a documented
+limit.
+
+State writes use a same-directory temporary file, fsync, atomic rename, and a
+last-good `.bak`. Corrupt or future-version state is preserved; replacement
+requires an explicit caller decision. Connection epochs are explicit in
+`RuntimeBridge`, and the projector preserves dormant geometry across epoch
+reset while requiring live mirror observations before restoring World entries.
+No compositor control is introduced.
+
+Unsigned 64-bit IDs and counters are serialized as canonical decimal strings
+to preserve exact values in double-based JSON consumers. Persisted world
+coordinates are limited to 1e12 units to bound geometry arithmetic; runtime
+world coordinates remain double-based. Corruption snapshots use collision-safe
+suffixes, and debounced writes have a configurable maximum dirty age.

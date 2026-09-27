@@ -52,7 +52,10 @@ target_compile_features(
 
 add_library(hyprvx_runtime_projection STATIC
     daemon/src/SpatialProjection.cpp
+    daemon/src/ProjectionStateStore.cpp
 )
+
+find_package(nlohmann_json 3.2.0 REQUIRED)
 
 target_include_directories(
     hyprvx_runtime_projection
@@ -65,6 +68,7 @@ target_link_libraries(
     PUBLIC
         hyprvx_core
         hyprvx_hyprland_ipc
+        nlohmann_json::nlohmann_json
 )
 
 target_compile_features(
@@ -277,6 +281,7 @@ if(BUILD_TESTING AND HYPRVX_BUILD_TESTS)
         tests/unit/test_socket2_stream.cpp
         tests/unit/test_runtime_bridge.cpp
         tests/unit/test_spatial_projection.cpp
+        tests/unit/test_projection_state.cpp
     )
 
     target_link_libraries(

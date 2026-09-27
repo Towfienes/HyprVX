@@ -48,6 +48,7 @@ int watch() {
     while (auto line = stream.nextLine()) {
         report(bridge.processLine(*line));
     }
+    bridge.endEpoch();
     return 0;
 }
 
