@@ -74,3 +74,19 @@ True zoom is experimental until Hyprland render hooks and compatibility are prov
 Status: accepted
 
 Project license will be selected after a third-party license audit.
+
+## D011 - Read-only event-driven Hyprland runtime bridge
+
+Status: accepted
+
+Keep Hyprland wire parsing and socket access outside `hyprvx_core`. A semantic
+adapter translates verified socket2 events into structured runtime events, and
+an eventually consistent `RuntimeMirror` observes those events without mutating
+`World`. The socket2 reader blocks for input; it does not poll Hyprland or issue
+`hyprctl` requests.
+
+The initial runtime policy targets one active output: the laptop output is
+active alone, an external DP output takes over exclusively while connected,
+and the laptop output resumes when it disconnects. Simultaneous multi-monitor
+behavior is deferred. Typed monitor hotplug events remain deferred until their
+payloads are verified on hardware.

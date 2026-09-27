@@ -2,7 +2,7 @@
 
 ## Phase
 
-Phase 2A.5 complete - typed window-move and workspace-lifecycle events
+Phase 2B complete - read-only event-driven Hyprland runtime bridge
 
 ## Completed
 
@@ -139,7 +139,36 @@ Validated captured events:
 
 Timestamp-prefixed probe lines continue to parse.
 
+## Phase 2B validation
+
+Build:
+PASS
+
+Full test suite:
+179 / 179 PASS
+
+Validated:
+- SemanticEventAdapter maps structured events and suppresses captured legacy/v2 duplicates
+- RuntimeMirror safely tracks partial windows, workspace state and focus
+- blocking socket2 reader frames split, combined, CRLF and trailing partial input
+- event lines are capped at 64 KiB; oversize unterminated frames fail safely
+- runtime socket path is preferred, with `/tmp/hypr` fallback when needed
+- `hyprvx-ipc-watch --file` replay uses the same parser, adapter and mirror path
+- read-only live socket smoke test connected and waited for events
+- address-first `changefloatingmode` format and empty activewindowv2 focus-clear event
+- malformed recognized payloads are preserved as UnknownEvent
+- canonical hex window identity, merge-preserved out-of-order metadata, and bounded close tombstones
+- tombstoned late metadata is suppressed from mirror state and semantic watch output
+- mirror reset clears state for a new connection epoch
+- runtime state contains metadata only; socket2 geometry is not inferred
+
+Runtime integration stays outside `hyprvx_core`; it does not mutate `World`.
+Runtime policy targets one active output, with external DP taking exclusive
+priority while connected. Monitor hotplug typing remains deferred pending
+hardware verification. Production Hyprland configuration and Caelestia remain
+unmodified.
+
 ## Next
 
-Phase 2A.6 - continue Hyprland 0.56.2 event-format discovery from captured
-socket2 output; add typed schemas only for newly captured formats.
+Phase 2C - define a safe, explicit reconciliation design before connecting
+read-only runtime observations to the spatial world model.

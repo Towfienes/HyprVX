@@ -39,6 +39,25 @@ bool isValidEventName(std::string_view name) {
     return true;
 }
 
+bool isValidAddress(std::string_view address) {
+    if (address.starts_with("0x") || address.starts_with("0X")) {
+        address.remove_prefix(2);
+    }
+    if (address.empty()) {
+        return false;
+    }
+    for (const char character : address) {
+        const bool isHex =
+            (character >= '0' && character <= '9') ||
+            (character >= 'a' && character <= 'f') ||
+            (character >= 'A' && character <= 'F');
+        if (!isHex) {
+            return false;
+        }
+    }
+    return true;
+}
+
 bool splitFirst(std::string_view value, std::string_view& first, std::string_view& rest) {
     const auto delimiter = value.find(',');
     if (delimiter == std::string_view::npos) {
@@ -90,15 +109,18 @@ std::optional<Event> EventParser::parse(std::string_view line) {
     if (name == "activewindow") {
         std::string_view className;
         std::string_view title;
-        if (!splitFirst(payload, className, title)) {
-            return std::nullopt;
+        if (!splitFirst(payload, className, title) || className.empty()) {
+            return unknown();
         }
         return ActiveWindowEvent{std::string(className), std::string(title)};
     }
 
     if (name == "activewindowv2") {
         if (payload.empty()) {
-            return std::nullopt;
+            return ActiveWindowV2Event{std::nullopt};
+        }
+        if (!isValidAddress(payload)) {
+            return unknown();
         }
         return ActiveWindowV2Event{std::string(payload)};
     }
@@ -106,17 +128,18 @@ std::optional<Event> EventParser::parse(std::string_view line) {
     if (name == "activelayout") {
         std::string_view keyboardName;
         std::string_view layoutName;
-        if (!splitFirst(payload, keyboardName, layoutName)) {
-            return std::nullopt;
+        if (!splitFirst(payload, keyboardName, layoutName) || keyboardName.empty() || layoutName.empty()) {
+            return unknown();
         }
         return ActiveLayoutEvent{std::string(keyboardName), std::string(layoutName)};
     }
 
     if (name == "changefloatingmode") {
-        std::string_view floatingValue;
         std::string_view address;
-        if (!splitFirst(payload, floatingValue, address) || address.empty()) {
-            return std::nullopt;
+        std::string_view floatingValue;
+        if (!splitFirst(payload, address, floatingValue) || !isValidAddress(address) || floatingValue.empty() ||
+            floatingValue.find(',') != std::string_view::npos) {
+            return unknown();
         }
         if (floatingValue == "0") {
             return ChangeFloatingModeEvent{false, std::string(address)};
@@ -124,29 +147,32 @@ std::optional<Event> EventParser::parse(std::string_view line) {
         if (floatingValue == "1") {
             return ChangeFloatingModeEvent{true, std::string(address)};
         }
-        return std::nullopt;
+        return unknown();
     }
 
     if (name == "workspace") {
+        if (payload.empty()) {
+            return unknown();
+        }
         return WorkspaceEvent{std::string(payload)};
     }
 
     if (name == "workspacev2") {
         std::string_view idValue;
         std::string_view workspaceName;
-        if (!splitFirst(payload, idValue, workspaceName)) {
-            return std::nullopt;
+        if (!splitFirst(payload, idValue, workspaceName) || workspaceName.empty()) {
+            return unknown();
         }
         const auto id = parseInteger(idValue);
         if (!id) {
-            return std::nullopt;
+            return unknown();
         }
         return WorkspaceV2Event{*id, std::string(workspaceName)};
     }
 
     if (name == "windowtitle") {
-        if (payload.empty()) {
-            return std::nullopt;
+        if (!isValidAddress(payload)) {
+            return unknown();
         }
         return WindowTitleEvent{std::string(payload)};
     }
@@ -154,8 +180,8 @@ std::optional<Event> EventParser::parse(std::string_view line) {
     if (name == "windowtitlev2") {
         std::string_view address;
         std::string_view title;
-        if (!splitFirst(payload, address, title) || address.empty()) {
-            return std::nullopt;
+        if (!splitFirst(payload, address, title) || !isValidAddress(address)) {
+            return unknown();
         }
         return WindowTitleV2Event{std::string(address), std::string(title)};
     }
@@ -170,7 +196,7 @@ std::optional<Event> EventParser::parse(std::string_view line) {
         if (!splitFirst(payload, address, remainder) ||
             !splitFirst(remainder, workspace, remainderAfterWorkspace) ||
             !splitFirst(remainderAfterWorkspace, className, title) ||
-            address.empty() || workspace.empty() || className.empty()) {
+            !isValidAddress(address) || workspace.empty() || className.empty()) {
             return unknown();
         }
         return OpenWindowEvent{
@@ -181,7 +207,7 @@ std::optional<Event> EventParser::parse(std::string_view line) {
     }
 
     if (name == "closewindow") {
-        if (payload.empty() || payload.find(',') != std::string_view::npos) {
+        if (!isValidAddress(payload)) {
             return unknown();
         }
         return CloseWindowEvent{std::string(payload)};
@@ -190,7 +216,7 @@ std::optional<Event> EventParser::parse(std::string_view line) {
     if (name == "movewindow") {
         std::string_view address;
         std::string_view workspace;
-        if (!splitFirst(payload, address, workspace) || address.empty() || workspace.empty()) {
+        if (!splitFirst(payload, address, workspace) || !isValidAddress(address) || workspace.empty()) {
             return unknown();
         }
         return MoveWindowEvent{std::string(address), std::string(workspace)};
@@ -203,7 +229,7 @@ std::optional<Event> EventParser::parse(std::string_view line) {
         std::string_view workspaceName;
         if (!splitFirst(payload, address, remainder) ||
             !splitFirst(remainder, workspaceIdValue, workspaceName) ||
-            address.empty() || workspaceName.empty()) {
+            !isValidAddress(address) || workspaceName.empty()) {
             return unknown();
         }
         const auto workspaceId = parseInteger(workspaceIdValue);

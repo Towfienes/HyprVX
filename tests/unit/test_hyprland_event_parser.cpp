@@ -4,6 +4,8 @@
 
 #include <string>
 #include <variant>
+#include <utility>
+#include <vector>
 
 using hyprvx::hyprland::ActiveLayoutEvent;
 using hyprvx::hyprland::ActiveWindowEvent;
@@ -47,7 +49,16 @@ TEST(HyprlandEventParserTest, ParsesActiveWindowV2) {
     ASSERT_TRUE(event);
     const auto* parsed = std::get_if<ActiveWindowV2Event>(&*event);
     ASSERT_NE(parsed, nullptr);
-    EXPECT_EQ(parsed->address, "0x123abc");
+    ASSERT_TRUE(parsed->address);
+    EXPECT_EQ(*parsed->address, "0x123abc");
+}
+
+TEST(HyprlandEventParserTest, ParsesEmptyActiveWindowV2AsFocusClear) {
+    const auto event = EventParser::parse("activewindowv2>>");
+    ASSERT_TRUE(event);
+    const auto* parsed = std::get_if<ActiveWindowV2Event>(&*event);
+    ASSERT_NE(parsed, nullptr);
+    EXPECT_FALSE(parsed->address);
 }
 
 TEST(HyprlandEventParserTest, ParsesActiveLayoutAndPreservesLayoutCommas) {
@@ -60,16 +71,29 @@ TEST(HyprlandEventParserTest, ParsesActiveLayoutAndPreservesLayoutCommas) {
 }
 
 TEST(HyprlandEventParserTest, ParsesFloatingModeAsTypedBoolean) {
-    const auto event = EventParser::parse("changefloatingmode>>1,0xabc");
+    const auto event = EventParser::parse("changefloatingmode>>55f003ec5bc0,1");
     ASSERT_TRUE(event);
     const auto* parsed = std::get_if<ChangeFloatingModeEvent>(&*event);
     ASSERT_NE(parsed, nullptr);
     EXPECT_TRUE(parsed->floating);
-    EXPECT_EQ(parsed->address, "0xabc");
+    EXPECT_EQ(parsed->address, "55f003ec5bc0");
+}
+
+TEST(HyprlandEventParserTest, ParsesCapturedFloatingOffAddressThenBool) {
+    const auto event = EventParser::parse("changefloatingmode>>55f003ec5bc0,0");
+    ASSERT_TRUE(event);
+    const auto* parsed = std::get_if<ChangeFloatingModeEvent>(&*event);
+    ASSERT_NE(parsed, nullptr);
+    EXPECT_EQ(parsed->address, "55f003ec5bc0");
+    EXPECT_FALSE(parsed->floating);
 }
 
 TEST(HyprlandEventParserTest, RejectsUnknownFloatingModeValue) {
-    EXPECT_FALSE(EventParser::parse("changefloatingmode>>yes,0xabc"));
+    const auto event = EventParser::parse("changefloatingmode>>55f003ec5bc0,yes");
+    ASSERT_TRUE(event);
+    const auto* parsed = std::get_if<UnknownEvent>(&*event);
+    ASSERT_NE(parsed, nullptr);
+    EXPECT_EQ(parsed->name, "changefloatingmode");
 }
 
 TEST(HyprlandEventParserTest, ParsesWorkspaceName) {
@@ -90,7 +114,9 @@ TEST(HyprlandEventParserTest, ParsesWorkspaceV2IdAndName) {
 }
 
 TEST(HyprlandEventParserTest, RejectsMalformedWorkspaceV2Id) {
-    EXPECT_FALSE(EventParser::parse("workspacev2>>2x,work"));
+    const auto event = EventParser::parse("workspacev2>>2x,work");
+    ASSERT_TRUE(event);
+    EXPECT_TRUE(std::holds_alternative<UnknownEvent>(*event));
 }
 
 TEST(HyprlandEventParserTest, ParsesWindowTitleAddress) {
@@ -123,6 +149,41 @@ TEST(HyprlandEventParserTest, RejectsMalformedLinesAndInvalidProbePrefix) {
     EXPECT_FALSE(EventParser::parse("activewindow kitty,title"));
     EXPECT_FALSE(EventParser::parse("[yesterday] workspace>>1"));
     EXPECT_FALSE(EventParser::parse(">>payload"));
+}
+
+TEST(HyprlandEventParserTest, EveryMalformedKnownPayloadIsPreservedAsUnknown) {
+    const std::vector<std::pair<std::string, std::string>> malformed = {
+        {"activewindow>>class-without-title-delimiter", "activewindow"},
+        {"activewindowv2>>addr,extra", "activewindowv2"},
+        {"activewindowv2>>bad-address", "activewindowv2"},
+        {"activelayout>>keyboard-without-layout", "activelayout"},
+        {"changefloatingmode>>addr,2", "changefloatingmode"},
+        {"changefloatingmode>>bad-address,1", "changefloatingmode"},
+        {"workspace>>", "workspace"},
+        {"workspacev2>>bad-id,name", "workspacev2"},
+        {"windowtitle>>", "windowtitle"},
+        {"windowtitle>>addr,extra", "windowtitle"},
+        {"windowtitlev2>>addr", "windowtitlev2"},
+        {"windowtitlev2>>bad-address,title", "windowtitlev2"},
+        {"openwindow>>addr,1,class", "openwindow"},
+        {"closewindow>>", "closewindow"},
+        {"closewindow>>not-an-address", "closewindow"},
+        {"movewindow>>addr", "movewindow"},
+        {"movewindow>>bad-address,2", "movewindow"},
+        {"movewindowv2>>addr,bad-id,name", "movewindowv2"},
+        {"createworkspace>>", "createworkspace"},
+        {"createworkspacev2>>bad-id,name", "createworkspacev2"},
+        {"destroyworkspace>>", "destroyworkspace"},
+        {"destroyworkspacev2>>bad-id,name", "destroyworkspacev2"}};
+
+    for (const auto& [line, expectedName] : malformed) {
+        const auto event = EventParser::parse(line);
+        ASSERT_TRUE(event) << line;
+        const auto* parsed = std::get_if<UnknownEvent>(&*event);
+        ASSERT_NE(parsed, nullptr) << line;
+        EXPECT_EQ(parsed->name, expectedName) << line;
+        EXPECT_EQ(parsed->payload, line.substr(line.find(">>") + 2)) << line;
+    }
 }
 
 TEST(HyprlandEventParserLifecycleTest, ParsesBasicOpenWindow) {

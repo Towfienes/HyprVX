@@ -1,0 +1,16 @@
+[12:00:00] openwindow>>55f003fc2bd0,1,thunar,Home
+activewindow>>thunar,Home
+[12:00:01] activewindowv2>>55f003fc2bd0
+movewindow>>55f003fc2bd0,2
+[12:00:02] movewindowv2>>55f003fc2bd0,2,2
+workspace>>2
+workspacev2>>2,2
+windowtitle>>55f003fc2bd0
+windowtitlev2>>55f003fc2bd0,Home, Documents
+changefloatingmode>>55f003fc2bd0,1
+createworkspace>>3
+createworkspacev2>>3,3
+destroyworkspace>>1
+destroyworkspacev2>>1,1
+activelayout>>kbd,English
+monitoraddedv2>>DP-1,mode,position

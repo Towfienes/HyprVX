@@ -13,7 +13,7 @@ struct ActiveWindowEvent {
 };
 
 struct ActiveWindowV2Event {
-    std::string address;
+    std::optional<std::string> address;
 };
 
 struct ActiveLayoutEvent {

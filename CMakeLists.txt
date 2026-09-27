@@ -31,6 +31,11 @@ target_include_directories(
 
 add_library(hyprvx_hyprland_ipc STATIC
     daemon/src/EventParser.cpp
+    daemon/src/SemanticEvent.cpp
+    daemon/src/SemanticEventAdapter.cpp
+    daemon/src/RuntimeMirror.cpp
+    daemon/src/RuntimeBridge.cpp
+    daemon/src/Socket2Stream.cpp
 )
 
 target_include_directories(
@@ -158,6 +163,23 @@ set_target_properties(
         OUTPUT_NAME hyprvx-topology-sim
 )
 
+add_executable(
+    hyprvx_ipc_watch
+    daemon/src/ipc_watch_main.cpp
+)
+
+target_link_libraries(
+    hyprvx_ipc_watch
+    PRIVATE
+        hyprvx_hyprland_ipc
+)
+
+set_target_properties(
+    hyprvx_ipc_watch
+    PROPERTIES
+        OUTPUT_NAME hyprvx-ipc-watch
+)
+
 include(CTest)
 
 if(BUILD_TESTING AND HYPRVX_BUILD_TESTS)
@@ -197,6 +219,10 @@ if(BUILD_TESTING AND HYPRVX_BUILD_TESTS)
     add_executable(
         hyprvx_hyprland_ipc_tests
         tests/unit/test_hyprland_event_parser.cpp
+        tests/unit/test_semantic_event_adapter.cpp
+        tests/unit/test_runtime_mirror.cpp
+        tests/unit/test_socket2_stream.cpp
+        tests/unit/test_runtime_bridge.cpp
     )
 
     target_link_libraries(
@@ -208,6 +234,15 @@ if(BUILD_TESTING AND HYPRVX_BUILD_TESTS)
 
     gtest_discover_tests(
         hyprvx_hyprland_ipc_tests
+    )
+
+    add_test(
+        NAME HyprlandIpcWatchReplay
+        COMMAND
+            ${CMAKE_COMMAND}
+            -DWATCH_EXECUTABLE=$<TARGET_FILE:hyprvx_ipc_watch>
+            -DCAPTURE_FILE=${CMAKE_CURRENT_SOURCE_DIR}/tests/data/runtime_bridge_capture.txt
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_ipc_watch_replay.cmake
     )
 
     foreach(test_case IN ITEMS
