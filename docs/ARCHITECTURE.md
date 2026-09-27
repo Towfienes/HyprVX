@@ -156,3 +156,33 @@ projector's spatial revision changes; title and focus churn do not schedule
 writes. The debounce has a configurable maximum dirty age, so continuous
 spatial changes cannot defer the save indefinitely; callers can save
 immediately during graceful shutdown.
+
+## Runtime camera navigation
+
+Phase 2E adds `hyprvx_runtime_navigation` above the core camera/navigation
+classes and the runtime projection. `RuntimeCameraController` accepts semantic
+pan, window/workspace/view goto, directional focus, history, and Home actions.
+Physical adapters translate mouse, keyboard, or future trackpad gestures into
+the same actions. The controller changes only the active HyprVX camera; it
+never moves/focuses a Hyprland window or switches a compositor workspace.
+
+HyprVX spatial selection is separate from compositor keyboard focus. Observed
+focus may seed selection while idle; after explicit user navigation, user
+selection owns directional focus until the adapter resets ownership. Closing
+or losing the selected projected window clears selection on reconciliation.
+Direct pan cancels an active camera flight, while a new explicit destination
+replaces the previous target. A pan gesture records one history transaction
+at its end, not one entry per input update. Camera animation advances only
+while input, velocity, or a flight is active. The SDL simulator exercises this
+path without requiring a Hyprland connection. Camera resting position is not
+persisted in Phase 2E; animation and gesture state are transient.
+
+For safe visual projection replay, run
+`hyprvx-visual-sim --capture tests/data/runtime_bridge_capture.txt`; an
+optional `--state <state.json>` restores durable projection state first. The
+simulator draws projected windows and known workspace-region outlines, and
+uses the runtime navigation controller for selection and camera motion.
+
+The active output's `Camera` is supplied to the controller by its caller.
+Runtime policy remains one active output (eDP-2 alone, or external DP alone
+when connected); linked or simultaneous output navigation is not introduced.

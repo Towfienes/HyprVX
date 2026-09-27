@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cmath>
 #include <iomanip>
+#include <fstream>
 #include <iostream>
 #include <optional>
 #include <sstream>
@@ -15,6 +16,10 @@
 #include "hyprvx/core/NavigationState.hpp"
 #include "hyprvx/core/ViewportFraming.hpp"
 #include "hyprvx/core/World.hpp"
+#include "hyprvx/runtime/RuntimeCameraController.hpp"
+#include "hyprvx/runtime/ProjectionStateStore.hpp"
+#include "hyprvx/runtime/SpatialProjection.hpp"
+#include "hyprvx/hyprland/RuntimeBridge.hpp"
 
 namespace {
 
@@ -517,6 +522,17 @@ void drawWorld(
     }
 }
 
+void drawWorkspaceRegions(
+    SDL_Renderer* renderer,
+    const hyprvx::runtime::SpatialProjector& projector,
+    const hyprvx::Camera& camera
+) {
+    for (const auto& [name, region] : projector.workspaceMap().regions()) {
+        static_cast<void>(name);
+        outlineRect(renderer, toScreenRect(region.bounds, camera), 75, 105, 145, 220);
+    }
+}
+
 std::optional<
     std::pair<
         hyprvx::IslandId,
@@ -876,16 +892,6 @@ hyprvx::CameraView currentCameraView(
     };
 }
 
-void flyToCameraView(
-    hyprvx::CameraController& controller,
-    const hyprvx::CameraView& view
-) {
-    controller.flyToView(
-        view.position,
-        view.zoom
-    );
-}
-
 std::optional<hyprvx::ZoneId>
 zoneIdFromKey(
     SDL_Keycode key
@@ -923,45 +929,6 @@ windowAtPoint(
     return hitFreeWindow(
         world,
         worldPoint
-    );
-}
-
-void flyToWindow(
-    SDL_Window* window,
-    const hyprvx::World& world,
-    hyprvx::WindowId windowId,
-    hyprvx::Camera& camera,
-    hyprvx::CameraController& controller
-) {
-    const auto geometry =
-        world.windowGeometry(windowId);
-
-    if (!geometry.has_value()) {
-        return;
-    }
-
-    int width{};
-    int height{};
-
-    SDL_GetWindowSizeInPixels(
-        window,
-        &width,
-        &height
-    );
-
-    const hyprvx::FramedView view =
-        hyprvx::frameRectInViewport(
-            *geometry,
-            {
-                static_cast<double>(width),
-                static_cast<double>(height)
-            },
-            camera.zoom()
-        );
-
-    controller.flyToView(
-        view.cameraPosition,
-        view.zoom
     );
 }
 
@@ -1024,6 +991,7 @@ void render(
     const hyprvx::Camera& camera,
     const hyprvx::CameraController& controller,
     const hyprvx::World& world,
+    const hyprvx::runtime::SpatialProjector* projector,
     const WindowDrag& drag,
     const std::optional<hyprvx::WindowId>& focusedWindow
 ) {
@@ -1053,6 +1021,8 @@ void render(
         height
     );
 
+    if (projector != nullptr) drawWorkspaceRegions(renderer, *projector, camera);
+
     drawWorld(
         renderer,
         camera,
@@ -1074,8 +1044,23 @@ void render(
 
 }
 
-int main() {
+int main(int argc, char** argv) {
     using namespace hyprvx;
+
+    std::string capturePath;
+    std::string statePath;
+    for (int index = 1; index < argc; ++index) {
+        const std::string argument(argv[index]);
+        if (argument == "--capture" && index + 1 < argc) capturePath = argv[++index];
+        else if (argument == "--state" && index + 1 < argc) statePath = argv[++index];
+        else if (argument == "--help") {
+            std::cout << "Usage: hyprvx-visual-sim [--capture <socket2.log>] [--state <state.json>]\n";
+            return 0;
+        } else {
+            std::cerr << "Unknown or incomplete option: " << argument << "\n";
+            return 2;
+        }
+    }
 
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         std::cerr
@@ -1143,7 +1128,40 @@ int main() {
 
     World world;
 
-    world.addFreeWindow({
+    hyprvx::hyprland::RuntimeBridge runtimeBridge;
+    hyprvx::runtime::SpatialProjector projector;
+    projector.setCompositorEpoch("visual-simulator");
+    if (!capturePath.empty()) {
+        if (!statePath.empty()) {
+            const auto loaded = hyprvx::runtime::ProjectionStateStore{}.load(statePath);
+            if (loaded.state) projector.restoreState(*loaded.state, world);
+            else if (loaded.status != hyprvx::runtime::StateLoadStatus::Missing) {
+                std::cerr << "Ignoring saved state: " << loaded.diagnostic << "\n";
+            }
+        }
+        std::ifstream capture(capturePath, std::ios::binary);
+        if (!capture) {
+            std::cerr << "Could not open capture: " << capturePath << "\n";
+            SDL_DestroyRenderer(renderer);
+            SDL_DestroyWindow(window);
+            SDL_Quit();
+            return 1;
+        }
+        std::string line;
+        while (std::getline(capture, line)) {
+            static_cast<void>(runtimeBridge.processLine(line));
+            projector.reconcile(runtimeBridge.mirror(), world);
+        }
+        if (capture.bad()) {
+            std::cerr << "Failed reading capture: " << capturePath << "\n";
+            SDL_DestroyRenderer(renderer);
+            SDL_DestroyWindow(window);
+            SDL_Quit();
+            return 1;
+        }
+    }
+
+    if (capturePath.empty()) world.addFreeWindow({
         1,
         {
             {350.0, 250.0},
@@ -1151,7 +1169,7 @@ int main() {
         }
     });
 
-    world.addFreeWindow({
+    if (capturePath.empty()) world.addFreeWindow({
         4,
         {
             {-1800.0, 1000.0},
@@ -1159,6 +1177,7 @@ int main() {
         }
     });
 
+    if (capturePath.empty()) {
     Island code{
         codeIslandId,
         {2600.0, -1300.0}
@@ -1183,18 +1202,20 @@ int main() {
     world.addIsland(
         std::move(code)
     );
+    }
+
+    int initialWidth{};
+    int initialHeight{};
+    SDL_GetWindowSizeInPixels(window, &initialWidth, &initialHeight);
+    hyprvx::runtime::RuntimeCameraController navigation{
+        camera, controller, world,
+        {static_cast<double>(initialWidth), static_cast<double>(initialHeight)}};
+    if (!capturePath.empty()) {
+        navigation.observeCompositorSelection(projector.focusedWindowId());
+    }
 
     InputState input;
     WindowDrag windowDrag;
-
-    SpatialNavigator spatialNavigator;
-
-    CameraHistory cameraHistory{64};
-
-    CameraHistoryTransaction
-        manualHistory{
-            cameraHistory
-        };
 
     ManualHistoryInput
         manualHistoryInput;
@@ -1230,6 +1251,7 @@ int main() {
 
     std::optional<WindowId>
         focusedWindow{};
+    if (!capturePath.empty()) focusedWindow = navigation.selectedWindow();
 
     bool running = true;
     bool dirty = true;
@@ -1243,33 +1265,35 @@ int main() {
         camera,
         controller,
         world,
+        capturePath.empty() ? nullptr : &projector,
         windowDrag,
         focusedWindow
     );
 
     std::cout
-        << "\nHyprVX island simulator controls:\n"
+        << "\nHyprVX spatial simulator controls:\n"
         << "  LMB drag      : move window / island member\n"
         << "  Middle drag   : pan canvas\n"
-        << "  WASD / arrows : pan camera\n"
+        << "  H/J/K/L, WASD : pan camera\n"
+        << "  arrows        : pan camera\n"
         << "  Wheel         : zoom around cursor\n"
         << "  F             : fly to CODE island\n"
         << "  Shift+H/J/K/L : spatial focus navigation\n"
         << "  Alt+Left/Right: camera history back/forward\n"
-        << "  1 / 2 / 3     : go to Zone\n"
+        << "  1 / 2 / 3     : workspace region in capture mode, otherwise Zone\n"
         << "  Ctrl+1/2/3    : save current view to Zone\n"
         << "  R / Home      : smooth Go Home\n"
         << "  Esc           : quit\n\n";
+    if (!capturePath.empty()) {
+        std::cout << "Replay projection view loaded: " << capturePath << "\n";
+    }
 
     while (running) {
         const bool motionActive =
             keyboardActive(input) ||
-            input.middleDragging ||
             windowDrag.active() ||
             manualHistoryInput.wheelBurst ||
-            controller.isFlying() ||
-            controller.velocity()
-                .lengthSquared() > 0.01;
+            navigation.needsFrame();
 
         SDL_Event event{};
         bool receivedEvent{};
@@ -1315,18 +1339,26 @@ int main() {
 
                         switch (current.key.key) {
                             case SDLK_W:
+                            case SDLK_K:
+                                if ((current.key.mod & SDL_KMOD_SHIFT) != 0 && current.key.key == SDLK_K) break;
                                 input.up = pressed;
                                 break;
 
                             case SDLK_S:
+                            case SDLK_J:
+                                if ((current.key.mod & SDL_KMOD_SHIFT) != 0 && current.key.key == SDLK_J) break;
                                 input.down = pressed;
                                 break;
 
                             case SDLK_A:
+                            case SDLK_H:
+                                if ((current.key.mod & SDL_KMOD_SHIFT) != 0 && current.key.key == SDLK_H) break;
                                 input.left = pressed;
                                 break;
 
                             case SDLK_D:
+                            case SDLK_L:
+                                if ((current.key.mod & SDL_KMOD_SHIFT) != 0 && current.key.key == SDLK_L) break;
                                 input.right = pressed;
                                 break;
 
@@ -1379,14 +1411,6 @@ int main() {
                         ) {
                             manualHistoryInput.keyboard =
                                 true;
-
-                            if (!manualHistory.active()) {
-                                manualHistory.begin(
-                                    currentCameraView(
-                                        camera
-                                    )
-                                );
-                            }
                         }
 
                         if (
@@ -1395,23 +1419,6 @@ int main() {
                         ) {
                             manualHistoryInput.keyboard =
                                 false;
-
-                            if (
-                                !manualHistoryInput.middle &&
-                                !manualHistoryInput.wheelBurst
-                            ) {
-                                if (
-                                    manualHistory.finish(
-                                        currentCameraView(
-                                            camera
-                                        )
-                                    )
-                                ) {
-                                    std::cout
-                                        << "Manual history: keyboard recorded"
-                                        << std::endl;
-                                }
-                            }
                         }
 
                         if (
@@ -1472,38 +1479,15 @@ int main() {
                                 spatialDirection.has_value() &&
                                 focusedWindow.has_value()
                             ) {
-                                const auto result =
-                                    spatialNavigator
-                                        .findNeighbor(
-                                            world,
-                                            *focusedWindow,
-                                            *spatialDirection
-                                        );
-
-                                if (result.has_value()) {
+                                navigation.observeCompositorSelection(focusedWindow);
+                                if (navigation.focusDirection(*spatialDirection)) {
                                     std::cout
                                         << "Spatial focus: "
                                         << *focusedWindow
                                         << " -> "
-                                        << result->windowId
+                                        << *navigation.selectedWindow()
                                         << "\n";
-
-                                    cameraHistory.record(
-                                        currentCameraView(
-                                            camera
-                                        )
-                                    );
-
-                                    focusedWindow =
-                                        result->windowId;
-
-                                    flyToWindow(
-                                        window,
-                                        world,
-                                        *focusedWindow,
-                                        camera,
-                                        controller
-                                    );
+                                    focusedWindow = navigation.selectedWindow();
 
                                     dirty = true;
                                 } else {
@@ -1519,18 +1503,7 @@ int main() {
                                 current.key.key ==
                                     SDLK_LEFT
                             ) {
-                                const auto target =
-                                    cameraHistory.back(
-                                        currentCameraView(
-                                            camera
-                                        )
-                                    );
-
-                                if (target.has_value()) {
-                                    flyToCameraView(
-                                        controller,
-                                        *target
-                                    );
+                                if (navigation.historyBack()) {
 
                                     std::cout
                                         << "History: back"
@@ -1549,18 +1522,7 @@ int main() {
                                 current.key.key ==
                                     SDLK_RIGHT
                             ) {
-                                const auto target =
-                                    cameraHistory.forward(
-                                        currentCameraView(
-                                            camera
-                                        )
-                                    );
-
-                                if (target.has_value()) {
-                                    flyToCameraView(
-                                        controller,
-                                        *target
-                                    );
+                                if (navigation.historyForward()) {
 
                                     std::cout
                                         << "History: forward"
@@ -1616,22 +1578,13 @@ int main() {
                                 !altHeld &&
                                 !shiftHeld
                             ) {
-                                const Zone* zone =
-                                    zones.find(
-                                        *zoneId
-                                    );
-
-                                if (zone != nullptr) {
-                                    cameraHistory.record(
-                                        currentCameraView(
-                                            camera
-                                        )
-                                    );
-
-                                    flyToCameraView(
-                                        controller,
-                                        zone->view
-                                    );
+                                const std::string workspaceName = std::to_string(*zoneId);
+                                if (!capturePath.empty() && projector.workspaceMap().find(workspaceName) != nullptr) {
+                                    static_cast<void>(navigation.gotoWorkspace(workspaceName));
+                                    std::cout << "HyprVX workspace region " << workspaceName << std::endl;
+                                    dirty = true;
+                                } else if (const Zone* zone = zones.find(*zoneId); zone != nullptr) {
+                                    static_cast<void>(navigation.gotoView(zone->view));
 
                                     std::cout
                                         << "Zone "
@@ -1657,21 +1610,12 @@ int main() {
                                 current.key.key ==
                                     SDLK_HOME
                             ) {
-                                cameraHistory.record(
-                                    currentCameraView(
-                                        camera
-                                    )
-                                );
-
                                 const Zone* home =
                                     zones.find(1);
 
-                                if (home != nullptr) {
-                                    flyToCameraView(
-                                        controller,
-                                        home->view
-                                    );
-                                }
+                                navigation.observeCompositorSelection(focusedWindow);
+                                if (focusedWindow) static_cast<void>(navigation.home());
+                                else if (home != nullptr) static_cast<void>(navigation.gotoView(home->view));
 
                                 dirty = true;
                             }
@@ -1680,20 +1624,11 @@ int main() {
                                 current.key.key ==
                                 SDLK_F
                             ) {
-                                cameraHistory.record(
-                                    currentCameraView(
-                                        camera
-                                    )
-                                );
-
                                 const Zone* code =
                                     zones.find(2);
 
                                 if (code != nullptr) {
-                                    flyToCameraView(
-                                        controller,
-                                        code->view
-                                    );
+                                    static_cast<void>(navigation.gotoView(code->view));
                                 }
 
                                 dirty = true;
@@ -1710,19 +1645,10 @@ int main() {
                             SDL_BUTTON_MIDDLE
                         ) {
                             input.middleDragging = true;
+                            static_cast<void>(navigation.panBegin());
 
                             manualHistoryInput.middle =
                                 true;
-
-                            if (!manualHistory.active()) {
-                                manualHistory.begin(
-                                    currentCameraView(
-                                        camera
-                                    )
-                                );
-                            }
-
-                            controller.cancelFlight();
 
                             input.lastDragTime =
                                 Clock::now();
@@ -1754,6 +1680,7 @@ int main() {
                                     )
                             ) {
                                 focusedWindow = *clicked;
+                                navigation.observeCompositorSelection(focusedWindow);
 
                                 std::cout
                                     << "Focused window: "
@@ -1787,13 +1714,7 @@ int main() {
                                 !manualHistoryInput.keyboard &&
                                 !manualHistoryInput.wheelBurst
                             ) {
-                                if (
-                                    manualHistory.finish(
-                                        currentCameraView(
-                                            camera
-                                        )
-                                    )
-                                ) {
+                                if (navigation.panEnd()) {
                                     std::cout
                                         << "Manual history: MMB recorded"
                                         << std::endl;
@@ -1829,23 +1750,10 @@ int main() {
 
                             input.lastDragTime = now;
 
-                            const Vec2 delta{
-                                -static_cast<double>(
-                                    current.motion.xrel
-                                ) / camera.zoom(),
-
-                                -static_cast<double>(
-                                    current.motion.yrel
-                                ) / camera.zoom()
-                            };
-
-                            camera.moveBy(delta);
-
-                            if (dt > 0.000001) {
-                                controller.setVelocity(
-                                    delta / dt
-                                );
-                            }
+                            static_cast<void>(dt);
+                            navigation.panByScreen({
+                                static_cast<double>(current.motion.xrel),
+                                static_cast<double>(current.motion.yrel)});
 
                             dirty = true;
                         }
@@ -1869,14 +1777,7 @@ int main() {
                         ) {
                             manualHistoryInput.wheelBurst =
                                 true;
-
-                            if (!manualHistory.active()) {
-                                manualHistory.begin(
-                                    currentCameraView(
-                                        camera
-                                    )
-                                );
-                            }
+                            static_cast<void>(navigation.panBegin());
                         }
 
                         manualHistoryInput.lastWheelEvent =
@@ -1917,6 +1818,8 @@ int main() {
                     case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
                     case SDL_EVENT_WINDOW_RESIZED:
                     case SDL_EVENT_WINDOW_EXPOSED:
+                        SDL_GetWindowSizeInPixels(window, &initialWidth, &initialHeight);
+                        navigation.setViewport({static_cast<double>(initialWidth), static_cast<double>(initialHeight)});
                         dirty = true;
                         break;
 
@@ -1975,13 +1878,7 @@ int main() {
                     !manualHistoryInput.keyboard &&
                     !manualHistoryInput.middle
                 ) {
-                    if (
-                        manualHistory.finish(
-                            currentCameraView(
-                                camera
-                            )
-                        )
-                    ) {
+                    if (navigation.panEnd()) {
                         std::cout
                             << "Manual history: wheel recorded"
                             << std::endl;
@@ -2005,21 +1902,16 @@ int main() {
                 0.05
             );
 
-        controller.setPanInput(
+        navigation.setPanInput(
             keyboardDirection(input)
         );
 
         if (!input.middleDragging) {
             const bool shouldUpdate =
-                keyboardActive(input) ||
-                controller.isFlying() ||
-                controller.velocity()
-                    .lengthSquared() > 0.01;
+                navigation.needsFrame();
 
             if (shouldUpdate) {
-                controller.update(
-                    deltaSeconds
-                );
+                static_cast<void>(navigation.tick(deltaSeconds));
 
                 dirty = true;
             }
@@ -2032,6 +1924,7 @@ int main() {
                 camera,
                 controller,
                 world,
+                capturePath.empty() ? nullptr : &projector,
                 windowDrag,
                 focusedWindow
             );

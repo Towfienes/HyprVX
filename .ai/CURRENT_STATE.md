@@ -2,7 +2,7 @@
 
 ## Phase
 
-Phase 2D complete - durable one-way runtime spatial projection and epoch recovery
+Phase 2E complete - user-driven runtime camera navigation over durable spatial projection
 
 ## Completed
 
@@ -217,5 +217,31 @@ No compositor commands, polling, plugin, production config changes, or automatic
 
 ## Next
 
-Phase 2E - define the first user-driven camera/navigation integration over the
-persisted one-way spatial model while retaining read-only compositor behavior.
+Phase 2F - define runtime input adapter boundaries and visual integration for
+persisted Hyprland projections while retaining read-only compositor behavior.
+
+## Phase 2E validation
+
+Configure/build: PASS
+
+Full CTest suite: 261 / 261 PASS
+
+Validated runtime camera navigation:
+- separate runtime navigation library reuses CameraController, CameraHistory, SpatialNavigator, and ViewportFraming without adding daemon dependencies to hyprvx_core
+- semantic pan gestures create one history entry; zero-delta pan creates none; keyboard pan is delta-time driven and settles without overshoot
+- projected window/address and numeric, named, special, and restored workspace navigation; missing targets fail without creating World state
+- directional selection works in all four directions, follows projected geometry, and remains distinct from observed compositor focus
+- observed focus seeds selection until explicit user navigation takes ownership; selected close/reconcile and epoch reset are safe
+- history back/forward, branch truncation, bounded capacity, transition replacement, and direct-pan flight interruption
+- Home prefers focused projected window, then supplied focused workspace, nearest known projected window, and origin fallback
+- SDL visual simulator routes mouse pan, keyboard pan, spatial focus, history, zones, and Home through the runtime controller
+- simulator `--capture` replays socket2 fixtures through RuntimeBridge and SpatialProjector, draws projected windows/workspace outlines, and accepts optional `--state` restore
+- captured runtime event replay plus navigation produced deterministic final camera state
+
+Safe visual smoke: SDL dummy-video simulator launch passed; it printed controls
+and waited for input without connecting to Hyprland. Idle camera navigation
+waits for events and only advances while input, velocity, or a transition is active.
+
+No camera position, animation, velocity, or gesture state is persisted. No
+Hyprland window/workspace control, production config, plugin, polling, or
+multi-output camera behavior was added.

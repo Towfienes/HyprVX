@@ -13,6 +13,8 @@ HyprVX should be invisible when idle.
 - no hidden UI animation loop
 - coalesce high-frequency input
 - synchronize visual updates to compositor frames
+- camera controller exposes whether a frame is needed; idle navigation waits for input events
+- advance camera physics only while input, velocity, or a transition is active
 
 ## Initial baseline
 

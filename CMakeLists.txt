@@ -55,6 +55,16 @@ add_library(hyprvx_runtime_projection STATIC
     daemon/src/ProjectionStateStore.cpp
 )
 
+add_library(hyprvx_runtime_navigation STATIC
+    daemon/src/RuntimeCameraController.cpp
+)
+target_include_directories(hyprvx_runtime_navigation PUBLIC daemon/include)
+target_link_libraries(hyprvx_runtime_navigation PUBLIC hyprvx_runtime_projection hyprvx_core)
+target_compile_features(hyprvx_runtime_navigation PUBLIC cxx_std_20)
+target_compile_options(hyprvx_runtime_navigation PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic -Wconversion -Wshadow>
+)
+
 find_package(nlohmann_json 3.2.0 REQUIRED)
 
 target_include_directories(
@@ -154,6 +164,7 @@ add_executable(
 target_link_libraries(
     hyprvx_visual_simulator
     PRIVATE
+        hyprvx_runtime_navigation
         hyprvx_core
         PkgConfig::SDL3
 )
@@ -281,15 +292,20 @@ if(BUILD_TESTING AND HYPRVX_BUILD_TESTS)
         tests/unit/test_socket2_stream.cpp
         tests/unit/test_runtime_bridge.cpp
         tests/unit/test_spatial_projection.cpp
+        tests/unit/test_runtime_camera_controller.cpp
         tests/unit/test_projection_state.cpp
     )
 
     target_link_libraries(
         hyprvx_hyprland_ipc_tests
         PRIVATE
+            hyprvx_runtime_navigation
             hyprvx_runtime_projection
             hyprvx_hyprland_ipc
             GTest::gtest_main
+    )
+    target_compile_definitions(hyprvx_hyprland_ipc_tests PRIVATE
+        HYPRVX_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/data"
     )
 
     gtest_discover_tests(

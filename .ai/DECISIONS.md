@@ -136,3 +136,18 @@ to preserve exact values in double-based JSON consumers. Persisted world
 coordinates are limited to 1e12 units to bound geometry arithmetic; runtime
 world coordinates remain double-based. Corruption snapshots use collision-safe
 suffixes, and debounced writes have a configurable maximum dirty age.
+
+## D014 - Semantic runtime camera navigation
+
+Status: accepted
+
+Physical and simulated inputs map to shared semantic camera actions in the
+runtime navigation layer. `RuntimeCameraController` reuses core Camera,
+CameraController motion, CameraHistory, SpatialNavigator, and ViewportFraming;
+it never issues compositor focus, window, or workspace commands. HyprVX
+selection is distinct from compositor focus: observed focus may seed selection
+until explicit user navigation takes ownership. Direct pan interrupts a fly,
+and a new explicit destination replaces the previous flight. Workspace jumps
+change only the HyprVX camera. A continuous pan is one history transaction.
+The single-active-output/external-exclusive policy remains the runtime target;
+trackpad input can later adapt into the same semantic actions.

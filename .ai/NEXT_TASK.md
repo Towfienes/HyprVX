@@ -1,14 +1,20 @@
 # HyprVX Next Task
 
-## Phase 2E
+## Phase 2F
 
-Design the first user-driven camera/navigation integration over the persisted
-one-way runtime spatial projection.
+Define runtime input adapter boundaries and visual integration for persisted
+Hyprland projections, retaining read-only compositor behavior.
 
 Phase 2D final audit hardening updates schema-v1 unsigned 64-bit persistence to
 canonical decimal strings, adds collision-safe corrupt snapshots and bounded
 dirty-age debounce, and caps persisted geometry at 1e12 world units. Preserve
 these constraints in future state-format changes.
+
+Phase 2E provides `RuntimeCameraController` semantic navigation and routes the
+standalone SDL simulator's pan, focus, history, zone, and Home controls through
+it. Selection remains distinct from compositor focus; direct input cancels
+camera flights; workspace/view jumps affect only the HyprVX camera; one active
+output remains the target. Camera view persistence is deferred.
 
 ## Required behavior
 
