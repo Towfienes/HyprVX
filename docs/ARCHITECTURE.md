@@ -84,3 +84,30 @@ windows, while a real open event permits address reuse. Empty
 The initial output policy is single-active-output with external DP taking over
 from eDP-2 while connected. Simultaneous multi-monitor behavior and typed
 monitor hotplug events are deferred until verified on hardware.
+
+## One-way spatial projection
+
+Phase 2C adds an integration-side `SpatialProjector`:
+
+`RuntimeMirror` -> `hyprvx_runtime_projection` -> `hyprvx_core::World`
+
+The parser and mirror remain in the Hyprland IPC adapter. The projection target
+depends on both the adapter and compositor-agnostic core; core has no runtime
+or Hyprland dependency. Reconciliation only mutates the in-memory HyprVX
+`World`. It never sends commands to Hyprland.
+
+Socket2 provides no window geometry. The projector applies an explicit
+HyprVX-owned initial placement policy (default 1000x700 windows, 200-unit
+spacing, and 3600-unit workspace stride). Workspace names, including numeric,
+named, and special names, receive stable non-overlapping regions for one
+projector epoch. Windows are laid out on a per-workspace grid and remain free
+windows. A workspace region is a spatial zone, not an Island.
+
+Canonical Hyprland addresses map through a monotonic collision-checked
+`WindowId` allocator. Metadata-only partials receive a stable projected record
+but defer World insertion until workspace name is known. A real close removes
+the World window and mapping; a later real open starts a new ID lifetime.
+Workspace moves relocate projected geometry to the destination region and
+return a grouped member to free-window ownership. Repeated reconciliation is
+idempotent. Framing helpers use the core `ViewportFraming` logic but do not
+drive a camera automatically. The one-active-output policy remains unchanged.

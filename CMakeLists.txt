@@ -50,6 +50,41 @@ target_compile_features(
         cxx_std_20
 )
 
+add_library(hyprvx_runtime_projection STATIC
+    daemon/src/SpatialProjection.cpp
+)
+
+target_include_directories(
+    hyprvx_runtime_projection
+    PUBLIC
+        daemon/include
+)
+
+target_link_libraries(
+    hyprvx_runtime_projection
+    PUBLIC
+        hyprvx_core
+        hyprvx_hyprland_ipc
+)
+
+target_compile_features(
+    hyprvx_runtime_projection
+    PUBLIC
+        cxx_std_20
+)
+
+target_compile_options(
+    hyprvx_runtime_projection
+    PRIVATE
+        $<$<CXX_COMPILER_ID:GNU,Clang>:
+            -Wall
+            -Wextra
+            -Wpedantic
+            -Wconversion
+            -Wshadow
+        >
+)
+
 target_compile_options(
     hyprvx_hyprland_ipc
     PRIVATE
@@ -168,6 +203,24 @@ add_executable(
     daemon/src/ipc_watch_main.cpp
 )
 
+add_executable(
+    hyprvx_project_replay
+    daemon/src/project_replay_main.cpp
+)
+
+target_link_libraries(
+    hyprvx_project_replay
+    PRIVATE
+        hyprvx_runtime_projection
+        hyprvx_hyprland_ipc
+)
+
+set_target_properties(
+    hyprvx_project_replay
+    PROPERTIES
+        OUTPUT_NAME hyprvx-project-replay
+)
+
 target_link_libraries(
     hyprvx_ipc_watch
     PRIVATE
@@ -223,11 +276,13 @@ if(BUILD_TESTING AND HYPRVX_BUILD_TESTS)
         tests/unit/test_runtime_mirror.cpp
         tests/unit/test_socket2_stream.cpp
         tests/unit/test_runtime_bridge.cpp
+        tests/unit/test_spatial_projection.cpp
     )
 
     target_link_libraries(
         hyprvx_hyprland_ipc_tests
         PRIVATE
+            hyprvx_runtime_projection
             hyprvx_hyprland_ipc
             GTest::gtest_main
     )

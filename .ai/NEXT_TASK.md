@@ -1,24 +1,21 @@
 # HyprVX Next Task
 
-## Phase 2C
+## Phase 2D
 
-Design a safe reconciliation boundary between read-only RuntimeMirror state
-and HyprVX's spatial world model.
-
-Do not mutate `hyprvx_core::World` until identity, startup partial-state
-behavior, ownership changes, and recovery are specified and tested.
+Design persistence and reconnect recovery for the one-way runtime spatial
+projection before adding user-driven camera or grouping controls.
 
 ## Required behavior
 
 Keep compositor wire formats and socket handling outside `hyprvx_core`. Use
-captured events and the existing RuntimeBridge for integration tests.
+captured events and the existing RuntimeBridge and SpatialProjector for
+integration tests.
 
 ## Pass criteria
 
-- runtime window identity remains the Hyprland address until a stable mapping is designed
-- startup with partial mirror state and window close/reopen are reconciled safely
-- core behavior remains compositor-agnostic
-- changes have automated coverage
+- define whether projected layout state survives process restart or is rebuilt each epoch
+- specify reset/reconnect behavior for projector IDs, workspace regions, and placement slots
+- preserve read-only behavior and one-way projection
 - one-active-output policy remains the target
 - monitor hotplug schemas remain deferred until hardware verification
 - no production Hyprland or Caelestia configuration changes
@@ -28,5 +25,5 @@ captured events and the existing RuntimeBridge for integration tests.
 
 Do not add monitor hotplug schemas without verified payloads. Do not add a
 native plugin or production integration until compatibility, failure
-containment and rollback are defined. Preserve read-only behavior until the
-reconciliation design is approved.
+containment and rollback are defined. Do not add camera control or compositor
+mutation until persistence and reconnect policy are specified.

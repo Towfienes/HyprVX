@@ -2,7 +2,7 @@
 
 ## Phase
 
-Phase 2B complete - read-only event-driven Hyprland runtime bridge
+Phase 2C complete - one-way read-only runtime spatial projection
 
 ## Completed
 
@@ -168,7 +168,28 @@ priority while connected. Monitor hotplug typing remains deferred pending
 hardware verification. Production Hyprland configuration and Caelestia remain
 unmodified.
 
+## Phase 2C validation
+
+Configure/build: PASS
+
+Full CTest suite: 207 / 207 PASS
+
+Validated:
+- separate `hyprvx_runtime_projection` library depends on the IPC adapter and compositor-agnostic core
+- canonical address to collision-checked monotonic `WindowId` mapping with close cleanup and new-open lifetime
+- stable numeric, named, and special workspace region assignment with configurable non-overlapping placement
+- finite policy-derived workspace bounds that expand to contain allocated grid rows
+- validation coverage for invalid placement policies and workspace names; multi-row placement geometry is deterministic and non-overlapping
+- explicit 1000x700 default HyprVX-owned projected geometry, configurable workspace stride and grid placement
+- metadata-only partial windows remain deferred until workspace metadata is known; pre-open move state projects safely
+- idempotent reconciliation, metadata enrichment, workspace relocation, focus/focus-clear, and tombstoned close handling
+- World removal safely handles free windows and island members while preserving single ownership
+- camera framing helpers reuse `ViewportFraming`; no camera is automatically driven
+- `hyprvx-project-replay` successfully projected a captured real Hyprland lifecycle log through the parser, adapter, mirror, and projector
+
+No compositor mutation, plugin, polling, production config change, or multi-output expansion was introduced.
+
 ## Next
 
-Phase 2C - define a safe, explicit reconciliation design before connecting
-read-only runtime observations to the spatial world model.
+Phase 2D - define persistence and recovery for the one-way projected spatial
+model before connecting user-driven camera or grouping controls.

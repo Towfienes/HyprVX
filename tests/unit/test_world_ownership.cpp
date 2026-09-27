@@ -201,6 +201,21 @@ TEST(
     );
 }
 
+TEST(WorldOwnershipTest, RemoveWindowRemovesFreeOrIslandOwnedWindow) {
+    World world;
+    ASSERT_TRUE(world.addFreeWindow({41, {{10.0, 20.0}, {100.0, 80.0}}}));
+    EXPECT_TRUE(world.removeWindow(41));
+    EXPECT_FALSE(world.windowExists(41));
+
+    ASSERT_TRUE(world.addFreeWindow({42, {{10.0, 20.0}, {100.0, 80.0}}}));
+    ASSERT_TRUE(world.addIsland(Island{7, {}}));
+    ASSERT_TRUE(world.joinFreeWindowToIsland(42, 7));
+    EXPECT_TRUE(world.removeWindow(42));
+    EXPECT_FALSE(world.windowExists(42));
+    ASSERT_NE(world.island(7), nullptr);
+    EXPECT_TRUE(world.island(7)->members().empty());
+}
+
 TEST(
     WorldOwnershipTest,
     WindowHasSingleOwner

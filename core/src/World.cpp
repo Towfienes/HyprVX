@@ -27,6 +27,19 @@ bool World::removeFreeWindow(
         freeWindows_.erase(id) != 0;
 }
 
+bool World::removeWindow(WindowId id) {
+    if (removeFreeWindow(id)) {
+        return true;
+    }
+    for (auto& [islandId, islandValue] : islands_) {
+        static_cast<void>(islandId);
+        if (islandValue.removeMember(id)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool World::hasFreeWindow(
     WindowId id
 ) const noexcept {

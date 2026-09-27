@@ -93,10 +93,10 @@ void IslandInteractionController::update(
             state_.windowId
         )
     ) {
-        updateJoin(
+        static_cast<void>(updateJoin(
             world,
             deltaSeconds
-        );
+        ));
 
         return;
     }
@@ -110,7 +110,7 @@ void IslandInteractionController::update(
         owner.has_value() &&
         *owner == state_.islandId
     ) {
-        updateDetach(world);
+        static_cast<void>(updateDetach(world));
         return;
     }
 

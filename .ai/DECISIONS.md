@@ -90,3 +90,18 @@ active alone, an external DP output takes over exclusively while connected,
 and the laptop output resumes when it disconnects. Simultaneous multi-monitor
 behavior is deferred. Typed monitor hotplug events remain deferred until their
 payloads are verified on hardware.
+
+## D012 - One-way runtime spatial projection
+
+Status: accepted
+
+`RuntimeMirror` is compositor observation state. The separate
+`hyprvx_runtime_projection` integration layer reconciles it one-way into
+`hyprvx_core::World`; there is no compositor control path in Phase 2C.
+Projected geometry is owned by HyprVX and is never represented as geometry
+reported by Hyprland. Workspace regions are spatial zones, not Islands, and
+observed windows stay free windows by default. Window IDs are allocated
+monotonically per projector epoch from canonical addresses and are removed on
+close; workspace and placement slot assignments remain reserved for the epoch
+to keep unrelated window lifecycle events from shifting existing geometry.
+The primary runtime target remains one active output.

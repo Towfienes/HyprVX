@@ -13,6 +13,10 @@ public:
 
     bool removeFreeWindow(WindowId id);
 
+    // Removes a window from whichever owner currently contains it.
+    // Island membership is removed without altering the island itself.
+    bool removeWindow(WindowId id);
+
     [[nodiscard]]
     bool hasFreeWindow(WindowId id) const noexcept;
 
