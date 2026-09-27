@@ -89,3 +89,12 @@ Home dispatch. Callers needing that fallback can call
 `RuntimeCameraController::home` directly with the workspace context; the
 simulator dispatcher uses the controller's focused projected window, known
 content, and origin fallbacks.
+
+## Phase 3 nested native input
+
+The nested Wayland overlay maps pointer, XKB keyboard, and optional pointer
+gesture protocol events into the same semantic adapters. Passive mode passes
+input to ordinary applications; interactive mode accepts navigation input.
+Seat capability loss and pointer/keyboard leave cancel transient input.
+Touchpad gesture delivery depends on the nested compositor advertising the
+client gesture protocol. No host input device is opened.

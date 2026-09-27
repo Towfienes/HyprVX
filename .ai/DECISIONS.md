@@ -166,3 +166,18 @@ window. Home prioritizes that user-owned selection; compositor focus remains
 the seed while ownership is compositor-seeded. Three-finger pan, pinch, and
 four-finger directional swipe are represented by the same semantic actions,
 with no hardware gesture library or production binding added.
+
+## D016 - Nested-only native prototype and explicit transform refusal
+
+Status: accepted for Phase 3 development
+
+Native Wayland integration is confined to a PID-verified nested Hyprland
+session with a generated config and private runtime directory. The platform
+library is above runtime navigation; `hyprvx_core` remains independent. The
+native overlay uses layer shell and bounded SHM with event-driven redraw. A
+separate plugin for exact Hyprland 0.56.2 commit provides a guarded, read-only
+event source and semantic camera control. Actual compositor geometry is kept
+apart from projected World geometry. The installed window-transformer API
+does not provide matching inverse input hit testing and excludes popups;
+enabling native content translation is therefore refused. Compositor zoom is
+deferred. No compositor model mutation or ownership echo is introduced.

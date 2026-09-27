@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.25)
 project(
     HyprVX
     VERSION 0.1.0
-    LANGUAGES CXX
+    LANGUAGES C CXX
 )
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -67,6 +67,16 @@ target_compile_options(hyprvx_runtime_navigation PRIVATE
 )
 
 find_package(nlohmann_json 3.2.0 REQUIRED)
+
+add_library(hyprvx_nested_guard STATIC platform/src/NestedGuard.cpp)
+set_target_properties(hyprvx_nested_guard PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(hyprvx_nested_guard PUBLIC platform/include)
+target_link_libraries(hyprvx_nested_guard PUBLIC nlohmann_json::nlohmann_json)
+target_compile_features(hyprvx_nested_guard PUBLIC cxx_std_20)
+
+add_executable(hyprvx_nested_check platform/src/nested_check_main.cpp)
+set_target_properties(hyprvx_nested_check PROPERTIES OUTPUT_NAME hyprvx-nested-check)
+target_link_libraries(hyprvx_nested_check PRIVATE hyprvx_nested_guard)
 
 target_include_directories(
     hyprvx_runtime_projection
@@ -156,6 +166,49 @@ pkg_check_modules(
     IMPORTED_TARGET
     sdl3
 )
+
+pkg_check_modules(WAYLAND_CLIENT REQUIRED IMPORTED_TARGET wayland-client)
+pkg_check_modules(XKBCOMMON REQUIRED IMPORTED_TARGET xkbcommon)
+pkg_check_modules(HYPRLAND REQUIRED IMPORTED_TARGET hyprland)
+find_program(WAYLAND_SCANNER wayland-scanner REQUIRED)
+set(HYPRVX_PROTOCOL_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated-protocols)
+file(MAKE_DIRECTORY ${HYPRVX_PROTOCOL_DIR})
+
+function(hyprvx_client_protocol protocol_name xml_path)
+    add_custom_command(
+        OUTPUT ${HYPRVX_PROTOCOL_DIR}/${protocol_name}-client-protocol.h
+               ${HYPRVX_PROTOCOL_DIR}/${protocol_name}-protocol.c
+        COMMAND ${WAYLAND_SCANNER} client-header ${xml_path}
+                ${HYPRVX_PROTOCOL_DIR}/${protocol_name}-client-protocol.h
+        COMMAND ${WAYLAND_SCANNER} private-code ${xml_path}
+                ${HYPRVX_PROTOCOL_DIR}/${protocol_name}-protocol.c
+        DEPENDS ${xml_path}
+        VERBATIM)
+    set(HYPRVX_GENERATED_PROTOCOLS ${HYPRVX_GENERATED_PROTOCOLS}
+        ${HYPRVX_PROTOCOL_DIR}/${protocol_name}-protocol.c
+        ${HYPRVX_PROTOCOL_DIR}/${protocol_name}-client-protocol.h PARENT_SCOPE)
+endfunction()
+
+hyprvx_client_protocol(wlr-layer-shell ${CMAKE_CURRENT_SOURCE_DIR}/platform/protocols/wlr-layer-shell-unstable-v1.xml)
+hyprvx_client_protocol(pointer-gestures /usr/share/wayland-protocols/unstable/pointer-gestures/pointer-gestures-unstable-v1.xml)
+hyprvx_client_protocol(xdg-shell /usr/share/wayland-protocols/stable/xdg-shell/xdg-shell.xml)
+
+add_library(hyprvx_wayland_platform STATIC
+    platform/src/NativeSession.cpp
+    platform/src/NativeEventBridge.cpp
+    ${HYPRVX_GENERATED_PROTOCOLS})
+target_include_directories(hyprvx_wayland_platform PUBLIC platform/include PRIVATE ${HYPRVX_PROTOCOL_DIR})
+target_link_libraries(hyprvx_wayland_platform PUBLIC hyprvx_nested_guard hyprvx_runtime_navigation
+    PkgConfig::WAYLAND_CLIENT PkgConfig::XKBCOMMON)
+target_compile_features(hyprvx_wayland_platform PUBLIC cxx_std_20)
+
+add_executable(hyprvx_native_dev platform/src/native_dev_main.cpp)
+set_target_properties(hyprvx_native_dev PROPERTIES OUTPUT_NAME hyprvx-native-dev)
+target_link_libraries(hyprvx_native_dev PRIVATE hyprvx_wayland_platform)
+
+add_library(hyprvx_hyprland_plugin MODULE platform/src/HyprlandPlugin.cpp)
+target_link_libraries(hyprvx_hyprland_plugin PRIVATE hyprvx_nested_guard PkgConfig::HYPRLAND)
+target_compile_features(hyprvx_hyprland_plugin PRIVATE cxx_std_23)
 
 add_executable(
     hyprvx_visual_simulator
@@ -296,6 +349,10 @@ if(BUILD_TESTING AND HYPRVX_BUILD_TESTS)
         tests/unit/test_spatial_projection.cpp
         tests/unit/test_runtime_camera_controller.cpp
         tests/unit/test_runtime_navigation_input.cpp
+        tests/unit/test_nested_guard.cpp
+        tests/unit/test_overlay_state.cpp
+        tests/unit/test_native_event_bridge.cpp
+        tests/unit/test_plugin_compatibility.cpp
         tests/unit/test_projection_state.cpp
     )
 
@@ -303,6 +360,8 @@ if(BUILD_TESTING AND HYPRVX_BUILD_TESTS)
         hyprvx_hyprland_ipc_tests
         PRIVATE
             hyprvx_runtime_navigation
+            hyprvx_nested_guard
+            hyprvx_wayland_platform
             hyprvx_runtime_projection
             hyprvx_hyprland_ipc
             GTest::gtest_main

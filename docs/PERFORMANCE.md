@@ -58,3 +58,17 @@ Eventually record:
 ## Regression policy
 
 A meaningful idle CPU, power, frame-time or memory regression blocks further feature work until understood.
+
+## Phase 3 native prototype
+
+The nested overlay blocks in `poll` while idle and schedules frames only for
+dirty projection, camera, selection, or output state. One Wayland frame
+callback gates outstanding redraws. ARGB8888 SHM is capped at three buffers
+and 16 million pixels per buffer. The plugin has no render hot path: its
+callbacks send bounded datagrams only on compositor events. Native transform
+mode is refused, so its incremental idle CPU is zero. Measure actual idle and
+active cost in the nested session before considering production integration.
+In the Phase 3 smoke, `/proc` CPU accounting measured 0 ticks over five
+seconds for the idle native overlay and 0 ticks over five seconds for the
+nested compositor with the idle plugin loaded. Active navigation frame time
+was not measured; this prototype is not yet a 120/210 Hz performance claim.

@@ -268,7 +268,35 @@ plugin, compositor command, polling loop, or production config change.
 Physical trackpad acquisition remains deferred; semantic gesture adapters are
 implemented and testable.
 
+## Phase 3 nested native prototype
+
+The Phase 3 worktree adds an isolated nested Hyprland harness, a reusable
+PID/socket peer safety guard, a Wayland layer-shell overlay with SHM rendering,
+native XKB/pointer/optional gesture input, and the existing socket2 runtime
+projection path. It also adds an exact-commit-guarded Hyprland plugin with
+read-only event callbacks, a credential-checked JSON datagram bridge, actual
+geometry observation separate from World, and nested-only semantic controls.
+The transform API limitation is recorded in `docs/NATIVE_PHASE3.md`; unsafe
+native content transform activation is refused and zoom is deferred.
+Wayland callbacks contain C++ exceptions at the C ABI boundary; failures stop
+the overlay, and native control-signal masks are restored during cleanup.
+
+Nested smoke verified compositor startup, sample foot clients, layer
+registration, socket2 plus authenticated plugin events, semantic control pan,
+transform refusal, reset, repeated plugin unload/reload, and compositor
+survival. A second isolated start/stop also passed. Native physical input is
+wired but was not automatically injected in the smoke environment. A clean
+Debug configure/build and the worktree build passed. Full CTest: 298 / 298 on
+both builds. The native overlay used 0 CPU ticks in a five-second idle sample;
+the nested compositor with the plugin loaded also used 0 ticks over five
+seconds. `git diff --check`: PASS. No commit or host integration was made.
+
 ## Next
 
-Phase 2F implementation is complete. Select and document the next milestone
-after review of the runtime input boundary and simulator behavior.
+Phase 3 nested native prototype is implemented and validated. The remaining
+native compositor transform, inverse hit testing, and true zoom depend on a
+Hyprland API that can keep rendered content, popups, and input coordinates in
+agreement. Physical input was wired through the existing adapters, but live
+pointer/keyboard injection was not part of the safe nested smoke. Continue
+development only in the simulator and nested compositor until those gaps are
+resolved.

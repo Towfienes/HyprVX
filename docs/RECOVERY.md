@@ -68,3 +68,10 @@ recovery.
 Daemon crash should not kill Hyprland.
 
 Native plugin crashes are higher risk and must be contained through development policy and compatibility checks.
+
+The Phase 3 harness targets only a PID-verified nested compositor. The overlay
+stops on Wayland or socket2 disconnect; restarting it requires a new guarded
+launch. `python3 tools/hyprvx_nested.py camera-reset` resets only the guarded
+native child. `plugin-control reset` and `plugin-unload` leave compositor
+rendering at identity. If the nested compositor fails, stop the harness and
+start a fresh isolated session; no host configuration or state is changed.

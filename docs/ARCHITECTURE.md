@@ -195,3 +195,14 @@ selection click records HyprVX selection without framing it or changing
 compositor focus. Home honors user-owned selection before compositor-seeded
 focus. Gesture semantics cover three-finger pan, pinch zoom, and four-finger
 directional swipe, while physical trackpad event acquisition remains deferred.
+
+## Phase 3 nested native boundary
+
+`hyprvx_wayland_platform` sits above runtime navigation and projection. It
+owns a guarded nested Wayland layer surface, socket2 reader, native event
+receiver, SHM renderer, and physical input adapters. It does not add a
+dependency to `hyprvx_core`. The separate Hyprland plugin is an optional
+read-only event source and semantic control bridge. Plugin-observed actual
+geometry is kept separate from projected World geometry. No compositor model
+mutation or render hook is active; see `docs/NATIVE_PHASE3.md` for the exact
+0.56.2 transform constraint.
