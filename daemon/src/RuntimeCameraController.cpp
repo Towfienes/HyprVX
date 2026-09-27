@@ -63,7 +63,7 @@ bool RuntimeCameraController::panBegin() {
         keyboardPanActive_ = false;
         panHistory_.begin(currentView());
         panTransactionActive_ = true;
-        userOwnsSelection_ = true;
+        selectionOwnership_ = SelectionOwnership::UserOwned;
     }
     return true;
 }
@@ -88,7 +88,7 @@ bool RuntimeCameraController::panEnd() {
     const bool changed = panHistory_.finish(currentView());
     panTransactionActive_ = false;
     keyboardPanActive_ = false;
-    userOwnsSelection_ = true;
+    selectionOwnership_ = SelectionOwnership::UserOwned;
     return changed;
 }
 
@@ -99,8 +99,22 @@ void RuntimeCameraController::setPanInput(Vec2 direction) {
         keyboardPanActive_ = true;
     }
     motion_.setPanInput(direction);
-    if (active) userOwnsSelection_ = true;
+    if (active) selectionOwnership_ = SelectionOwnership::UserOwned;
     else if (keyboardPanActive_) keyboardPanActive_ = false;
+}
+
+void RuntimeCameraController::zoomAtAnchor(double factor, Vec2 screenAnchor) {
+    if (!std::isfinite(factor) || factor <= 0.0 || !std::isfinite(screenAnchor.x) || !std::isfinite(screenAnchor.y)) return;
+    motion_.cancelFlight();
+    motion_.setPanInput({});
+    motion_.zoomByFactorAroundScreenPoint(factor, screenAnchor);
+}
+
+void RuntimeCameraController::cancelInputGesture() noexcept {
+    motion_.stop();
+    panHistory_.cancel();
+    panTransactionActive_ = false;
+    keyboardPanActive_ = false;
 }
 
 void RuntimeCameraController::finishPanIfSettled() {
@@ -131,12 +145,19 @@ bool RuntimeCameraController::selectAndFrame(WindowId id, ViewportFramingPolicy 
     const auto framed = frameRectInViewport(*geometry, viewportPixels_, camera_.zoom(), policy);
     if (!transitionTo({framed.cameraPosition, framed.zoom})) return false;
     selectedWindow_ = id;
-    userOwnsSelection_ = true;
+    selectionOwnership_ = SelectionOwnership::UserOwned;
     return true;
 }
 
 bool RuntimeCameraController::gotoWindow(WindowId id, ViewportFramingPolicy policy) {
     return selectAndFrame(id, policy);
+}
+
+bool RuntimeCameraController::selectWindow(WindowId id) {
+    if (!hasProjectedWindow(id)) return false;
+    selectedWindow_ = id;
+    selectionOwnership_ = SelectionOwnership::UserOwned;
+    return true;
 }
 
 bool RuntimeCameraController::gotoExternalAddress(std::string_view address, ViewportFramingPolicy policy) {
@@ -150,13 +171,13 @@ bool RuntimeCameraController::gotoWorkspace(std::string_view workspace, Viewport
     const auto framed = projector_->viewForWorkspace(workspace, viewportPixels_, camera_.zoom(), policy);
     if (!framed) return false;
     const bool changed = transitionTo({framed->position, framed->zoom});
-    if (changed) userOwnsSelection_ = true;
+    if (changed) selectionOwnership_ = SelectionOwnership::UserOwned;
     return changed;
 }
 
 bool RuntimeCameraController::gotoView(CameraView view) {
     const bool changed = transitionTo(view);
-    if (changed) userOwnsSelection_ = true;
+    if (changed) selectionOwnership_ = SelectionOwnership::UserOwned;
     return changed;
 }
 
@@ -177,7 +198,7 @@ bool RuntimeCameraController::historyBack() {
     panTransactionActive_ = false;
     keyboardPanActive_ = false;
     motion_.flyToView(target->position, target->zoom);
-    userOwnsSelection_ = true;
+    selectionOwnership_ = SelectionOwnership::UserOwned;
     return true;
 }
 
@@ -190,13 +211,15 @@ bool RuntimeCameraController::historyForward() {
     panTransactionActive_ = false;
     keyboardPanActive_ = false;
     motion_.flyToView(target->position, target->zoom);
-    userOwnsSelection_ = true;
+    selectionOwnership_ = SelectionOwnership::UserOwned;
     return true;
 }
 
 bool RuntimeCameraController::home(
     ViewportFramingPolicy policy,
     std::optional<std::string_view> focusedWorkspace) {
+    if (selectionOwnership_ == SelectionOwnership::UserOwned && selectedWindow_ &&
+        selectAndFrame(*selectedWindow_, policy)) return true;
     if (projector_ != nullptr) {
         if (const auto focused = projector_->focusedWindowId(); focused && selectAndFrame(*focused, policy)) return true;
         if (focusedWorkspace) {
@@ -205,7 +228,8 @@ bool RuntimeCameraController::home(
             }
         }
     }
-    if (selectedWindow_ && selectAndFrame(*selectedWindow_, policy)) return true;
+    if (selectionOwnership_ == SelectionOwnership::CompositorSeeded && selectedWindow_ &&
+        selectAndFrame(*selectedWindow_, policy)) return true;
     if (projector_ != nullptr) {
         const ProjectedWindowRecord* nearest{};
         double nearestDistance = std::numeric_limits<double>::infinity();
@@ -225,17 +249,17 @@ bool RuntimeCameraController::home(
 }
 
 void RuntimeCameraController::observeCompositorSelection(std::optional<WindowId> id) {
-    if (userOwnsSelection_) return;
+    if (selectionOwnership_ == SelectionOwnership::UserOwned) return;
     selectedWindow_ = id && hasProjectedWindow(*id) ? id : std::nullopt;
 }
 
 void RuntimeCameraController::observeCompositorFocus(std::string_view externalAddress) {
-    if (userOwnsSelection_ || projector_ == nullptr) return;
+    if (selectionOwnership_ == SelectionOwnership::UserOwned || projector_ == nullptr) return;
     observeCompositorSelection(projector_->mappedId(externalAddress));
 }
 
 void RuntimeCameraController::resetSelectionOwnership() noexcept {
-    userOwnsSelection_ = false;
+    selectionOwnership_ = SelectionOwnership::CompositorSeeded;
 }
 
 void RuntimeCameraController::reconcileProjector() {
@@ -244,7 +268,7 @@ void RuntimeCameraController::reconcileProjector() {
 
 void RuntimeCameraController::endEpoch() noexcept {
     selectedWindow_.reset();
-    userOwnsSelection_ = false;
+    selectionOwnership_ = SelectionOwnership::CompositorSeeded;
     panTransactionActive_ = false;
     keyboardPanActive_ = false;
     panHistory_.cancel();

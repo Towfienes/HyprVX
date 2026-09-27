@@ -186,3 +186,12 @@ uses the runtime navigation controller for selection and camera motion.
 The active output's `Camera` is supplied to the controller by its caller.
 Runtime policy remains one active output (eDP-2 alone, or external DP alone
 when connected); linked or simultaneous output navigation is not introduced.
+
+Phase 2F adds `RuntimeNavigationActionDispatcher` above the controller. The
+keyboard, mouse, and gesture adapters emit device-independent intent; SDL key
+and button decoding stays in the simulator boundary. Direct pan deltas are
+coalesced per event batch and a gesture is one history transaction. A
+selection click records HyprVX selection without framing it or changing
+compositor focus. Home honors user-owned selection before compositor-seeded
+focus. Gesture semantics cover three-finger pan, pinch zoom, and four-finger
+directional swipe, while physical trackpad event acquisition remains deferred.

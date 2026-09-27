@@ -2,9 +2,9 @@
 
 All physical input is translated into semantic canvas actions.
 
-TrackpadAdapter
-MouseAdapter
-KeyboardAdapter
+GestureNavigationAdapter
+MouseNavigationAdapter
+KeyboardNavigationAdapter
         |
         v
 Semantic Camera Commands
@@ -18,6 +18,13 @@ Semantic Camera Commands
         v
 RuntimeCameraController -> Camera / CameraMotion / CameraHistory
 
+`RuntimeNavigationActionDispatcher` validates action ordering and coalesces
+high-frequency direct-pan deltas until the end of each input event batch. A
+pan gesture contributes at most one history transaction. If navigation
+interrupts a direct gesture, its pending delta and transaction are canceled;
+a late pan-end is ignored. Keyboard pan uses held-key state and the existing
+delta-time-aware camera motion model.
+
 The runtime camera controller changes only the HyprVX view. It does not focus
 or move compositor windows and does not switch compositor workspaces.
 
@@ -26,10 +33,14 @@ or move compositor windows and does not switch compositor workspaces.
 Trackpad interaction should feel continuous and direct.
 
 High-frequency raw events must be accumulated and consumed at frame cadence rather than converted into shell commands one by one.
-The SDL simulator maps middle-button drag and keyboard pan to semantic pan
-updates. A continuous pan gesture creates at most one camera-history entry.
-User input interrupts active camera flights; a new explicit destination
-replaces the previous flight.
+The SDL simulator keeps SDL key/button decoding in
+`SdlNavigationInputAdapter`; keyboard and mouse policy lives in device-neutral
+adapters. Middle-button drag, keyboard movement, wheel zoom, and window click
+selection all pass through semantic actions and the shared dispatcher. Three-
+finger pan, pinch, and four-finger directional swipe have testable adapters
+that need no physical trackpad. A continuous pan gesture creates at most one
+camera-history entry. User input interrupts active camera flights; a new
+explicit destination replaces the previous flight.
 
 ## Mouse goals
 
@@ -66,5 +77,15 @@ compositor focus initializes selection while navigation is idle; after a user
 navigation action, the HyprVX selection owns directional navigation until the
 adapter explicitly resets ownership. No compositor command is emitted.
 
-Future three-finger pan, pinch zoom, and four-finger directional gestures must
-adapt into the same semantic command layer rather than a separate camera path.
+Physical trackpad event acquisition must adapt into the same semantic command
+layer rather than a separate camera path.
+
+The current gesture adapter uses normalized deltas and configurable
+sensitivity/threshold values; device-specific libinput/libgesture acquisition
+is deferred. The simulator remains the only active physical-input integration.
+
+The generic action currently does not carry a focused-workspace hint into
+Home dispatch. Callers needing that fallback can call
+`RuntimeCameraController::home` directly with the workspace context; the
+simulator dispatcher uses the controller's focused projected window, known
+content, and origin fallbacks.

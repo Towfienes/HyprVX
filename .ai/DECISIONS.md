@@ -151,3 +151,18 @@ and a new explicit destination replaces the previous flight. Workspace jumps
 change only the HyprVX camera. A continuous pan is one history transaction.
 The single-active-output/external-exclusive policy remains the runtime target;
 trackpad input can later adapt into the same semantic actions.
+
+## D015 - Device-neutral runtime navigation input
+
+Status: accepted
+
+Keyboard, mouse, and gesture adapters emit `RuntimeNavigationAction` values;
+only the SDL boundary decodes SDL key/button events. A shared dispatcher
+coalesces direct pan deltas before applying them to the camera. An active
+direct gesture owns its matching end event; interruption clears the gesture so
+a delayed end cannot create an orphan history transaction. Click selection is
+user-owned spatial selection and does not frame or focus the compositor
+window. Home prioritizes that user-owned selection; compositor focus remains
+the seed while ownership is compositor-seeded. Three-finger pan, pinch, and
+four-finger directional swipe are represented by the same semantic actions,
+with no hardware gesture library or production binding added.

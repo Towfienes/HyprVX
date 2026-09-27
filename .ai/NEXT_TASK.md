@@ -1,40 +1,39 @@
 # HyprVX Next Task
 
-## Phase 2F
+## Phase 2F status
 
-Define runtime input adapter boundaries and visual integration for persisted
-Hyprland projections, retaining read-only compositor behavior.
+Runtime input boundaries and simulator integration are implemented. Keyboard,
+mouse, and semantic gesture adapters share `RuntimeNavigationAction` and
+`RuntimeNavigationActionDispatcher`; SDL decoding stays in the simulator.
+Pan input is coalesced per event batch, stale gesture endings are ignored, and
+click selection/Home respect HyprVX selection ownership. The simulator remains
+read-only toward Hyprland.
 
-Phase 2D final audit hardening updates schema-v1 unsigned 64-bit persistence to
-canonical decimal strings, adds collision-safe corrupt snapshots and bounded
-dirty-age debounce, and caps persisted geometry at 1e12 world units. Preserve
-these constraints in future state-format changes.
+Final validation is recorded in `.ai/CURRENT_STATE.md`. Physical trackpad
+event acquisition and production bindings remain deferred.
 
-Phase 2E provides `RuntimeCameraController` semantic navigation and routes the
-standalone SDL simulator's pan, focus, history, zone, and Home controls through
-it. Selection remains distinct from compositor focus; direct input cancels
-camera flights; workspace/view jumps affect only the HyprVX camera; one active
-output remains the target. Camera view persistence is deferred.
+The final audit fixed unsupported modifier key-up handling, ignored key-up for
+unheld directions, and added SDL focus-loss cancellation of transient input
+without resetting the compositor epoch. The complete suite now passes 285 /
+285; see current state for the full validation record.
+
+## Next
+
+Review Phase 2F behavior and define the next milestone before adding physical
+trackpad acquisition or compositor-facing integration. Preserve the project
+constraints below.
 
 ## Required behavior
 
-Keep compositor wire formats and socket handling outside `hyprvx_core`. Use
-captured events and the existing RuntimeBridge, SpatialProjector, and durable
-state APIs for integration tests.
-
-## Pass criteria
-
-- preserve one-active-output behavior as the primary runtime path
-- keep camera commands local to HyprVX; do not add compositor window-control IPC
+- keep Hyprland parsing and socket handling outside `hyprvx_core`
+- maintain one active output as the runtime target
+- keep camera actions local to HyprVX; add no compositor window-control IPC
 - keep persistence writes event-driven and skip focus/title churn
-- retain durable-state conservative matching and explicit recovery behavior
-- one-active-output policy remains the target
-- monitor hotplug schemas remain deferred until hardware verification
-- no production Hyprland or Caelestia configuration changes
-- no compositor reload
+- retain conservative restore matching and explicit recovery behavior
+- defer monitor event schemas until payloads are verified
+- do not modify production Hyprland or Caelestia configuration
+- do not add a native plugin, auto-start service, or polling loop
 
-## Not yet
-
-Do not add monitor hotplug schemas without verified payloads. Do not add a
-native plugin or production integration until compatibility, failure
-containment and rollback are defined. Do not add compositor mutation.
+Phase 2D persistence constraints remain: canonical decimal strings for
+unsigned 64-bit state, collision-safe corrupt snapshots, bounded dirty-age
+debounce, and persisted geometry limited to 1e12 world units.

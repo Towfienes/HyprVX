@@ -215,11 +215,6 @@ Validated:
 
 No compositor commands, polling, plugin, production config changes, or automatic reconnect were added.
 
-## Next
-
-Phase 2F - define runtime input adapter boundaries and visual integration for
-persisted Hyprland projections while retaining read-only compositor behavior.
-
 ## Phase 2E validation
 
 Configure/build: PASS
@@ -245,3 +240,35 @@ waits for events and only advances while input, velocity, or a transition is act
 No camera position, animation, velocity, or gesture state is persisted. No
 Hyprland window/workspace control, production config, plugin, polling, or
 multi-output camera behavior was added.
+
+## Phase 2F implementation
+
+Runtime input now has a device-independent `RuntimeNavigationAction` model,
+`RuntimeNavigationActionDispatcher`, and keyboard, mouse, and gesture
+adapters. SDL key/button decoding is isolated in the simulator adapter. Mouse
+middle drag and keyboard movement use the shared semantic dispatcher; pan
+deltas coalesce while SDL drains an event batch. Wheel zoom uses anchored
+semantic zoom actions. Window clicks set HyprVX selection without framing or
+changing compositor focus.
+
+Keyboard simultaneous directions and modifier releases, mouse drag/click/
+wheel/reset, three-finger pan, pinch, four-finger swipe/reset, invalid gesture
+ordering, deterministic directional ties, Home selection priority, input
+interruption/focus loss, stale pan-end, epoch reset, mouse/gesture equivalence,
+and keyboard-driven camera movement are covered by 24 input tests. The audit
+added 8 tests; full CTest is 285 / 285 PASS. Build: PASS. `git diff --check`:
+PASS. SDL dummy-video capture smoke: PASS; the simulator loaded the fixture
+and blocked on events while idle. `hyprvx-project-replay` run twice against
+the same fixture produced byte-identical World output.
+
+Selection ownership is explicit: observed focus seeds while compositor-owned;
+selection made by user navigation owns Home/directional selection until reset.
+Camera control remains local to HyprVX with one active output. There is no
+plugin, compositor command, polling loop, or production config change.
+Physical trackpad acquisition remains deferred; semantic gesture adapters are
+implemented and testable.
+
+## Next
+
+Phase 2F implementation is complete. Select and document the next milestone
+after review of the runtime input boundary and simulator behavior.

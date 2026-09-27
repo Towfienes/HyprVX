@@ -57,6 +57,7 @@ add_library(hyprvx_runtime_projection STATIC
 
 add_library(hyprvx_runtime_navigation STATIC
     daemon/src/RuntimeCameraController.cpp
+    daemon/src/RuntimeNavigationInput.cpp
 )
 target_include_directories(hyprvx_runtime_navigation PUBLIC daemon/include)
 target_link_libraries(hyprvx_runtime_navigation PUBLIC hyprvx_runtime_projection hyprvx_core)
@@ -159,6 +160,7 @@ pkg_check_modules(
 add_executable(
     hyprvx_visual_simulator
     simulator/visual_main.cpp
+    simulator/SdlNavigationInput.cpp
 )
 
 target_link_libraries(
@@ -293,6 +295,7 @@ if(BUILD_TESTING AND HYPRVX_BUILD_TESTS)
         tests/unit/test_runtime_bridge.cpp
         tests/unit/test_spatial_projection.cpp
         tests/unit/test_runtime_camera_controller.cpp
+        tests/unit/test_runtime_navigation_input.cpp
         tests/unit/test_projection_state.cpp
     )
 

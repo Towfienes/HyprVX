@@ -17,42 +17,19 @@
 #include "hyprvx/core/ViewportFraming.hpp"
 #include "hyprvx/core/World.hpp"
 #include "hyprvx/runtime/RuntimeCameraController.hpp"
+#include "hyprvx/runtime/RuntimeNavigationInput.hpp"
 #include "hyprvx/runtime/ProjectionStateStore.hpp"
 #include "hyprvx/runtime/SpatialProjection.hpp"
 #include "hyprvx/hyprland/RuntimeBridge.hpp"
+#include "SdlNavigationInput.hpp"
 
 namespace {
 
 using Clock = std::chrono::steady_clock;
+using hyprvx::runtime::RuntimeNavigationAction;
+using hyprvx::runtime::RuntimeNavigationActionType;
 
 constexpr hyprvx::IslandId codeIslandId = 10;
-
-struct InputState {
-    bool up{};
-    bool down{};
-    bool left{};
-    bool right{};
-
-    bool middleDragging{};
-
-    Clock::time_point lastDragTime{};
-};
-
-struct ManualHistoryInput {
-    bool keyboard{};
-    bool middle{};
-    bool wheelBurst{};
-
-    Clock::time_point lastWheelEvent{};
-
-    [[nodiscard]]
-    bool active() const noexcept {
-        return
-            keyboard ||
-            middle ||
-            wheelBurst;
-    }
-};
 
 enum class DragKind {
     None,
@@ -88,40 +65,6 @@ struct WindowDrag {
         detachReferenceBounds.reset();
     }
 };
-
-hyprvx::Vec2 keyboardDirection(
-    const InputState& input
-) {
-    hyprvx::Vec2 direction{};
-
-    if (input.left) {
-        direction.x -= 1.0;
-    }
-
-    if (input.right) {
-        direction.x += 1.0;
-    }
-
-    if (input.up) {
-        direction.y -= 1.0;
-    }
-
-    if (input.down) {
-        direction.y += 1.0;
-    }
-
-    return direction;
-}
-
-bool keyboardActive(
-    const InputState& input
-) {
-    return
-        input.up ||
-        input.down ||
-        input.left ||
-        input.right;
-}
 
 hyprvx::Rect expanded(
     hyprvx::Rect rect,
@@ -1214,11 +1157,9 @@ int main(int argc, char** argv) {
         navigation.observeCompositorSelection(projector.focusedWindowId());
     }
 
-    InputState input;
     WindowDrag windowDrag;
-
-    ManualHistoryInput
-        manualHistoryInput;
+    hyprvx::simulator::SdlNavigationInputAdapter physicalInput;
+    hyprvx::runtime::RuntimeNavigationActionDispatcher actionDispatcher(navigation);
 
     ZoneStore zones;
 
@@ -1255,6 +1196,7 @@ int main(int argc, char** argv) {
 
     bool running = true;
     bool dirty = true;
+    Clock::time_point lastWheelEvent{};
 
     auto previousFrame =
         Clock::now();
@@ -1290,9 +1232,9 @@ int main(int argc, char** argv) {
 
     while (running) {
         const bool motionActive =
-            keyboardActive(input) ||
+            physicalInput.keyboardActive() ||
             windowDrag.active() ||
-            manualHistoryInput.wheelBurst ||
+            physicalInput.wheelActive() ||
             navigation.needsFrame();
 
         SDL_Event event{};
@@ -1318,350 +1260,67 @@ int main(int argc, char** argv) {
                         running = false;
                         break;
 
+                    case SDL_EVENT_WINDOW_FOCUS_LOST:
+                        physicalInput.reset();
+                        actionDispatcher.cancelInput();
+                        finishLeftDrag(world, windowDrag);
+                        lastWheelEvent = {};
+                        dirty = true;
+                        break;
+
                     case SDL_EVENT_KEY_DOWN:
                     case SDL_EVENT_KEY_UP: {
-                        const bool pressed =
-                            current.type ==
-                            SDL_EVENT_KEY_DOWN;
-
-                        const bool keyboardWasActive =
-                            keyboardActive(input);
-
-                        const bool modifiedArrow =
-                            (
-                                current.key.mod &
-                                (
-                                    SDL_KMOD_SHIFT |
-                                    SDL_KMOD_ALT |
-                                    SDL_KMOD_CTRL
-                                )
-                            ) != 0;
-
-                        switch (current.key.key) {
-                            case SDLK_W:
-                            case SDLK_K:
-                                if ((current.key.mod & SDL_KMOD_SHIFT) != 0 && current.key.key == SDLK_K) break;
-                                input.up = pressed;
-                                break;
-
-                            case SDLK_S:
-                            case SDLK_J:
-                                if ((current.key.mod & SDL_KMOD_SHIFT) != 0 && current.key.key == SDLK_J) break;
-                                input.down = pressed;
-                                break;
-
-                            case SDLK_A:
-                            case SDLK_H:
-                                if ((current.key.mod & SDL_KMOD_SHIFT) != 0 && current.key.key == SDLK_H) break;
-                                input.left = pressed;
-                                break;
-
-                            case SDLK_D:
-                            case SDLK_L:
-                                if ((current.key.mod & SDL_KMOD_SHIFT) != 0 && current.key.key == SDLK_L) break;
-                                input.right = pressed;
-                                break;
-
-                            case SDLK_UP:
-                                if (
-                                    !modifiedArrow ||
-                                    !pressed
-                                ) {
-                                    input.up = pressed;
-                                }
-                                break;
-
-                            case SDLK_DOWN:
-                                if (
-                                    !modifiedArrow ||
-                                    !pressed
-                                ) {
-                                    input.down = pressed;
-                                }
-                                break;
-
-                            case SDLK_LEFT:
-                                if (
-                                    !modifiedArrow ||
-                                    !pressed
-                                ) {
-                                    input.left = pressed;
-                                }
-                                break;
-
-                            case SDLK_RIGHT:
-                                if (
-                                    !modifiedArrow ||
-                                    !pressed
-                                ) {
-                                    input.right = pressed;
-                                }
-                                break;
-
-                            default:
-                                break;
-                        }
-
-                        const bool keyboardNowActive =
-                            keyboardActive(input);
-
-                        if (
-                            !keyboardWasActive &&
-                            keyboardNowActive
-                        ) {
-                            manualHistoryInput.keyboard =
-                                true;
-                        }
-
-                        if (
-                            keyboardWasActive &&
-                            !keyboardNowActive
-                        ) {
-                            manualHistoryInput.keyboard =
-                                false;
-                        }
-
-                        if (
-                            current.type ==
-                                SDL_EVENT_KEY_DOWN &&
-                            !current.key.repeat
-                        ) {
-                            const bool shiftHeld =
-                                (
-                                    current.key.mod &
-                                    SDL_KMOD_SHIFT
-                                ) != 0;
-
-                            const bool altHeld =
-                                (
-                                    current.key.mod &
-                                    SDL_KMOD_ALT
-                                ) != 0;
-
-                            const bool ctrlHeld =
-                                (
-                                    current.key.mod &
-                                    SDL_KMOD_CTRL
-                                ) != 0;
-
-                            std::optional<
-                                SpatialDirection
-                            > spatialDirection{};
-
-                            if (shiftHeld) {
-                                switch (current.key.key) {
-                                    case SDLK_H:
-                                        spatialDirection =
-                                            SpatialDirection::Left;
-                                        break;
-
-                                    case SDLK_L:
-                                        spatialDirection =
-                                            SpatialDirection::Right;
-                                        break;
-
-                                    case SDLK_K:
-                                        spatialDirection =
-                                            SpatialDirection::Up;
-                                        break;
-
-                                    case SDLK_J:
-                                        spatialDirection =
-                                            SpatialDirection::Down;
-                                        break;
-
-                                    default:
-                                        break;
-                                }
-                            }
-
-                            if (
-                                spatialDirection.has_value() &&
-                                focusedWindow.has_value()
-                            ) {
-                                navigation.observeCompositorSelection(focusedWindow);
-                                if (navigation.focusDirection(*spatialDirection)) {
-                                    std::cout
-                                        << "Spatial focus: "
-                                        << *focusedWindow
-                                        << " -> "
-                                        << *navigation.selectedWindow()
-                                        << "\n";
-                                    focusedWindow = navigation.selectedWindow();
-
-                                    dirty = true;
-                                } else {
-                                    std::cout
-                                        << "Spatial focus: no candidate from "
-                                        << *focusedWindow
-                                        << "\n";
-                                }
-                            }
-
-                            if (
-                                altHeld &&
-                                current.key.key ==
-                                    SDLK_LEFT
-                            ) {
-                                if (navigation.historyBack()) {
-
-                                    std::cout
-                                        << "History: back"
-                                        << std::endl;
-
-                                    dirty = true;
-                                } else {
-                                    std::cout
-                                        << "History: no back entry"
-                                        << std::endl;
-                                }
-                            }
-
-                            if (
-                                altHeld &&
-                                current.key.key ==
-                                    SDLK_RIGHT
-                            ) {
-                                if (navigation.historyForward()) {
-
-                                    std::cout
-                                        << "History: forward"
-                                        << std::endl;
-
-                                    dirty = true;
-                                } else {
-                                    std::cout
-                                        << "History: no forward entry"
-                                        << std::endl;
-                                }
-                            }
-
-                            const auto zoneId =
-                                zoneIdFromKey(
-                                    current.key.key
-                                );
-
-                            if (
-                                zoneId.has_value() &&
-                                ctrlHeld
-                            ) {
-                                const Zone* existing =
-                                    zones.find(
-                                        *zoneId
-                                    );
-
-                                std::string name =
-                                    existing != nullptr
-                                    ? existing->name
-                                    : (
-                                        "Zone " +
-                                        std::to_string(
-                                            *zoneId
-                                        )
-                                    );
-
-                                zones.set({
-                                    *zoneId,
-                                    std::move(name),
-                                    currentCameraView(
-                                        camera
-                                    )
-                                });
-
-                                std::cout
-                                    << "Zone "
-                                    << *zoneId
-                                    << " saved"
-                                    << std::endl;
-                            } else if (
-                                zoneId.has_value() &&
-                                !altHeld &&
-                                !shiftHeld
-                            ) {
-                                const std::string workspaceName = std::to_string(*zoneId);
-                                if (!capturePath.empty() && projector.workspaceMap().find(workspaceName) != nullptr) {
-                                    static_cast<void>(navigation.gotoWorkspace(workspaceName));
-                                    std::cout << "HyprVX workspace region " << workspaceName << std::endl;
-                                    dirty = true;
-                                } else if (const Zone* zone = zones.find(*zoneId); zone != nullptr) {
-                                    static_cast<void>(navigation.gotoView(zone->view));
-
-                                    std::cout
-                                        << "Zone "
-                                        << zone->id
-                                        << ": "
-                                        << zone->name
-                                        << std::endl;
-
-                                    dirty = true;
-                                }
-                            }
-
-                            if (
-                                current.key.key ==
-                                SDLK_ESCAPE
-                            ) {
+                        RuntimeNavigationAction semantic;
+                        const bool pressed = current.type == SDL_EVENT_KEY_DOWN;
+                        if (physicalInput.keyEvent(current.key.key, pressed, current.key.mod,
+                                                   current.key.repeat, semantic)) {
+                            const auto type = semantic.type;
+                            if (type == RuntimeNavigationActionType::Quit && pressed && !current.key.repeat) {
                                 running = false;
-                            }
-
-                            if (
-                                current.key.key ==
-                                    SDLK_R ||
-                                current.key.key ==
-                                    SDLK_HOME
-                            ) {
-                                const Zone* home =
-                                    zones.find(1);
-
-                                navigation.observeCompositorSelection(focusedWindow);
-                                if (focusedWindow) static_cast<void>(navigation.home());
-                                else if (home != nullptr) static_cast<void>(navigation.gotoView(home->view));
-
-                                dirty = true;
-                            }
-
-                            if (
-                                current.key.key ==
-                                SDLK_F
-                            ) {
-                                const Zone* code =
-                                    zones.find(2);
-
-                                if (code != nullptr) {
-                                    static_cast<void>(navigation.gotoView(code->view));
+                            } else if (pressed && !current.key.repeat && type == RuntimeNavigationActionType::SaveViewSlot) {
+                                const Zone* existing = zones.find(static_cast<std::uint64_t>(semantic.slot));
+                                zones.set({static_cast<std::uint64_t>(semantic.slot), existing ? existing->name : ("Zone " + std::to_string(semantic.slot)), currentCameraView(camera)});
+                            } else if (pressed && !current.key.repeat && type == RuntimeNavigationActionType::GotoViewSlot) {
+                                if (const Zone* zone = zones.find(static_cast<std::uint64_t>(semantic.slot)); zone != nullptr) {
+                                    RuntimeNavigationAction view;
+                                    view.type = RuntimeNavigationActionType::GotoView;
+                                    view.view = zone->view;
+                                    static_cast<void>(actionDispatcher.submit(view));
                                 }
-
-                                dirty = true;
+                            } else if (pressed && !current.key.repeat && type == RuntimeNavigationActionType::GotoWorkspace) {
+                                const auto zoneId = static_cast<std::uint64_t>(semantic.slot);
+                                if (!actionDispatcher.submit(semantic)) {
+                                    if (const Zone* zone = zones.find(zoneId); zone != nullptr) {
+                                        RuntimeNavigationAction view;
+                                        view.type = RuntimeNavigationActionType::GotoView;
+                                        view.view = zone->view;
+                                        static_cast<void>(actionDispatcher.submit(view));
+                                    }
+                                }
+                            } else {
+                                static_cast<void>(actionDispatcher.submit(semantic));
+                            }
+                            if (type == RuntimeNavigationActionType::FocusDirection || type == RuntimeNavigationActionType::SelectWindow) {
+                                focusedWindow = navigation.selectedWindow();
                             }
                         }
-
                         dirty = true;
                         break;
                     }
 
                     case SDL_EVENT_MOUSE_BUTTON_DOWN:
-                        if (
-                            current.button.button ==
-                            SDL_BUTTON_MIDDLE
-                        ) {
-                            input.middleDragging = true;
-                            static_cast<void>(navigation.panBegin());
-
-                            manualHistoryInput.middle =
-                                true;
-
-                            input.lastDragTime =
-                                Clock::now();
-
-                            dirty = true;
+                        {
+                            RuntimeNavigationAction semantic;
+                            if (physicalInput.mouseButtonEvent(current.button.button, true, semantic)) {
+                                static_cast<void>(actionDispatcher.submit(semantic));
+                                dirty = true;
+                            }
                         }
 
                         if (
                             current.button.button ==
                             SDL_BUTTON_LEFT
                         ) {
-                            controller.cancelFlight();
-
                             const Vec2 clickWorld =
                                 camera.screenToWorld({
                                     static_cast<double>(
@@ -1672,15 +1331,11 @@ int main(int argc, char** argv) {
                                     )
                                 });
 
-                            if (
-                                const auto clicked =
-                                    windowAtPoint(
-                                        world,
-                                        clickWorld
-                                    )
-                            ) {
-                                focusedWindow = *clicked;
-                                navigation.observeCompositorSelection(focusedWindow);
+                            const auto clicked = windowAtPoint(world, clickWorld);
+                            RuntimeNavigationAction semantic;
+                            if (physicalInput.clickEvent(clicked, semantic)) {
+                                static_cast<void>(actionDispatcher.submit(semantic));
+                                focusedWindow = navigation.selectedWindow();
 
                                 std::cout
                                     << "Focused window: "
@@ -1701,27 +1356,12 @@ int main(int argc, char** argv) {
                         break;
 
                     case SDL_EVENT_MOUSE_BUTTON_UP:
-                        if (
-                            current.button.button ==
-                            SDL_BUTTON_MIDDLE
-                        ) {
-                            input.middleDragging = false;
-
-                            manualHistoryInput.middle =
-                                false;
-
-                            if (
-                                !manualHistoryInput.keyboard &&
-                                !manualHistoryInput.wheelBurst
-                            ) {
-                                if (navigation.panEnd()) {
-                                    std::cout
-                                        << "Manual history: MMB recorded"
-                                        << std::endl;
-                                }
+                        {
+                            RuntimeNavigationAction semantic;
+                            if (physicalInput.mouseButtonEvent(current.button.button, false, semantic)) {
+                                static_cast<void>(actionDispatcher.submit(semantic));
+                                dirty = true;
                             }
-
-                            dirty = true;
                         }
 
                         if (
@@ -1738,23 +1378,13 @@ int main(int argc, char** argv) {
                         break;
 
                     case SDL_EVENT_MOUSE_MOTION:
-                        if (input.middleDragging) {
-                            const auto now =
-                                Clock::now();
-
-                            const double dt =
-                                std::chrono::duration<double>(
-                                    now -
-                                    input.lastDragTime
-                                ).count();
-
-                            input.lastDragTime = now;
-
-                            static_cast<void>(dt);
-                            navigation.panByScreen({
-                                static_cast<double>(current.motion.xrel),
-                                static_cast<double>(current.motion.yrel)});
-
+                        {
+                            RuntimeNavigationAction semantic;
+                            if (physicalInput.mouseMotionEvent({static_cast<double>(current.motion.xrel), static_cast<double>(current.motion.yrel)}, semantic)) {
+                                static_cast<void>(actionDispatcher.submit(semantic));
+                            }
+                        }
+                        if (physicalInput.middleDragging()) {
                             dirty = true;
                         }
 
@@ -1772,16 +1402,9 @@ int main(int argc, char** argv) {
                         break;
 
                     case SDL_EVENT_MOUSE_WHEEL: {
-                        if (
-                            !manualHistoryInput.wheelBurst
-                        ) {
-                            manualHistoryInput.wheelBurst =
-                                true;
-                            static_cast<void>(navigation.panBegin());
-                        }
-
-                        manualHistoryInput.lastWheelEvent =
-                            Clock::now();
+                        RuntimeNavigationAction semantic;
+                        if (physicalInput.wheelBegin(semantic)) static_cast<void>(actionDispatcher.submit(semantic));
+                        lastWheelEvent = Clock::now();
 
                         float mouseX{};
                         float mouseY{};
@@ -1791,25 +1414,10 @@ int main(int argc, char** argv) {
                             &mouseY
                         );
 
-                        const double factor =
-                            std::exp(
-                                static_cast<double>(
-                                    current.wheel.y
-                                ) * 0.14
-                            );
-
-                        controller
-                            .zoomByFactorAroundScreenPoint(
-                                factor,
-                                {
-                                    static_cast<double>(
-                                        mouseX
-                                    ),
-                                    static_cast<double>(
-                                        mouseY
-                                    )
-                                }
-                            );
+                        if (physicalInput.wheelEvent(static_cast<double>(current.wheel.y),
+                                {static_cast<double>(mouseX), static_cast<double>(mouseY)}, semantic)) {
+                            static_cast<void>(actionDispatcher.submit(semantic));
+                        }
 
                         dirty = true;
                         break;
@@ -1857,34 +1465,9 @@ int main(int argc, char** argv) {
         const auto now =
             Clock::now();
 
-        if (
-            manualHistoryInput.wheelBurst
-        ) {
-            const double wheelIdleSeconds =
-                std::chrono::duration<double>(
-                    now -
-                    manualHistoryInput
-                        .lastWheelEvent
-                ).count();
-
-            if (
-                wheelIdleSeconds >=
-                0.18
-            ) {
-                manualHistoryInput.wheelBurst =
-                    false;
-
-                if (
-                    !manualHistoryInput.keyboard &&
-                    !manualHistoryInput.middle
-                ) {
-                    if (navigation.panEnd()) {
-                        std::cout
-                            << "Manual history: wheel recorded"
-                            << std::endl;
-                    }
-                }
-            }
+        if (physicalInput.wheelActive() && std::chrono::duration<double>(now - lastWheelEvent).count() >= 0.18) {
+            RuntimeNavigationAction semantic;
+            if (physicalInput.wheelEnd(semantic)) static_cast<void>(actionDispatcher.submit(semantic));
         }
 
         double deltaSeconds =
@@ -1902,19 +1485,10 @@ int main(int argc, char** argv) {
                 0.05
             );
 
-        navigation.setPanInput(
-            keyboardDirection(input)
-        );
-
-        if (!input.middleDragging) {
-            const bool shouldUpdate =
-                navigation.needsFrame();
-
-            if (shouldUpdate) {
-                static_cast<void>(navigation.tick(deltaSeconds));
-
-                dirty = true;
-            }
+        if (actionDispatcher.flushPendingPan()) dirty = true;
+        if (navigation.needsFrame()) {
+            static_cast<void>(navigation.tick(deltaSeconds));
+            dirty = true;
         }
 
         if (dirty) {
