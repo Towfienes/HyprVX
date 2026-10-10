@@ -65,7 +65,7 @@ tools. No user story can be judged before this phase and GATE-A pass.
 
 - [X] T007 Implement `core/include/hyprvx/core/CameraMath.hpp` exactly as the frozen C++ interface in `contracts/transform-contract.md` (namespace `hyprvx::cammath`, header-only, C++20, `SPDX-License-Identifier: BSD-3-Clause`, identity short-circuit, `ZoomLimits{0.1, 2.0}` default, `damageBox` = roundOut + 1 px); record the license in `docs/THIRD_PARTY.md` (owner: claude)
 - [X] T008 Make `core/src/Camera.cpp` delegate `worldToScreen`, `screenToWorld`, `visibleWorldRect` and the anchor math to `CameraMath` with `M = {0,0}` and unbounded limits, keeping `setZoom` validation (throws, no clamping); existing `tests/unit/test_camera.cpp` and simulators must pass unchanged (V-25 part 1) (owner: claude)
-- [ ] T009 Write `tests/unit/test_camera_math.cpp` (invariants 1–7 of the contract, ≥ 10⁴ seeded cases, seed printed on failure, independent oracle in `long double` and hand-computed dyadic values, non-zero `M` identity exactness, rejection cases, V1 equivalence) and register it in `CMakeLists.txt`; written from the contract, not from the header's code (V-06, V-25) (owner: claude)
+- [X] T009 Write `tests/unit/test_camera_math.cpp` (invariants 1–7 of the contract, ≥ 10⁴ seeded cases, seed printed on failure, independent oracle in `long double` and hand-computed dyadic values, non-zero `M` identity exactness, rejection cases, V1 equivalence) and register it in `CMakeLists.txt`; written from the contract, not from the header's code (V-06, V-25) (owner: claude)
 
 ### Reproducible build pipeline (`contracts/test-tooling.md` §1–§3)
 
