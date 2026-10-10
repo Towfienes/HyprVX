@@ -1,0 +1,107 @@
+{
+  "run_id": "20261011-004633-core-72cd72a",
+  "test": "V-05",
+  "task": "T006",
+  "agent": "codex",
+  "result": "PASS",
+  "variant": "core",
+  "patchset_id": "none",
+  "binary_sha256": null,
+  "source_commit": "72cd72a",
+  "raw_path": "/home/towfienes/.cache/hyprvx/codex/evidence/20261011-004633-core-72cd72a",
+  "configurations": {
+    "headless": {
+      "build_directory": "build-v3/headless",
+      "options": "all OFF",
+      "build": "PASS -j2",
+      "ctest": "PASS 287/287 (approved escalation)"
+    },
+    "enabled": {
+      "build_directory": "build-v3/enabled",
+      "options": "all ON",
+      "build": "PASS -j2",
+      "ctest": "PASS 298/298 (approved escalation)"
+    }
+  },
+  "checks": [
+    {
+      "item": "headless-configure",
+      "command": "cmake -S . -B build-v3/headless -G Ninja -DHYPRVX_WITH_SDL=OFF -DHYPRVX_WITH_WAYLAND_PLATFORM=OFF -DHYPRVX_WITH_HYPRLAND_PLUGIN=OFF",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "headless-configure.log"
+    },
+    {
+      "item": "headless-build",
+      "command": "cmake --build build-v3/headless -j2",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "headless-build.log"
+    },
+    {
+      "item": "enabled-configure",
+      "command": "cmake -S . -B build-v3/enabled -G Ninja -DHYPRVX_WITH_SDL=ON -DHYPRVX_WITH_WAYLAND_PLATFORM=ON -DHYPRVX_WITH_HYPRLAND_PLUGIN=ON",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "enabled-configure.log"
+    },
+    {
+      "item": "enabled-build",
+      "command": "cmake --build build-v3/enabled -j2",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "enabled-build.log"
+    },
+    {
+      "item": "headless-ctest-escalated",
+      "command": "ctest --test-dir build-v3/headless --output-on-failure",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "headless-ctest-escalated.log",
+      "execution": "require_escalated"
+    },
+    {
+      "item": "enabled-ctest-escalated",
+      "command": "ctest --test-dir build-v3/enabled --output-on-failure",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "enabled-ctest-escalated.log",
+      "execution": "require_escalated"
+    }
+  ],
+  "sandbox_attempts": [
+    {
+      "item": "headless-ctest",
+      "command": "ctest --test-dir build-v3/headless --output-on-failure",
+      "exit_code": 8,
+      "result": "BLOCKED",
+      "artifact": "headless-ctest.log"
+    },
+    {
+      "item": "enabled-ctest",
+      "command": "ctest --test-dir build-v3/enabled --output-on-failure",
+      "exit_code": 8,
+      "result": "BLOCKED",
+      "artifact": "enabled-ctest.log",
+      "execution": "sandbox"
+    }
+  ],
+  "notes": [
+    "Hai lượt CTest trong sandbox lỗi đúng một test bind() socket UNIX giả; cả hai bộ test PASS khi chạy ngoài sandbox với escalation được duyệt.",
+    "Không sửa hoặc bỏ qua test; không chạy Hyprland, test client hay capture tool."
+  ],
+  "not_run": [
+    "Kiểm chứng compositor/nested/visual; các lượt này chỉ configure/build/unit/replay."
+  ],
+  "artifacts": [
+    "enabled-build.log",
+    "enabled-configure.log",
+    "enabled-ctest-escalated.log",
+    "enabled-ctest.log",
+    "headless-build.log",
+    "headless-configure.log",
+    "headless-ctest-escalated.log",
+    "headless-ctest.log",
+    "summary.json"
+  ]
+}
