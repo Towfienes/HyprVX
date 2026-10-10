@@ -322,6 +322,7 @@ if(BUILD_TESTING AND HYPRVX_BUILD_TESTS)
 
         tests/unit/test_geometry.cpp
         tests/unit/test_camera.cpp
+        tests/unit/test_camera_math.cpp
         tests/unit/test_camera_motion.cpp
         tests/unit/test_island.cpp
         tests/unit/test_island_interaction.cpp
