@@ -42,6 +42,27 @@ class BuildScriptTest(unittest.TestCase):
                 self.assertNotIn("PROVENANCE.md", result.stdout)
                 self.assertNotIn("SHA256SUMS", result.stdout)
 
+    @unittest.skipUnless(SCRIPT.name == "build-hyprland.sh", "Hyprland resource guard only")
+    def test_low_memory_stops_before_lock_or_build(self):
+        with tempfile.TemporaryDirectory(prefix="hvx-memory-guard-") as directory:
+            root = Path(directory)
+            marker = root / "executed"
+            awk = root / "awk"
+            awk.write_text("#!/bin/sh\nprintf '6815743\\n'\n")
+            awk.chmod(0o700)
+            for tool in ("flock", "git", "cmake", "systemd-run"):
+                stub = root / tool
+                stub.write_text(f"#!/bin/sh\nprintf called >> '{marker}'\nexit 97\n")
+                stub.chmod(0o700)
+            result = subprocess.run(
+                ["bash", str(SCRIPT), "--variant", "stock"],
+                env=os.environ | {"HYPRVX_AGENT": "codex", "PATH": f"{root}:{os.defpath}"},
+                capture_output=True, text=True,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("BLOCKED: MemAvailable=6815743", result.stderr)
+            self.assertFalse(marker.exists(), result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
