@@ -350,3 +350,16 @@ Production safety: host Hyprland and Caelestia untouched; no plugin loaded; no p
   unreproduced V2 defect are classified separately and never PASS.
 - `tools/vpointer` (T054) is fully inside the blocked Phase 2; no early start.
 - Build/compositor verification: NOT RUN.
+
+## Sprint 1 implementation (2026-10-11)
+
+- User approved `tasks.md` at `966e6b6` and authorized T001–T053.
+- T001/T002 done (contracts frozen; Codex clone `/home/towfienes/Projects/HyprVX-v3-codex`, branch `v3/001-codex`,
+  push disabled). WO-01/WO-02/WO-03 issued to Codex.
+- T007/T008 done: `core/include/hyprvx/core/CameraMath.hpp` (BSD-3-Clause, contract 1.1) and `hyprvx::Camera`
+  delegation. Verified: ctest 298/298, simulator output byte-identical to `ab6647c`, 200 000-case bit-exact V1
+  self-check (evidence `20261011-003807-core-e94ffd2`, archived). Independent verification is Codex's T009.
+- Patches 0001–0005 drafted (render seam, culling, damage-union rule, HYPRVX_DEV dev control); `git am` on
+  `efb5099` reproduces the draft tree; syntax-only checks pass. Hyprland build and native tests: NOT RUN (need
+  Codex's scripts, GATE-A, GATE-N).
+- `contracts/dev-control.md` bumped to 1.1 (additive: `hyprctl hyprvx-dev` transport, state JSON, `-DHYPRVX_DEV=ON`).

@@ -1,11 +1,18 @@
 # HyprVX Next Task
 
-## V3 status (2026-10-10)
+## V3 status (2026-10-11)
 
-The architecture and the Claude Code + Codex collaboration replan (P1–P10) are approved and applied
-(`docs/v3/HYPRVX_V3_MASTER_PLAN.md` §I and §O; `docs/v3/HYPRVX_V3_COLLABORATION_REPLAN_PROPOSAL.md`).
-Sprint 1 preparation and `tasks.md` generation are approved. **Implementation starts only after the user approves
-`specs/001-native-spatial-camera/tasks.md`.**
+`specs/001-native-spatial-camera/tasks.md` was approved at `966e6b6`; Sprint 1 (T001–T053 only) is in progress on
+`v3/001-native-spatial-camera`. T054–T071 and U0 stay blocked until T053 and user approval.
+
+- Done and ticked: T001 (K0), T002 (Codex clone), T007 (`CameraMath.hpp`), T008 (`Camera.cpp` delegation;
+  evidence `20261011-003807-core-e94ffd2`, archived and `sha256sum -c` OK).
+- Drafted, not ticked: T025 and T035–T038 (`patches/hyprland/0001–0005`, draft tree
+  `~/.cache/hyprvx/claude/src/hyprland-efb5099/v3-dev`); static checks only, no Hyprland build yet. T024 waits for
+  Codex's `scripts/fetch-hyprland.sh` (T010).
+- Codex: WO-01 (T003–T006, T010–T021, stops before T009/T022), WO-02 (T009), WO-03 (dev-control 1.1 notice).
+- Next Claude step: integrate Codex handoffs (§O4), then T024/T025 scripted build, T039 (needs T021), T026 after
+  GATE-A, T040 after GATE-N. See `specs/001-native-spatial-camera/integration-log.md`.
 
 GitHub handoff: select `Towfienes/HyprVX`, branch `v3/spec-foundation`, in Claude Code Cloud and read
 `CLAUDE.md` first. A fresh checkout can select the feature with `SPECIFY_FEATURE_DIRECTORY=specs/001-native-spatial-camera`.
