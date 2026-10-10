@@ -175,7 +175,7 @@ proven on synthetic data; GATE-A PASS. Claude may write patches during this phas
 - [X] T048 V-20 preparation: assemble the Sprint 1 image set (paths and run-ids) in `specs/001-native-spatial-camera/checklists/verification.md` for human review; the user signs SC-005 (NOT AUTOMATABLE) (owner: claude)
 - [ ] T049 Update `checklists/verification.md` (V-01..V-15, V-20, V-22..V-25), `integration-log.md`, `.ai/CURRENT_STATE.md` and `.ai/NEXT_TASK.md` with archive paths (`~/.local/share/hyprvx/evidence/<agent>/<run-id>/`), run-ids, `sha256sum -c` results and honest statuses (owner: claude)
 - [ ] T050 Validate `quickstart.md` steps 1–4 against the delivered scripts; correct documentation drift in `specs/001-native-spatial-camera/quickstart.md` (owner: claude)
-- [ ] T051 Constitution re-check of delivered Sprint 1 code against principles I–X; record exceptions in `plan.md` Complexity Tracking (owner: claude)
+- [X] T051 Constitution re-check of delivered Sprint 1 code against principles I–X; record exceptions in `plan.md` Complexity Tracking (owner: claude)
 - [ ] T052 Merge-readiness review: every Sprint 1 commit since `966e6b6` reviewed (including the integrated Codex commits), every PASS backed by archived evidence, `git rev-parse dev == 15f75b0` (owner: claude)
 - [ ] T053 **G1 — Sprint 1 gate**: present results; STOP for user approval before any Phase 2 task (owner: claude)
 

@@ -102,3 +102,26 @@ tests/native/       # L4/L5/L5b scenario scripts; raw evidence in ~/.cache/hyprv
 |---|---|---|
 | `noSimplify` while camera ≠ identity (perf cost) | Removes RC2 without touching every pass element | Camera-aware bbox/opaque regions add seams before correctness is proven; scheduled for Phase 7 |
 | Dev-only camera control in the patch | Tests need deterministic camera states | The plugin controller is a later feature; IPC from tests must not depend on it |
+
+## Constitution re-check of delivered Sprint 1 code (T051, 2026-10-11)
+
+| Principle | Result | Evidence / note |
+|---|---|---|
+| I Host safety | PASS | V-22 audit: 95 nested sessions, none with the host signature, private `/tmp/hvx-*` runtime dirs, agent-prefix binaries only; identity re-verified before every harness command (V-07, 22/22); tests render on a headless nested output, the host config is never touched |
+| II Evidence | PASS (SC-005 pending) | every PASS cites an archived run with a verified `SHA256SUMS`; SC-005/V-20 needs the user's review |
+| III Normal equivalence | PASS | T-ID pixel identity ×3 at scale 1 and 1.25 on patchset 47b6baa12904; GATE-A deterministic baseline |
+| IV Single transform | PASS | `scripts/check-single-transform.sh` clean; R1 source review (`r1-source-verification.md` §b) |
+| V Reversibility | PASS | camera-only state; panic restores exact identity (T-OFF 10/10); rejected values change nothing (T-INVALID); no window model writes |
+| VI Performance | DEFERRED (measured in T045) | exceptions below; frames are still produced only for damage or camera changes |
+| VII Caelestia | PASS (layers) / NOT RUN (Caelestia itself) | layers untransformed (T-LAYER); lock, IME, notifications, cursor outside the hint (R1 §d) |
+| VIII Reuse | PASS | V1 `Camera` delegates to `CameraMath` with unchanged results (V-25); V1 harness ported and hardened rather than replaced |
+| IX License | PASS | `CameraMath.hpp` BSD-3-Clause recorded (DV3-10); no third-party source copied; glaze is fetched at a pinned commit only to build upstream Hyprland, not vendored |
+| X Reproducible | PASS (input level) / pending (test-result level, T046) | pinned efb5099 + glaze b518eec + scanner 0.4.6, `git am` series, truthful `GIT_DIRTY`; fresh build dir per build |
+
+**Additional complexity recorded (Sprint 1):**
+
+| Exception | Why needed | Simpler alternative rejected because |
+|---|---|---|
+| Damage-union rule: camera damage is added on top of stock damage | Damage calls carry no owner; the union covers window-owned and screen-space content without classifying | Owner classification needs changes in every caller (surfaces, popups, subsurfaces, decorations, layers) for no correctness gain in Sprint 1; cost is measured in T045 |
+| Region round-out under the camera | Modified boxes have fractional edges; integer regions truncated the last column (found at scale 1.25) | Snapping the camera to integer pixels would change the transform contract |
+| Headless test output `HVX-1` in the nested compositor | The nested window's size follows the host layout, which breaks determinism and US2.2 geometry | Changing host window rules would modify the host configuration (Constitution I) |
