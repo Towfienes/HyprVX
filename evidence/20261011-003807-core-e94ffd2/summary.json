@@ -1,0 +1,7 @@
+{"run_id": "20261011-003807-core-e94ffd2", "test": "T007/T008 core build + GTest + V1 equivalence self-check", "result": "PASS",
+ "variant": "core", "git_sha": "e94ffd2d84ac7c9167329d04c924d8e50dd65935", "agent": "claude",
+ "checks": {"ctest": "298/298 passed (baseline ab6647c: 298/298)", "hyprvx-sim": "output byte-identical to ab6647c",
+            "selfcheck": "200000 random cases bit-exact vs V1 formulas, identity exact with non-zero M, damageBox/validate/anchorZoom spot checks: 0 failures",
+            "header": "g++/clang++ C++20/C++23 -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Werror clean"},
+ "artifacts": ["build-info.json", "configure.log", "build.log", "ctest.log", "ctest-baseline-ab6647c.log", "sim.out", "sim-baseline-ab6647c.out", "sim-cmp.txt", "selfcheck.cpp", "selfcheck.out", "header-check.txt", "meminfo-before-build.txt"],
+ "not_run": ["T009 property tests (Codex)", "SDL simulators hyprvx-visual-sim/multi-output-sim/topology-sim: built, not run (would open windows on the host session)"]}
