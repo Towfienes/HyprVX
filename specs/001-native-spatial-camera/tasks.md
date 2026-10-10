@@ -84,9 +84,9 @@ tools. No user story can be judged before this phase and GATE-A pass.
 ### Measurement tools (test-tooling §4–§6)
 
 - [ ] T018 [P] Implement `tools/testclient/` (`hyprvx-testclient`): deterministic content, colors and marker sizes exactly as test-tooling §4, `--control` FIFO commands `fill`/`redraw`/`sync`/`quit`, JSONL log with `seq`/`frame_done`, `--layer TOP|OVERLAY`, `--scale-aware`; CMake target under `HYPRVX_WITH_WAYLAND_PLATFORM` in `CMakeLists.txt` (owner: claude)
-- [ ] T019 [P] Implement `tools/analyze_frame.py` (`python -I`, modes `bbox` and `diff`, JSON output and exit codes of test-tooling §6) with synthetic-image tests in `tools/tests/test_analyze_frame.py` whose expected answers are computed independently of the analyzer (owner: claude)
+- [X] T019 [P] Implement `tools/analyze_frame.py` (`python -I`, modes `bbox` and `diff`, JSON output and exit codes of test-tooling §6) with synthetic-image tests in `tools/tests/test_analyze_frame.py` whose expected answers are computed independently of the analyzer (owner: claude)
 - [ ] T020 [P] Write the shared nested config template `tests/native/config/` (animations off, fixed gaps/borders, identical for all variants; format verified against Hyprland `efb5099` source) and the shared helpers `tests/native/lib.sh` (run-id, ready-signal capture rule of test-tooling §5, raw evidence written to `~/.cache/hyprvx/$HYPRVX_AGENT/evidence/<run-id>/`, `summary.json` and a final `SHA256SUMS` copied to the repo index `evidence/<run-id>/` per test-tooling §8, BLOCKED on timeout) (owner: claude)
-- [ ] T021 Write `scripts/check-single-transform.sh` (Constitution IV lint): fail if any `patches/hyprland/*.patch` hunk outside the vendored `CameraMath.hpp` contains inline camera arithmetic (`/ zoom`, `* zoom`, `/z`, `*z` on camera fields) or a second forward/inverse formula; self-test against a synthetic bad patch (owner: claude)
+- [X] T021 Write `scripts/check-single-transform.sh` (Constitution IV lint): fail if any `patches/hyprland/*.patch` hunk outside the vendored `CameraMath.hpp` contains inline camera arithmetic (`/ zoom`, `* zoom`, `/z`, `*z` on camera fields) or a second forward/inverse formula; self-test against a synthetic bad patch (owner: claude)
 
 ### GATE-A — deterministic baseline
 
@@ -141,7 +141,7 @@ proven on synthetic data; GATE-A PASS. Claude may write patches during this phas
 - [ ] T036 [US2] Author `patches/hyprland/0003-*.patch` culling: `shouldRenderWindow` / `visibleOnMonitor` use `visibleWorldRect ∩ W(w)` (FR-006; window outside the monitor's logical rect but inside the visible world rect is rendered) (owner: claude)
 - [ ] T037 [US2] Author `patches/hyprland/0004-*.patch` damage: `damageSurface` / `damageWindow` / `damageBox` / `damageRegion` for window-owned content via `cammath::damageBox` (decorations included); camera change damages the whole output; layer popups/subsurfaces never transformed (FR-005) (owner: claude)
 - [ ] T038 [US2] Author `patches/hyprland/0005-*.patch` dev control exactly as `contracts/dev-control.md` (`camera`, `camera-mon`, `panic`, `state`, `full-damage`), compiled only with `HYPRVX_DEV`, validation through `cammath::validate` (FR-008, FR-009) (owner: claude)
-- [ ] T039 [US2] Run `scripts/check-single-transform.sh` on the series; fix every finding in the patches (owner: claude)
+- [X] T039 [US2] Run `scripts/check-single-transform.sh` on the series; fix every finding in the patches (owner: claude)
 - [ ] T040 [US2] Build `patched` (0001–0005), run `tests/native/run_sprint1.sh` after GATE-A (T022) and GATE-N (T034) pass; debug and fix in the patches until V-09, V-10, V-11, V-12, V-12b, V-14, V-15 PASS or a stop condition is reached; log each run (owner: claude)
 
 **Checkpoint**: US2 geometry, stale-frame and layer checks PASS at scale 1 and 1.25, T-ID still PASS.

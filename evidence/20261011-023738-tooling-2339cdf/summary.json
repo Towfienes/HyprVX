@@ -1,0 +1,4 @@
+{"run_id": "20261011-023738-tooling-2339cdf", "test": "T019 analyzer synthetic tests; T021 lint self-test; T039 lint on patches 0001-0005", "result": "PASS", "agent": "claude", "git_sha": "2339cdfe7aa57098cf01ee7ea837c048aedd01e1",
+ "checks": {"test_analyze_frame": "9/9", "lint_self_test": "PASS (2 bad rejected, 1 good accepted)", "lint_series": "PASS (5 patches, no findings)"},
+ "artifacts": ["test_analyze_frame.log", "lint_selftest.log", "lint_series.log", "patches.sha256"],
+ "not_run": ["analyzer on real nested captures (GATE-A T022, GATE-N T034)"]}
