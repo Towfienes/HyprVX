@@ -330,3 +330,14 @@ Production safety: host Hyprland and Caelestia untouched; no plugin loaded; no p
 - `CLAUDE.md` directs Claude Code to the shared agent instructions and current feature.
 - Gitleaks found no secrets in the working tree or the 27 existing commits on this branch.
 - Build/compositor verification: NOT RUN; this milestone changes documentation and Git publication only.
+
+## V3 collaboration replan (2026-10-10)
+
+- User approved the hybrid Claude Code + Codex strategy and changes P1–P10 (DV3-09..DV3-13).
+- Applied on `v3/spec-foundation`: spec US2.2/US2.5/FR-012/SC-002, plan Phase 0/1/2 updates,
+  `transform-contract.md` v1.1, new `contracts/test-tooling.md` v1.0, verification V-12b/V-23/V-24/V-25,
+  master plan §H (U0), §I, §J, §K, §L and new §O.
+- Least-privilege audit: Codex's `workspace-write` sandbox keeps `.git` read-only (verified with `codex sandbox`
+  on scratch repos). Codex will use a separate `--no-hardlinks` clone with no access to the shared `.git`.
+- Next gate: user approval of `specs/001-native-spatial-camera/tasks.md` on branch `v3/001-native-spatial-camera`.
+- Build/compositor verification: NOT RUN (documentation and task generation only).

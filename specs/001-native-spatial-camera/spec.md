@@ -2,7 +2,8 @@
 
 **Feature Branch**: `v3/001-native-spatial-camera` (to be created on approval; specs live on `v3/spec-foundation`)
 **Created**: 2026-10-10
-**Status**: Draft — architecture approved; implementation NOT yet approved
+**Status**: Draft — architecture approved; replan P1/P2 applied 2026-10-10
+(`docs/v3/HYPRVX_V3_COLLABORATION_REPLAN_PROPOSAL.md`); implementation NOT yet approved
 **Input**: "Prove that Hyprland can pan and zoom real application windows correctly (pixels and pointer input
 agree), while Normal Mode stays stock-equivalent, in an isolated nested session." (Master plan §H Phases 0–2, §I.)
 
@@ -39,12 +40,16 @@ control; captures analyzed automatically, plus human review of the same images.
 **Acceptance Scenarios**:
 1. **Given** an 800×600 test window and camera z=0.25, **When** captured, **Then** its bounding box is 200×150 ± 2 px
    at the position given by the transform contract, and all four corner markers are present.
-2. **Given** z ∈ {0.5, 2.0} and pans of ±300 px, **When** captured, **Then** size and displacement match the
-   contract within ± 2 px.
+2. **Given** z = 0.5 (800×600 window) or z = 2.0 (400×300 window, so the transformed box fits the 1280×800
+   output), and pans of ±300 px, **When** captured, **Then** size and displacement match the contract within ± 2 px.
 3. **Given** 50 random camera states applied in sequence, **When** each partial-damage frame is compared with a
    forced full-damage frame of the same state, **Then** they match (no stale regions).
 4. **Given** any non-identity camera, **When** captured, **Then** borders and shadows enclose the transformed
    surface (no disconnected decorations), and layer-shell surfaces are unchanged.
+5. **Given** a fixed non-identity camera, **When** the client updates a small region in deterministic order,
+   **Then** each partial-damage frame matches a forced full-damage frame of the same client state
+   (T-STALE-STATIC; a camera change always damages the whole output, so scenario 3 alone never exercises the
+   partial-damage path).
 
 ### User Story 3 — Pointer input lands where the window is drawn (Priority: P1)
 As the user, clicking or moving the pointer over a zoomed or panned window delivers events to that window at
@@ -76,6 +81,9 @@ As the user, I can always return to identity/Normal instantly. Invalid camera st
 - Direct scanout / solitary client must be blocked while the camera is non-identity.
 - Fractional output scale (e.g. 1.25) must not break the ± 2 px criteria (nested test at scale 1 and 1.25).
 - Special-workspace dim and blur are out of scope for P1; they are documented if wrong (Phase 7).
+- A compositor-initiated window move or resize drag (Super+LMB, border drag) while the camera is non-identity
+  is blocked and logged in this feature. Moving windows in Drift changes the world offset `O(w)` and belongs to
+  Feature 002; Drift must never move a window by writing its logical geometry.
 
 ## Requirements *(mandatory)*
 
@@ -98,6 +106,9 @@ As the user, I can always return to identity/Normal instantly. Invalid camera st
   provenance.
 - **FR-011**: All verification MUST run against a nested compositor whose identity is re-verified before every
   mutating command.
+- **FR-012**: While the camera is non-identity, pointer drags delivered to a client surface (button held) MUST use
+  `surfaceLocal` coordinates, and decoration/corner hit selection MUST use the inverse transform.
+  Compositor-initiated window move/resize drags MUST be blocked and logged; they never write logical geometry.
 
 ### Key Entities
 - **Camera**: per (monitor, scene) — world point at the monitor's top-left `P`, zoom `z`.
@@ -107,8 +118,9 @@ See `data-model.md`.
 
 ## Success Criteria *(mandatory)*
 - **SC-001**: US1 pixel-identity holds in 3/3 repeated runs.
-- **SC-002**: US2 geometry is within ± 2 px for z ∈ {0.25, 0.5, 2.0} and pans of ±300 px, with 0 stale-frame
-  mismatches over 50 random states.
+- **SC-002**: US2 geometry is within ± 2 px for z ∈ {0.25, 0.5, 2.0} (z = 2.0 with a 400×300 window) and pans of
+  ±300 px, with 0 stale-frame mismatches over 50 random states and 0 mismatches over the static-camera
+  partial-damage sequence (US2.5).
 - **SC-003**: US3 surface-local error ≤ 1 px at ≥ 20 sampled points per camera state.
 - **SC-004**: `panic` returns to the identity image within one frame in 10/10 trials.
 - **SC-005**: A human reviewer confirms the captured image set shows no clipping, stair-step or detached
@@ -122,4 +134,4 @@ See `data-model.md`.
 
 ## Out of Scope
 Gestures, momentum, snapping, clusters, pinning, unified world, multi-monitor, production deployment, and any
-host-compositor interaction.
+host-compositor interaction. Window move/resize by drag in Drift (world-offset controller) belongs to Feature 002.

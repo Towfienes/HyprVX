@@ -261,6 +261,12 @@ phiên), tranh chấp build/RAM, viết contract test-tooling (đằng nào cũn
 
 ### H1. Worktree và branch
 
+> **Sửa đổi sau khi duyệt (2026-10-10, audit least privilege):** cách thiết lập Codex bên dưới (`git worktree` +
+> `--add-dir …/HyprVX/.git`) **đã bị thay thế** bởi master plan §O3. Codex chạy trong một clone riêng
+> (`git clone --no-hardlinks`), không có quyền ghi bất kỳ `.git` dùng chung nào; commit/fetch trong clone cần user duyệt
+> từng lệnh. Lý do: sandbox `workspace-write` khóa `.git` read-only có chủ đích (đã kiểm bằng `codex sandbox`), và
+> `--add-dir .git` sẽ mở `hooks/`, `config` và mọi ref của repo dùng chung với V1. Phần còn lại của H1 giữ làm lịch sử.
+
 ```fish
 # 0. (sau khi user duyệt mục J) áp các thay đổi đã duyệt trên v3/spec-foundation và commit theo yêu cầu user
 

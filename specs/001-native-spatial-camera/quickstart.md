@@ -9,25 +9,28 @@ directly.
 ```fish
 cd /home/towfienes/Projects/HyprVX-v3
 
-# 1. Pin upstream and apply the patch series (outside the repo, in ~/.cache/hyprvx)
+# Each agent uses its own cache root (contracts/test-tooling.md): ~/.cache/hyprvx/<agent>/{src,build,prefix,ccache,tools}
+set -x HYPRVX_AGENT claude                # or: codex
+
+# 1. Pin upstream and apply the patch series (outside the repo)
 bash scripts/fetch-hyprland.sh            # clones + verifies HEAD == efb50993…
 bash scripts/apply-patches.sh             # git am patches/hyprland/*.patch → prints patchset-id
 
-# 2. Build stock-from-source and patched (memory-capped)
+# 2. Build stock-from-source and patched (memory-capped, one heavy job at a time via the lock)
 bash scripts/build-hyprland.sh --variant stock
 bash scripts/build-hyprland.sh --variant patched
-cat ~/.cache/hyprvx/prefix/*/build-info.json
+cat ~/.cache/hyprvx/$HYPRVX_AGENT/prefix/*/build-info.json
 
-# 3. Unit tests (core + CameraMath)
-cmake -S . -B build-v3 -G Ninja -DHYPRVX_WITH_SDL=OFF -DHYPRVX_WITH_HYPRLAND_PLUGIN=OFF
+# 3. Unit tests (core + CameraMath), headless configure
+cmake -S . -B build-v3 -G Ninja -DHYPRVX_WITH_SDL=OFF -DHYPRVX_WITH_WAYLAND_PLATFORM=OFF -DHYPRVX_WITH_HYPRLAND_PLUGIN=OFF
 cmake --build build-v3 -j4; and ctest --test-dir build-v3 --output-on-failure
 
 # 4. Nested session (identity re-verified before every command)
 bash scripts/nested.sh start --variant patched --size 1280x800 --scale 1
-bash scripts/nested.sh run tools/testclient --size 800x600 --log evidence/run/client.jsonl
+bash scripts/nested.sh run hyprvx-testclient --size 800x600 --log evidence/<run-id>/client.jsonl
 bash scripts/nested.sh dev camera 0 0 0.25
-bash scripts/nested.sh capture evidence/run/z025.png
-python -I tools/analyze_frame.py evidence/run/z025.png --expect-scale 0.25 --contract specs/001-native-spatial-camera/contracts/transform-contract.md
+bash scripts/nested.sh capture evidence/<run-id>/z025.png    # after the frame-ready rule in test-tooling.md
+python -I tools/analyze_frame.py bbox evidence/<run-id>/z025.png --expect-box 0,0,200,150 --tolerance 2 --out evidence/<run-id>/z025.json
 bash scripts/nested.sh dev panic
 bash scripts/nested.sh stop               # refuses unless PID/start-time/signature still match
 ```

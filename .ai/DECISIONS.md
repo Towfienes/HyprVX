@@ -243,3 +243,42 @@ Status: accepted (user)
 
 Spec Kit 1.1.3 with the Claude integration. Constitution: `.specify/memory/constitution.md`. Features live in
 `specs/NNN-*`. `tasks.md` and implementation start only after user approval.
+
+### DV3-09 - Hybrid Claude Code + Codex collaboration
+
+Status: accepted (user, 2026-10-10)
+
+Claude Code is technical lead and integration owner. Codex works only on independently verifiable lanes
+(Sprint 1: build/CMake, scripts, harness, test tools, native test scripts, baselines, independent review) with
+exclusive file ownership. Codex runs in a separate `git clone --no-hardlinks` without write access to any shared
+`.git`. See master plan §O and `docs/v3/HYPRVX_V3_COLLABORATION_REPLAN_PROPOSAL.md`.
+
+### DV3-10 - CameraMath.hpp license
+
+Status: accepted (user, 2026-10-10)
+
+`core/include/hyprvx/core/CameraMath.hpp` carries `SPDX-License-Identifier: BSD-3-Clause` so it can be vendored
+into the Hyprland patch series. The project-wide license (V1 D010) remains open.
+
+### DV3-11 - Drag scope in Feature 001
+
+Status: accepted (user, 2026-10-10)
+
+Feature 001 keeps surface-local coordinates for client drags and inverse-transformed decoration hit selection
+(FR-012). Compositor move/resize drags are blocked while the camera is non-identity. Moving windows through the
+world offset `O(w)` belongs to Feature 002.
+
+### DV3-12 - Early unified-world feasibility spike (U0)
+
+Status: accepted (user, 2026-10-10)
+
+A time-boxed, evidence-only spike answers U3 after the Feature 001 gate, before or at the start of Phase 3. It
+does not implement Milestone U and its code is not merged.
+
+### DV3-13 - Commit authorization for V3 feature branches
+
+Status: accepted (user, 2026-10-10)
+
+Regular project-local commits are authorized on `v3/001-*` branches and for approved planning changes on
+`v3/spec-foundation`. No push, no destructive cleanup, no merge into `dev`, `main` or `v3/spec-foundation`
+without approval.

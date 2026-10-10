@@ -17,6 +17,7 @@ A dispatcher `ok` is never an artifact.
 | V-10 | L5 | T-Z025 / T-Z05 / T-Z2 ± 2 px, 4 markers | NOT RUN | |
 | V-11 | L5 | T-PAN displacement ± 2 px | NOT RUN | |
 | V-12 | L5 | T-STALE 50 states, 0 mismatches | NOT RUN | |
+| V-12b | L5 | T-STALE-STATIC: fixed non-identity camera, deterministic client partial updates, 0 mismatches vs full damage | NOT RUN | |
 | V-13 | L5 | T-OFF / panic ⇒ identity image (10/10) | NOT RUN | |
 | V-14 | L5 | Layer-shell test surface unchanged under camera | NOT RUN | |
 | V-15 | L5 | Scale 1.25 repeats V-10..V-12 | NOT RUN | |
@@ -27,3 +28,6 @@ A dispatcher `ok` is never an artifact.
 | V-20 | — | Human review of the image set (no clipping/stair-step/detached deco) | NOT AUTOMATABLE | reviewer + date |
 | V-21 | — | Delivery spike report (hooks vs patch) written | NOT RUN | `delivery-decision.md` |
 | V-22 | — | Host untouched: no host hyprctl/plugin/config change during the run | NOT RUN | harness audit log |
+| V-23 | L5 | GATE-A: stock vs stock ×3 pixel-identical with the shared nested config (precondition for V-09) | NOT RUN | |
+| V-24 | L5 | GATE-N: analyzer reports FAIL on the V2-as-is captures of V-08 (negative control) | NOT RUN | |
+| V-25 | L2 | V1 equivalence: `Camera` (M = 0) equals `CameraMath` forward/inverse; existing camera tests unchanged | NOT RUN | |

@@ -1,6 +1,8 @@
 # HyprVX V3 — Kế hoạch Kiến trúc, Phục hồi & Kỹ thuật (Architecture Approval Gate)
 
-> **Trạng thái:** kiến trúc đã được user duyệt ngày 2026-10-10. **Sprint 1 (mục I) CHƯA được duyệt thực thi.**
+> **Trạng thái:** kiến trúc đã được user duyệt ngày 2026-10-10. Replan cộng tác Claude + Codex (P1–P10) đã duyệt
+> và áp dụng ngày 2026-10-10 (`docs/v3/HYPRVX_V3_COLLABORATION_REPLAN_PROPOSAL.md`, mục O). Chuẩn bị Sprint 1 và sinh
+> `tasks.md` đã được duyệt; **implementation Sprint 1 chỉ bắt đầu sau khi user duyệt `tasks.md`.**
 > **Ngôn ngữ:** giải thích bằng tiếng Việt, thuật ngữ kỹ thuật giữ tiếng Anh.
 > **Worktree:** `/home/towfienes/Projects/HyprVX-v3`, branch `v3/spec-foundation` (tách từ V1 `dev@15f75b0`).
 > **Tài liệu liên quan (Spec Kit):**
@@ -24,6 +26,7 @@
 > - L Cấu trúc repo & build tái lập
 > - M Tương thích & cập nhật
 > - N Nhật ký thực hiện phiên lập kế hoạch
+> - O Quy trình cộng tác Claude Code + Codex
 
 ---
 
@@ -425,8 +428,9 @@ Effort là khoảng thô theo đơn vị *focused engineering-weeks*, độ tin 
 |---|---|---|---|---|---|---|
 | **0 Evidence & Recovery** | worktree V3, Spec Kit, research docs, script pin efb5099 + apply patch, build stock-from-source + V2-as-is trong nested | — | RAM thấp khi build | 0.5–1 | Clean build tái lập được + U1 xác nhận bằng ảnh | Mọi feature |
 | **1 Architecture Proof** | `CameraMath` + patch 0001–0004 (render seam, clip, simplify, culling, damage) + testclient/vpointer/analyzer | 0 | Seam ẩn ngoài danh sách 10 | 1–2 | **T-ID pixel-identical + T-Z025 pass** | gesture, snap |
-| **2 Native Spatial Camera** | input seam (hit-test, local, drag, warp, constraints), 1 cửa sổ thật đúng visual + input; **spike plugin-hook ⇒ quyết định phân phối** | 1 | Constraint/XWayland | 1–3 | L4+L5+L5b pass cho 1 cửa sổ; báo cáo spike | Multi-window |
-| **3 Multi-Window MVP (Option A)** | plugin controller + `O(w)`, popups, subsurfaces, XWayland, focus, move (Drift), OFF sạch, camera per workspace | 2 | Popup off-monitor (`CPopup::onMap` null) | 2–4 | Kịch bản 12 bước của user (trừ trackpad) chạy được trong nested | Unified world |
+| **2 Native Spatial Camera** | input seam (hit-test, local, chọn deco/góc theo inverse, warp, constraints; move/resize-drag bị chặn khi camera ≠ identity), 1 cửa sổ thật đúng visual + input; **spike plugin-hook ⇒ quyết định phân phối** | 1 | Constraint/XWayland | 1–3 | L4+L5+L5b pass cho 1 cửa sổ; báo cáo spike | Multi-window; move bằng `O(w)` |
+| U0 Unified-world feasibility spike | Trả lời U3 bằng bằng chứng: predicate `isDriftVisible` trong `shouldRenderWindow` + `windowAt` trên branch bỏ đi; quan sát frame callback, `wl_surface.enter`, focus → workspace switch, warp/animation side effect | 2 (cổng Feature 001) | Side effect focus/workspace | 0.5–1 (time-boxed) | Báo cáo `docs/v3/U0_FEASIBILITY_REPORT.md` với PASS/FAIL/BLOCKED từng câu hỏi; **không merge code** | Không implement U; không đổi ownership |
+| **3 Multi-Window MVP (Option A)** | plugin controller + `O(w)`, popups, subsurfaces, XWayland, focus, move (Drift) bằng drag sửa `O(w)`, OFF sạch, camera per workspace | 2 (U0 chạy trước hoặc đầu phase này) | Popup off-monitor (`CPopup::onMap` null) | 2–4 | Kịch bản 12 bước của user (trừ trackpad) chạy được trong nested | Unified world |
 | **4 Trackpad UX** | gesture arbitration, anchor zoom, momentum, cancel; **hardware validation** | 3 | `drag_3fg`, bind sẵn có | 1–3 | Checklist L6 do người ký | Snap |
 | 5 DriftWM window behavior | snap, implicit cluster (từ V1 Island), pin, nav, bookmarks, zoom-to-fit | 4 | Oscillation snap | 2–4 | Test L2 + L5 cho snap/cluster | — |
 | 6 Caelestia compat | chứng minh screen-space, workspace/focus/launcher; compat layer tùy chọn | 3 | FloatingWindow placement | 0.5–1 | Checklist Caelestia | Sửa file Caelestia |
@@ -435,7 +439,7 @@ Effort là khoảng thô theo đơn vị *focused engineering-weeks*, độ tin 
 | 8 Multi-monitor/HDR | camera độc lập mỗi output, hotplug, scale/HDR | 7 | HDR/CM | 2–4 | Ma trận topology | — |
 | 9 Production candidate | packaging, compat check, crash-loop guard, rollback, duyệt user | tất cả | — | 1–2 | L8 có user duyệt | — |
 
-**Shortest critical path đến MVP dùng được:** 0 → 1 → 2 → 3 → 4, sau đó 6 + 7 (smoke). Unified world (U) là **yêu cầu sản phẩm cuối, không phải tùy chọn**.
+**Shortest critical path đến MVP dùng được:** 0 → 1 → 2 → 3 → 4, sau đó 6 + 7 (smoke). Unified world (U) là **yêu cầu sản phẩm cuối, không phải tùy chọn**. Spike U0 (sau cổng Feature 001) phát hiện sớm rủi ro U3 trước khi đầu tư Phase 4–5; nó không thay thế Milestone U. Nếu U0 FAIL, phương án "drift workspace vật lý" vẫn cần user duyệt riêng (C5).
 
 **Acceptance cho Unified World (U):**
 - **U-1:** Cửa sổ từ ≥ 3 workspace hiển thị cùng lúc, đúng vị trí world.
@@ -447,8 +451,19 @@ Effort là khoảng thô theo đơn vị *focused engineering-weeks*, độ tin 
 
 ---
 
-## I. First Implementation Sprint (CHƯA thực thi — cần duyệt)
+## I. First Implementation Sprint (chuẩn bị + `tasks.md` đã duyệt; implementation chờ duyệt `tasks.md`)
 **Mục tiêu:** chốt rủi ro cao nhất, tức chứng minh có thể render surface thật bị scale/pan đúng pixel mà Normal vẫn pixel-identical.
+
+**Điều chỉnh theo replan (P7, 2026-10-10):**
+- **Infra-before-claims** thay cho "test infra trước code": patch được viết song song với tool; không patch nào được
+  đánh giá hay claim trước khi tool sẵn sàng và baseline stock đã tất định.
+- **Hai lane** (mục O): Claude giữ contract, `CameraMath.hpp`, patch 0001–0005, debug, tích hợp. Codex giữ CMake,
+  script build/provenance, harness, testclient, analyzer, kịch bản T-*, baseline và review độc lập.
+- **Checkpoint mới:** K0 (contract freeze: `transform-contract.md` v1.1, `test-tooling.md` v1.0), GATE-A (stock vs
+  stock ×3 pixel-identical, V-23), GATE-N (analyzer báo FAIL trên V2-as-is, V-24).
+- `tools/vpointer` **không gating** Sprint 1 (input thuộc Phase 2).
+- License: `CameraMath.hpp` mang `SPDX-License-Identifier: BSD-3-Clause` (DV3-10), nên patch 0001 không còn bị chặn.
+- Tái lập được báo cáo ở 3 mức tách biệt: input / test-result / binary (`contracts/test-tooling.md` §3).
 
 1. **Chuẩn bị nguồn (an toàn):** `scripts/fetch-hyprland.sh`
    - Clone `hyprwm/Hyprland` vào `~/.cache/hyprvx/src/hyprland-efb5099`, kèm submodules (hyprland-protocols, udis86).
@@ -459,7 +474,7 @@ Effort là khoảng thô theo đơn vị *focused engineering-weeks*, độ tin 
    - `GIT_COMMIT_HASH` giữ thật; `GIT_DIRTY="hyprvx-<sha256(patches)[:12]>"`.
    - Build 2 biến thể: **stock-from-source** và **patched**. Ghi `build-info.json` (sha256 binary, versions lib).
    - Chạy trong `systemd-run --user --scope -p MemoryMax=6G`.
-3. **Test infra trước code:**
+3. **Test infra trước claim** (viết song song với patch; schema trong `specs/001-native-spatial-camera/contracts/test-tooling.md`):
    - `tools/testclient` (C++, xdg_toplevel SHM): vẽ nền đặc, 4 marker màu ở góc, lưới 50 px; log JSON `enter/motion/button` surface-local.
    - `tools/vpointer`: zwlr_virtual_pointer_v1, absolute motion.
    - `tools/analyze_frame.py`: chạy `python -I`, đọc PNG (Pillow nếu có, nếu không thì PPM qua `grim -t ppm`), tìm bbox theo màu marker.
@@ -476,10 +491,12 @@ Effort là khoảng thô theo đơn vị *focused engineering-weeks*, độ tin 
    - **T-Z025 / T-Z05 / T-Z2:** bbox ± 2 px, marker đủ.
    - **T-PAN:** displacement đúng.
    - **T-STALE:** 50 trạng thái camera ngẫu nhiên; mỗi trạng thái so ảnh partial-damage với ảnh sau `damageMonitor` full, diff ≤ ngưỡng.
+   - **T-STALE-STATIC:** camera cố định ≠ identity, client cập nhật vùng nhỏ theo thứ tự xác định; mỗi frame partial-damage so với frame full-damage cùng trạng thái client (spec US2.5).
+   - **T-Z2** dùng cửa sổ 400×300 để box đã transform nằm gọn trong output 1280×800 (spec US2.2).
    - **T-OFF:** về identity ⇒ ảnh bằng ảnh T-ID.
    - Input chưa nằm trong sprint 1; chỉ ghi chú observation.
 7. **Kết quả kỳ vọng:** cửa sổ foot/testclient co đúng 25%, không cắt, không stale; layer-shell (testclient layer tùy chọn) không đổi.
-8. **Success criteria:** T-ID, T-Z*, T-PAN, T-STALE, T-OFF đều PASS kèm artifact; L2 invariants PASS; clean build tái lập 2 lần cho cùng sha256 đầu vào patch.
+8. **Success criteria:** GATE-A và GATE-N PASS; T-ID, T-Z*, T-PAN, T-STALE, T-STALE-STATIC, T-OFF đều PASS kèm artifact; L2 invariants PASS (gồm tương đương V1); clean build tái lập 2 lần cho cùng sha256 đầu vào patch (mức input + test-result); Codex chạy lại độc lập (R1) cho cùng kết quả.
 9. **Stop conditions:**
    - T-ID không pixel-identical.
    - Build đòi đổi package hệ thống.
@@ -502,8 +519,16 @@ Effort là khoảng thô theo đơn vị *focused engineering-weeks*, độ tin 
 - **DV3-07** Không copy code DriftWM (GPL-3.0).
 - **DV3-08** Spec Kit làm quy trình (mục K).
 
+**Đã chốt trong replan cộng tác (user duyệt 2026-10-10):**
+- **DV3-09** Chiến lược Hybrid Claude Code + Codex theo phase; Claude là technical lead và integration owner (mục O).
+- **DV3-10** `CameraMath.hpp` mang `SPDX-License-Identifier: BSD-3-Clause` (chỉ file này).
+- **DV3-11** Feature 001 chặn move/resize-drag khi camera ≠ identity; move bằng `O(w)` thuộc Feature 002 (FR-012).
+- **DV3-12** Spike U0 time-boxed, chỉ bằng chứng, sau cổng Feature 001.
+- **DV3-13** Ủy quyền commit thường trực trên branch `v3/001-*` (không push, không cleanup phá hủy, không merge vào
+  `dev`/`main`/`v3/spec-foundation` khi chưa duyệt).
+
 **Còn mở:**
-- License dự án (D010 của V1). Cần permissive (MIT/BSD-3) cho `CameraMath.hpp` vendored vào Hyprland (BSD-3).
+- License toàn dự án (D010 của V1). `CameraMath.hpp` đã chốt BSD-3-Clause (DV3-10).
 - Phím bật/tắt Drift.
 - Có tắt `drag_3fg` khi ở Drift hay không.
 - Zoom range cuối cùng.
@@ -534,8 +559,8 @@ Spec Kit CLI 1.1.3 được khởi tạo trong worktree V3 bằng lệnh `specif
 
 | Feature dir | Phase | Trạng thái |
 |---|---|---|
-| `specs/001-native-spatial-camera/` | 0 + 1 + 2 (Sprint 1 nằm trong này) | **spec + plan + research + contracts đã viết; tasks.md chưa sinh** |
-| `specs/002-multi-window-drift-mvp/` | 3 | tạo khi 001 qua cổng |
+| `specs/001-native-spatial-camera/` | 0 + 1 + 2 (Sprint 1 nằm trong này) | spec + plan + research + contracts (replan P1–P5 đã áp); `tasks.md` sinh trên branch `v3/001-native-spatial-camera`, chờ duyệt |
+| `specs/002-multi-window-drift-mvp/` | 3 (gồm move bằng drag sửa `O(w)`, DV3-11) | tạo khi 001 qua cổng |
 | `specs/003-trackpad-native-ux/` | 4 | — |
 | `specs/004-drift-window-behavior/` | 5 | — |
 | `specs/005-caelestia-compatibility/` | 6 | — |
@@ -589,7 +614,8 @@ hyprwayland-scanner: không có trong pacman → build từ tag pin (v0.4.6, đ�
 ```
 - **Không vendor** cây Hyprland 2.6 GB vào git. Nguồn sự thật = commit pin + patch series.
 - Hai lần build sạch (rm build dir) phải cho ra cùng `patchset-id`. Binary sha256 có thể khác do timestamp; chấp nhận nếu `build-info.json` khớp và test L4/L5 cho cùng kết quả.
-- CMake của V1: thêm option `HYPRVX_WITH_SDL`, `HYPRVX_WITH_HYPRLAND_PLUGIN` (mặc định OFF cho core-only); dùng `pkg_get_variable(... wayland-protocols pkgdatadir)` thay cho đường dẫn tuyệt đối `/usr/share/...`; luôn dùng build dir mới (`build-v3/`).
+- CMake của V1: thêm option `HYPRVX_WITH_SDL`, `HYPRVX_WITH_WAYLAND_PLATFORM`, `HYPRVX_WITH_HYPRLAND_PLUGIN` (mặc định OFF cho core-only); mỗi option gate cả target lẫn dependency discovery tương ứng (`CMakeLists.txt:161-211` hiện REQUIRED vô điều kiện). Dùng `pkg_get_variable(... wayland-protocols pkgdatadir)` thay cho đường dẫn tuyệt đối `/usr/share/...`. Configure headless (cả ba OFF) chỉ cần toolchain, GTest, nlohmann_json, Python 3. Luôn dùng build dir mới (`build-v3/`).
+- Mỗi agent có cache riêng `~/.cache/hyprvx/<agent>/{src,build,prefix,ccache,tools}`; không dùng chung source tree, prefix hay ccache (`contracts/test-tooling.md` §1).
 - CI: khả thi cho L1–L3 (container Arch, không GPU). L4+ cần GPU và Wayland host, nên chỉ chạy local, có script tái lập.
 
 **Branching:**
@@ -652,3 +678,73 @@ hyprwayland-scanner: không có trong pacman → build từ tag pin (v0.4.6, đ�
 | Feature 001 | spec/plan/research/data-model/contracts/quickstart/checklist | `specs/001-native-spatial-camera/` |
 | Hyprland/Caelestia host | **Không đụng tới.** Không chạy hyprctl, Hyprland, pacman, ydotool | — |
 | Build/test V1 | **NOT RUN.** Phiên này chỉ làm tài liệu; build sạch thuộc Phase 0 | — |
+
+---
+
+## O. Quy trình cộng tác Claude Code + Codex (replan P8, duyệt 2026-10-10)
+
+Chi tiết và lý do nằm trong `docs/v3/HYPRVX_V3_COLLABORATION_REPLAN_PROPOSAL.md` (mục A–J). Mục này là phần có
+hiệu lực. Spec Kit vẫn là workflow duy nhất; không có hệ thống task thứ hai.
+
+### O1. Vai trò
+- **Claude Code:** technical lead, integration owner. Sở hữu contract, `CameraMath.hpp`, `Camera.cpp`, patch series,
+  debug compositor, `specs/` (gồm `tasks.md`, `verification.md`, `integration-log.md`), `docs/`, `.ai/`, `.specify/`.
+- **Codex:** lane độc lập có đầu ra kiểm chứng được. Trong Sprint 1: `CMakeLists.txt`, `.gitignore`, `scripts/`,
+  `tools/`, `tests/native/`, `tests/unit/test_camera_math.cpp`; review độc lập ở cổng (`codex review`, chạy lại suite).
+- Mỗi file chỉ có một owner tại một thời điểm. Chuyển quyền phải ghi vào `integration-log.md`. Claude không sửa test
+  của Codex; Codex không sửa patch của Claude. Owner của lane được quyết lại ở mỗi `/speckit-tasks`.
+
+### O2. Ghi task trong Spec Kit
+- Owner ghi ở cuối description: `- [ ] T014 [P] … in tools/testclient/ (owner: codex)`.
+- Chỉ Claude sinh, sửa và tick `tasks.md`. Claude chạy `/speckit-implement` với filter owner của mình. Codex nhận
+  work order (task ID, contract, lệnh verify, ranh giới file) và không chạy skill Spec Kit.
+
+### O3. Codex chạy trong clone riêng, không truy cập `.git` dùng chung (least privilege)
+Kiểm chứng ngày 2026-10-10 bằng `codex sandbox -P :workspace` trên repo thử trong scratchpad: sandbox
+`workspace-write` của Codex đặt `.git` của workspace ở chế độ **read-only** (cả worktree lẫn clone). `git commit`,
+ghi `.git/hooks` và ghi `.git/config` đều trả `Read-only file system`. Vì vậy cách cũ trong đề xuất (mục H1:
+`git worktree` + `--add-dir …/HyprVX/.git`) **bị thay thế**. Nó tắt một cơ chế an toàn có chủ đích và cho Codex
+quyền ghi `hooks/` và `config` (thực thi code trong lệnh git sau này của user hoặc Claude), cùng mọi ref của repo
+dùng chung với V1 (`dev`, `main`, `v3/spec-foundation`).
+
+Thiết lập được duyệt (Claude tạo clone khi Sprint 1 implementation được duyệt; repo chỉ 2.3 MB):
+```fish
+git clone --no-hardlinks --branch v3/001-native-spatial-camera \
+    /home/towfienes/Projects/HyprVX /home/towfienes/Projects/HyprVX-v3-codex
+git -C /home/towfienes/Projects/HyprVX-v3-codex switch -c v3/001-codex
+git -C /home/towfienes/Projects/HyprVX-v3-codex remote set-url --push origin DISABLED
+mkdir -p ~/.cache/hyprvx/codex ~/.cache/hyprvx/claude ~/.cache/hyprvx/locks
+touch ~/.cache/hyprvx/locks/heavy.lock
+
+# User tự khởi động Codex (không đổi config, auth hay model mặc định):
+codex -C /home/towfienes/Projects/HyprVX-v3-codex -s workspace-write -a on-request \
+      --add-dir ~/.cache/hyprvx/codex -m <model>
+```
+- `--no-hardlinks`: object của clone không chung inode với repo V1/V3, nên ghi qua clone không thể sửa object dùng chung.
+- Không `--add-dir` cho bất kỳ `.git` nào. `git commit` và `git fetch` trong clone sẽ cần user duyệt từng lệnh
+  (escalation `on-request`); user thấy đúng lệnh trước khi chạy. Các lệnh đó chỉ chạm `.git` của chính clone.
+- `--add-dir` chỉ cấp `~/.cache/hyprvx/codex` (source/build/prefix/ccache riêng của Codex), không cấp cache của Claude.
+  Lock file được mở read-only để `flock`; khả năng này được kiểm trong smoke test S0.
+- `/tmp` mặc định ghi được trong sandbox Codex (cần cho runtime dir `/tmp/hvx-*` của nested).
+- Push bị vô hiệu ở clone. Codex không bao giờ dùng `--dangerously-bypass-approvals-and-sandbox`.
+
+### O4. Handoff và tích hợp
+1. Codex commit nhỏ theo task trên `v3/001-codex` với trailer `Task:`, `Verify:`, `Result:`, `Evidence:`, `Not-run:`.
+2. Claude lấy commit **từ bên ngoài clone** và không bao giờ chạy lệnh git bên trong clone (tránh hook/config của
+   clone): `git fetch /home/towfienes/Projects/HyprVX-v3-codex v3/001-codex:refs/codex/v3/001-codex`.
+3. Claude review diff (`git diff v3/001-native-spatial-camera...refs/codex/v3/001-codex`), chạy lại lệnh verify, rồi
+   `git merge --no-ff refs/codex/v3/001-codex` vào `v3/001-native-spatial-camera`, tick `tasks.md`, ghi `integration-log.md`.
+4. Acceptance fail thì không merge. Codex lấy cập nhật bằng `git fetch origin` + `git merge` (không rebase/force).
+5. Phụ thuộc chưa xong: code theo contract đã freeze, không theo HEAD dở của bên kia; bị chặn thì ghi BLOCKED và
+   chuyển task. Không ai `stash`, `reset --hard`, `clean` trên checkout của bên kia. Mỗi lần tích hợp Claude kiểm
+   `git rev-parse dev` == `15f75b0`.
+
+### O5. Tài nguyên máy
+Một job nặng tại một thời điểm (build Hyprland hoặc nested session) qua `flock ~/.cache/hyprvx/locks/heavy.lock`;
+`MemAvailable ≥ 6.5 GiB` trước khi build; dừng khi PSI memory full avg10 > 10; `-j4`, `MemoryMax=6G`. Job nhẹ chạy
+song song. Chi tiết: `specs/001-native-spatial-camera/contracts/test-tooling.md` §2.
+
+### O6. Model và quota
+Claude Opus 5.5 giữ một phiên dài cho lane compositor, không đổi model giữa phiên; mở phiên mới ở ranh giới cổng
+với handoff `.ai/`. Codex: một phiên bền cho lane hạ tầng (`codex resume --last`); model mạnh hơn chỉ dùng cho review
+cổng. Chọn model theo kết quả kiểm chứng trên dự án, không theo tên model.
