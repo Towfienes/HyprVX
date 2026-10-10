@@ -1,0 +1,58 @@
+# HyprVX native test config, identical for every variant (contracts/test-tooling.md section 5).
+# Rendered per nested session by tools/hyprvx_nested.py: @WIDTH@, @HEIGHT@ and @SCALE@ are replaced; nothing else
+# changes between stock, v2 and patched. Hyprlang (legacy) format: an explicit --config path without a .lua
+# extension selects the legacy parser in Hyprland efb5099 (src/config/ConfigManager.cpp). Every key below was
+# checked against src/config/values/ConfigValues.cpp of efb5099; a config error would draw an error bar into captures.
+
+monitor = , @WIDTH@x@HEIGHT@@60, 0x0, @SCALE@
+
+general {
+    gaps_in = 0
+    gaps_out = 0
+    border_size = 2
+    col.active_border = rgb(888888)
+    col.inactive_border = rgb(888888)
+}
+
+decoration {
+    rounding = 0
+    dim_inactive = false
+    blur {
+        enabled = false
+    }
+    shadow {
+        enabled = false
+    }
+}
+
+animations {
+    enabled = false
+}
+
+misc {
+    disable_hyprland_logo = true
+    disable_splash_rendering = true
+    force_default_wallpaper = 0
+    background_color = rgb(111111)
+    disable_autoreload = true
+}
+
+cursor {
+    inactive_timeout = 1
+}
+
+ecosystem {
+    no_update_news = true
+    no_donation_nag = true
+}
+
+input {
+    kb_layout = us
+}
+
+render {
+    direct_scanout = 0
+}
+
+# The test client floats at a fixed logical position with its own fixed size (min = max size).
+windowrule = match:class ^(hyprvx-testclient)$, float on, move 140 100

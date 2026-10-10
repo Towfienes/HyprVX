@@ -265,6 +265,35 @@ class GlazePinTest(unittest.TestCase):
             self.assertIn("glaze-" + build.GLAZE_TAG, result.stdout)
 
 
+class VersionProvenanceTest(unittest.TestCase):
+    # Verbatim from the generated src/version.h of the first real stock build (efb5099, 2026-10-11).
+    HEADER = (
+        '#pragma once\n'
+        '#define GIT_COMMIT_HASH    "efb50993780079460b0cbed1363e2166a2de1d9f"\n'
+        '#define GIT_BRANCH         "unknown"\n'
+        '#define GIT_DIRTY          "clean-upstream"\n'
+        '#define GIT_TAG            "v0.56.2"\n'
+        '// clang-format off\n'
+        '#define AQUAMARINE_VERSION_MAJOR 0\n'
+    )
+
+    def test_aligned_defines_are_parsed(self):
+        defines = build.version_defines(self.HEADER)
+        self.assertEqual(defines["GIT_COMMIT_HASH"], "efb50993780079460b0cbed1363e2166a2de1d9f")
+        self.assertEqual(defines["GIT_DIRTY"], "clean-upstream")
+        self.assertNotIn("AQUAMARINE_VERSION_MAJOR", defines)
+
+    def test_truthful_header_passes_and_mismatches_block(self):
+        head = "efb50993780079460b0cbed1363e2166a2de1d9f"
+        build.check_version_provenance(self.HEADER, head, "clean-upstream")
+        with self.assertRaisesRegex(SystemExit, "BLOCKED: generated version.h"):
+            build.check_version_provenance(self.HEADER, "0" * 40, "clean-upstream")
+        with self.assertRaisesRegex(SystemExit, "BLOCKED: generated version.h"):
+            build.check_version_provenance(self.HEADER, head, "hyprvx-5005d4c52ac7")
+        with self.assertRaisesRegex(SystemExit, "BLOCKED: generated version.h"):
+            build.check_version_provenance(self.HEADER.replace("clean-upstream", "clean"), head, "clean-upstream")
+
+
 def load_tests(loader, tests, pattern):
     suite = loader.loadTestsFromTestCase(BuildScriptTest)
     if SCRIPT.name == "build-hyprland.sh":
@@ -272,6 +301,7 @@ def load_tests(loader, tests, pattern):
         suite.addTests(loader.loadTestsFromTestCase(PsiWatchdogTest))
         suite.addTests(loader.loadTestsFromTestCase(BuildMemoryTest))
         suite.addTests(loader.loadTestsFromTestCase(GlazePinTest))
+        suite.addTests(loader.loadTestsFromTestCase(VersionProvenanceTest))
     return suite
 
 

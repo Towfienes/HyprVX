@@ -60,6 +60,18 @@ def register_pressure_trigger():
     return pressure
 
 
+def version_defines(text):
+    """String #defines of Hyprland's generated src/version.h; version.h.in aligns values with several spaces."""
+    return dict(re.findall(r'^#define[ \t]+(\w+)[ \t]+"([^"\n]*)"[ \t]*$', text, re.MULTILINE))
+
+
+def check_version_provenance(text, head, git_dirty):
+    defines = version_defines(text)
+    if defines.get("GIT_COMMIT_HASH") != head or defines.get("GIT_DIRTY") != git_dirty:
+        blocked("generated version.h does not match truthful build provenance: GIT_COMMIT_HASH=%r GIT_DIRTY=%r"
+                % (defines.get("GIT_COMMIT_HASH"), defines.get("GIT_DIRTY")))
+
+
 def interrupted(signum, frame):
     raise InterruptedError("build interrupted")
 
@@ -92,21 +104,27 @@ def watch_build(process, pressure, unit, *, poller=None, avg10_reader=full_avg10
                 os.close(pidfd)
 
 
+def variant_identity(repo, variant):
+    """(identifier, patchset_id, patches) for a variant; the identifier names the install prefix."""
+    patch_dir = repo / ("research/v2-drift-mvp" if variant == "v2" else "patches/hyprland")
+    patches = [] if variant == "stock" else sorted(patch_dir.glob("*.patch"))
+    if variant != "stock" and not patches:
+        blocked("no patches for this variant")
+    patchset_id = hashlib.sha256(b"".join(p.read_bytes() for p in patches)).hexdigest()[:12] if patches else "none"
+    identifier = "stock" if variant == "stock" else ("v2-" + patchset_id if variant == "v2" else patchset_id)
+    return identifier, patchset_id, patches
+
+
 def main(repo, variant, dry_run):
     pin = "efb50993780079460b0cbed1363e2166a2de1d9f"
     agent = os.environ["HYPRVX_AGENT"]
     cache = Path.home() / ".cache/hyprvx" / agent
     src = cache / "src/hyprland-efb5099" / ("v3-dev" if variant == "patched" else variant)
-    patch_dir = repo / ("research/v2-drift-mvp" if variant == "v2" else "patches/hyprland")
-    patches = [] if variant == "stock" else sorted(patch_dir.glob("*.patch"))
 
     def git(*args):
         return output(["git", "-C", str(src), *args])
 
-    if variant != "stock" and not patches:
-        blocked("no patches for this variant")
-    patchset_id = hashlib.sha256(b"".join(p.read_bytes() for p in patches)).hexdigest()[:12] if patches else "none"
-    identifier = "stock" if variant == "stock" else ("v2-" + patchset_id if variant == "v2" else patchset_id)
+    identifier, patchset_id, patches = variant_identity(repo, variant)
     prefix = cache / "prefix" / identifier
     git_dirty = "clean-upstream" if variant == "stock" else "hyprvx-" + patchset_id
     env = os.environ.copy()
@@ -189,10 +207,7 @@ def main(repo, variant, dry_run):
         raise
     watch_build(process, pressure, unit)
 
-    version_header = (src / "src/version.h").read_text()
-    if ('#define GIT_COMMIT_HASH "' + head + '"' not in version_header or
-            '#define GIT_DIRTY "' + git_dirty + '"' not in version_header):
-        blocked("generated version.h does not match truthful build provenance")
+    check_version_provenance((src / "src/version.h").read_text(), head, git_dirty)
     compiler = re.search(r"^CMAKE_CXX_COMPILER:FILEPATH=(.+)$", (build / "CMakeCache.txt").read_text(), re.MULTILINE)
     if not compiler:
         blocked("configured C++ compiler is unavailable")
