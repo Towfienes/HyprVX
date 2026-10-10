@@ -3,6 +3,9 @@
 > **Trạng thái:** kiến trúc đã được user duyệt ngày 2026-10-10. Replan cộng tác Claude + Codex (P1–P10) đã duyệt
 > và áp dụng ngày 2026-10-10 (`docs/v3/HYPRVX_V3_COLLABORATION_REPLAN_PROPOSAL.md`, mục O). Chuẩn bị Sprint 1 và sinh
 > `tasks.md` đã được duyệt; **implementation Sprint 1 chỉ bắt đầu sau khi user duyệt `tasks.md`.**
+> **Cập nhật 2026-10-11 (DV3-15):** user dừng mô hình cộng tác Claude + Codex. Claude Code là agent implementation duy
+> nhất; mục O (trừ O5) và mọi bước handoff giữa hai agent hết hiệu lực. Các sửa kỹ thuật của replan (P1–P5, P10,
+> infra-before-claims, K0, GATE-A, GATE-N, U0) vẫn giữ. `tasks.md` đã được user duyệt tại `966e6b6`; Sprint 1 đang chạy.
 > **Ngôn ngữ:** giải thích bằng tiếng Việt, thuật ngữ kỹ thuật giữ tiếng Anh.
 > **Worktree:** `/home/towfienes/Projects/HyprVX-v3`, branch `v3/spec-foundation` (tách từ V1 `dev@15f75b0`).
 > **Tài liệu liên quan (Spec Kit):**
@@ -457,8 +460,8 @@ Effort là khoảng thô theo đơn vị *focused engineering-weeks*, độ tin 
 **Điều chỉnh theo replan (P7, 2026-10-10):**
 - **Infra-before-claims** thay cho "test infra trước code": patch được viết song song với tool; không patch nào được
   đánh giá hay claim trước khi tool sẵn sàng và baseline stock đã tất định.
-- **Hai lane** (mục O): Claude giữ contract, `CameraMath.hpp`, patch 0001–0005, debug, tích hợp. Codex giữ CMake,
-  script build/provenance, harness, testclient, analyzer, kịch bản T-*, baseline và review độc lập.
+- ~~**Hai lane** (mục O)~~ — hết hiệu lực từ DV3-15 (2026-10-11): Claude Code làm toàn bộ (contract, patch, tooling,
+  test, debug, tích hợp). R1 thành kiểm chứng clean-room do Claude chạy lại từ build mới (T044).
 - **Checkpoint mới:** K0 (contract freeze: `transform-contract.md` v1.1, `test-tooling.md` v1.0), GATE-A (stock vs
   stock ×3 pixel-identical, V-23), GATE-N (V-24; chỉ PASS khi đủ 5 điều kiện S1 setup hợp lệ, S2 camera thực sự áp
   dụng, P analyzer PASS trên ảnh tốt, N analyzer FAIL đúng loại lỗi trên V2-as-is, H xác nhận bằng mắt; bảng phân
@@ -532,6 +535,8 @@ Effort là khoảng thô theo đơn vị *focused engineering-weeks*, độ tin 
   `dev`/`main`/`v3/spec-foundation` khi chưa duyệt).
 - **DV3-14** Codex Auto-review cho escalation trong phạm vi §O3 (workspace-write + on-request giữ nguyên; nested
   compositor/GPU/socket host vẫn duyệt tay; không Full Access/Bypass), áp dụng từ WO-04.
+- **DV3-15** Dừng cộng tác Claude + Codex (user, 2026-10-11): Claude Code là agent implementation duy nhất; mục O hết
+  hiệu lực trừ O5; DV3-09 (hybrid) và DV3-14 bị thay thế; công việc và evidence đã có được giữ nguyên.
 
 **Còn mở:**
 - License toàn dự án (D010 của V1). `CameraMath.hpp` đã chốt BSD-3-Clause (DV3-10).
@@ -689,8 +694,13 @@ hyprwayland-scanner: không có trong pacman → build từ tag pin (v0.4.6, đ�
 
 ## O. Quy trình cộng tác Claude Code + Codex (replan P8, duyệt 2026-10-10)
 
-Chi tiết và lý do nằm trong `docs/v3/HYPRVX_V3_COLLABORATION_REPLAN_PROPOSAL.md` (mục A–J). Mục này là phần có
-hiệu lực. Spec Kit vẫn là workflow duy nhất; không có hệ thống task thứ hai.
+> **HẾT HIỆU LỰC từ 2026-10-11 (DV3-15).** User dừng mô hình cộng tác; Claude Code là agent duy nhất. O1–O4 và O6 chỉ
+> còn là lịch sử. Vẫn giữ như quy tắc kỹ thuật: O5 (tài nguyên máy: heavy lock, ngưỡng RAM, PSI, `MemoryMax=6G`, `-j4`),
+> layout cache `~/.cache/hyprvx/<agent>/` với `HYPRVX_AGENT=claude`, và quy tắc evidence/archive của
+> `contracts/test-tooling.md` §8. Clone `HyprVX-v3-codex` giữ nguyên làm tham chiếu lịch sử, không đồng bộ nữa.
+
+Chi tiết và lý do nằm trong `docs/v3/HYPRVX_V3_COLLABORATION_REPLAN_PROPOSAL.md` (mục A–J). Spec Kit vẫn là workflow
+duy nhất; không có hệ thống task thứ hai.
 
 ### O1. Vai trò
 - **Claude Code:** technical lead, integration owner. Sở hữu contract, `CameraMath.hpp`, `Camera.cpp`, patch series,

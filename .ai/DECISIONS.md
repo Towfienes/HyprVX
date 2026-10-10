@@ -297,3 +297,14 @@ clone, its cache and `/tmp`, host configuration, Caelestia, `/usr` and sudo rema
 Bypass Permissions are never enabled. A rejection makes the item BLOCKED. Every commit lists auto-approved
 escalations in an `Escalations:` trailer. Acceptance gates, stop conditions and Claude's review and integration of
 every handoff are unchanged. Details: master plan §O3.
+
+### DV3-15 - Return to Claude-only execution
+
+Status: accepted (user, 2026-10-11). Supersedes DV3-09 (hybrid collaboration) and DV3-14 (Codex Auto-review).
+
+Claude Code is the only implementation agent. The Codex lane, work orders, cross-agent handoffs, ownership split and
+inter-agent Git synchronization are retired; master plan §O is history except O5 (resource rules). All completed
+work, integrated Codex commits, evidence and approved technical corrections (P1–P5, P10, infra-before-claims, K0,
+GATE-A, GATE-N, U0) remain. Open tasks keep their IDs, dependencies and gates and are owned by Claude. Technical
+difference: R1 (T044, T069) and T068 lose author/verifier independence; they become clean-room rebuilds with a
+source-verification report written before reading new results. The Codex clone is left untouched as a reference.

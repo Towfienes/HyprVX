@@ -94,7 +94,7 @@ tests/native/       # L4/L5/L5b scenario scripts; raw evidence in ~/.cache/hyprv
 | Hidden seams beyond the 10 mapped | Stop condition; record each new seam with file:line before adding |
 | Nested screencopy differs from real output | Geometric criteria only; physical checks in later phases |
 | RAM pressure during builds | `-j4`, `MemoryMax`, ccache; one heavy job at a time (`contracts/test-tooling.md` lock); stop on swap thrash |
-| Two agents in parallel (master plan §O) | Exclusive file ownership; contract-first; Claude integrates; Codex in a separate clone without access to the shared `.git` |
+| Author and verifier are the same agent (DV3-15) | Tests written from the spec before patches are judged; GATE-A/GATE-N; R1 as a clean-room rebuild and source-verification report (T044); test changes after patches exist need a reason in `integration-log.md` |
 | Fractional scale rounding | Run tests at scale 1 and 1.25; tolerance ± 2 px |
 
 ## Complexity Tracking
