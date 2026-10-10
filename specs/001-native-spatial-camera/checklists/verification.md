@@ -29,7 +29,7 @@ A dispatcher `ok` is never an artifact.
 | V-19 | L5 | Popup mapped outside all monitors: no crash | NOT RUN | |
 | V-20 | — | Human review of the image set (no clipping/stair-step/detached deco) | NOT AUTOMATABLE | reviewer + date |
 | V-21 | — | Delivery spike report (hooks vs patch) written | NOT RUN | `delivery-decision.md` |
-| V-22 | — | Host untouched: no host hyprctl/plugin/config change during the run | NOT RUN | harness audit log |
+| V-22 | — | Host untouched: no host hyprctl/plugin/config change during the run | PASS | `~/.local/share/hyprvx/evidence/claude/20261011-053517-audit-4411e95-v22/` (95 nested sessions, none with the host signature, all private runtime dirs, agent-prefix binaries only; host hypr/caelestia config unchanged) |
 | V-23 | L5 | GATE-A: stock vs stock ×3 pixel-identical with the shared nested config (precondition for V-09) | PASS | `~/.local/share/hyprvx/evidence/claude/20261011-030116-stock-401d74b/` (3 identical PNGs sha256 6d7f6bd6…; diff 0 px) |
 | V-24 | L5 | GATE-N per `contracts/test-tooling.md` §6.1: setup valid (S1), camera applied (S2), analyzer PASS on stock and good fixtures (P), analyzer FAIL with expected reasons on V2-as-is (N), artifact visually confirmed (H). Any other outcome is FAIL or BLOCKED with its classification, never PASS | PASS | S1/S2/P/N `~/.local/share/hyprvx/evidence/claude/20261011-032750-v2-02a59d1/`; H `~/.local/share/hyprvx/evidence/claude/20261011-032829-v2-02a59d1-h/` (RC1 detected on v2_pan_right; RC2 not reproduced in this scene) |
 | V-25 | L2 | V1 equivalence: `Camera` (M = 0) equals `CameraMath` forward/inverse; existing camera tests unchanged | NOT RUN | |
