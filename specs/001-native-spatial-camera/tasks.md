@@ -123,12 +123,12 @@ proven on synthetic data; GATE-A PASS. Claude may write patches during this phas
 
 ### Tests for User Story 2 (written before patches are judged)
 
-- [ ] T027 [P] [US2] Write `tests/native/t_zoom.sh`: z = 0.25 and 0.5 with an 800×600 window, z = 2.0 with a 400×300 window (spec US2.1–2.2), expected boxes from `contracts/transform-contract.md` forward, ± 2 px, four markers (owner: claude)
-- [ ] T028 [P] [US2] Write `tests/native/t_pan.sh`: pans of ±300 px on both axes at z ∈ {0.5, 1.0}, displacement ± 2 px (owner: claude)
-- [ ] T029 [P] [US2] Write `tests/native/t_stale.sh`: 50 seeded random camera states (seed recorded); each frame vs the frame after `hyprvx-dev:full-damage`, 0 mismatches (US2.3) (owner: claude)
-- [ ] T030 [P] [US2] Write `tests/native/t_stale_static.sh`: fixed non-identity camera, deterministic `fill` sequence through the testclient control FIFO, each partial-damage frame vs a forced full-damage frame of the same client state, 0 mismatches (US2.5) (owner: claude)
-- [ ] T031 [P] [US2] Write `tests/native/t_layer.sh`: `hyprvx-testclient --layer TOP` region identical with identity and non-identity camera; window decorations enclose the transformed surface (US2.4, V-14) (owner: claude)
-- [ ] T032 [US2] Write `tests/native/run_sprint1.sh`: runs T-ID, US2 and US4 scripts at scale 1 and 1.25 (V-15) and aggregates `summary.json` results (owner: claude)
+- [X] T027 [P] [US2] Write `tests/native/t_zoom.sh`: z = 0.25 and 0.5 with an 800×600 window, z = 2.0 with a 400×300 window (spec US2.1–2.2), expected boxes from `contracts/transform-contract.md` forward, ± 2 px, four markers (owner: claude)
+- [X] T028 [P] [US2] Write `tests/native/t_pan.sh`: pans of ±300 px on both axes at z ∈ {0.5, 1.0}, displacement ± 2 px (owner: claude)
+- [X] T029 [P] [US2] Write `tests/native/t_stale.sh`: 50 seeded random camera states (seed recorded); each frame vs the frame after `hyprvx-dev:full-damage`, 0 mismatches (US2.3) (owner: claude)
+- [X] T030 [P] [US2] Write `tests/native/t_stale_static.sh`: fixed non-identity camera, deterministic `fill` sequence through the testclient control FIFO, each partial-damage frame vs a forced full-damage frame of the same client state, 0 mismatches (US2.5) (owner: claude)
+- [X] T031 [P] [US2] Write `tests/native/t_layer.sh`: `hyprvx-testclient --layer TOP` region identical with identity and non-identity camera; window decorations enclose the transformed surface (US2.4, V-14) (owner: claude)
+- [X] T032 [US2] Write `tests/native/run_sprint1.sh`: runs T-ID, US2 and US4 scripts at scale 1 and 1.25 (V-15) and aggregates `summary.json` results (owner: claude)
 
 ### Negative control (U1, GATE-N)
 
@@ -142,7 +142,7 @@ proven on synthetic data; GATE-A PASS. Claude may write patches during this phas
 - [X] T037 [US2] Author `patches/hyprland/0004-*.patch` damage: `damageSurface` / `damageWindow` / `damageBox` / `damageRegion` for window-owned content via `cammath::damageBox` (decorations included); camera change damages the whole output; layer popups/subsurfaces never transformed (FR-005) (owner: claude)
 - [X] T038 [US2] Author `patches/hyprland/0005-*.patch` dev control exactly as `contracts/dev-control.md` (`camera`, `camera-mon`, `panic`, `state`, `full-damage`), compiled only with `HYPRVX_DEV`, validation through `cammath::validate` (FR-008, FR-009) (owner: claude)
 - [X] T039 [US2] Run `scripts/check-single-transform.sh` on the series; fix every finding in the patches (owner: claude)
-- [ ] T040 [US2] Build `patched` (0001–0005), run `tests/native/run_sprint1.sh` after GATE-A (T022) and GATE-N (T034) pass; debug and fix in the patches until V-09, V-10, V-11, V-12, V-12b, V-14, V-15 PASS or a stop condition is reached; log each run (owner: claude)
+- [X] T040 [US2] Build `patched` (0001–0005), run `tests/native/run_sprint1.sh` after GATE-A (T022) and GATE-N (T034) pass; debug and fix in the patches until V-09, V-10, V-11, V-12, V-12b, V-14, V-15 PASS or a stop condition is reached; log each run (owner: claude)
 
 **Checkpoint**: US2 geometry, stale-frame and layer checks PASS at scale 1 and 1.25, T-ID still PASS.
 
@@ -155,12 +155,12 @@ proven on synthetic data; GATE-A PASS. Claude may write patches during this phas
 
 ### Tests for User Story 4
 
-- [ ] T041 [P] [US4] Write `tests/native/t_off.sh`: from random non-identity cameras, `hyprvx-dev:panic`, next ready frame equals the T-ID image, 10/10 (V-13, SC-004) (owner: claude)
-- [ ] T042 [P] [US4] Write `tests/native/t_invalid.sh`: NaN, Inf, z ≤ 0, z < 0.1, z > 2.0 requests; capture before and after is identical (state readout recorded as diagnostic only) (US4.2) (owner: claude)
+- [X] T041 [P] [US4] Write `tests/native/t_off.sh`: from random non-identity cameras, `hyprvx-dev:panic`, next ready frame equals the T-ID image, 10/10 (V-13, SC-004) (owner: claude)
+- [X] T042 [P] [US4] Write `tests/native/t_invalid.sh`: NaN, Inf, z ≤ 0, z < 0.1, z > 2.0 requests; capture before and after is identical (state readout recorded as diagnostic only) (US4.2) (owner: claude)
 
 ### Implementation for User Story 4
 
-- [ ] T043 [US4] Ensure `panic` sets every camera to `identityFor(M)` exactly and disables the scene, and setters leave the camera unchanged on rejection, in `patches/hyprland/0001-*.patch` / `0005-*.patch`; after GATE-A (T022) and T-ID (T026) pass, run `t_off.sh` and `t_invalid.sh` until V-13 PASS (owner: claude)
+- [X] T043 [US4] Ensure `panic` sets every camera to `identityFor(M)` exactly and disables the scene, and setters leave the camera unchanged on rejection, in `patches/hyprland/0001-*.patch` / `0005-*.patch`; after GATE-A (T022) and T-ID (T026) pass, run `t_off.sh` and `t_invalid.sh` until V-13 PASS (owner: claude)
 
 **Checkpoint**: Sprint 1 user stories complete.
 
