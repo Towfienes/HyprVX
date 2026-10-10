@@ -1,0 +1,42 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Towfienes <ngolamtien1706@gmail.com>
+Date: Sun, 11 Oct 2026 00:55:01 +0700
+Subject: [PATCH] hyprvx: cull windows against the camera's visible world rect
+
+Patch 0003 of the HyprVX V3 series (Feature 001, Sprint 1).
+
+CWindow::visibleOnMonitor (used by shouldRenderWindow) tests the window
+box against cammath::visibleWorldRect while a camera applies, so a
+window outside the monitor's logical rect but inside the visible world
+rect is rendered (FR-006). Stock test otherwise.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ src/desktop/view/Window.cpp | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/src/desktop/view/Window.cpp b/src/desktop/view/Window.cpp
+index 8836f73b..ded1e591 100644
+--- a/src/desktop/view/Window.cpp
++++ b/src/desktop/view/Window.cpp
+@@ -65,6 +65,7 @@
+ #include "../../layout/target/WindowTarget.hpp"
+ #include "../../layout/target/WindowGroupTarget.hpp"
+ #include "../../event/EventBus.hpp"
++#include "../../hyprvx/SceneCamera.hpp"
+ 
+ #include <hyprutils/string/String.hpp>
+ #include <hyprutils/string/VarList.hpp>
+@@ -1192,6 +1193,12 @@ bool CWindow::visibleOnMonitor(PHLMONITOR pMonitor) {
+     if (m_isFloating)
+         wbox = getFullWindowBoundingBox();
+ 
++    // HyprVX (FR-006): under a camera the monitor shows its visible world rect instead of its logical rect
++    if UNLIKELY (const auto CAMERA = HyprVX::activeCamera(*pMonitor); CAMERA) {
++        const auto VISIBLE = hyprvx::cammath::visibleWorldRect(*CAMERA, {pMonitor->m_size.x, pMonitor->m_size.y});
++        return !wbox.intersection({VISIBLE.pos.x, VISIBLE.pos.y, VISIBLE.size.x, VISIBLE.size.y}).empty();
++    }
++
+     return !wbox.intersection({pMonitor->m_position, pMonitor->m_size}).empty();
+ }
+ 
