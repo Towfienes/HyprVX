@@ -1,7 +1,24 @@
 #!/usr/bin/env python3
-"""Isolated Phase 3 Hyprland harness. Never targets the host instance."""
+"""HyprVX V3 nested Hyprland harness (contracts/test-tooling.md section 7). Never targets the host instance.
+
+  hyprvx_nested.py start --variant stock|v2|patched [--size WxH] [--scale S] [--binary PATH] [--lock-timeout SEC]
+  hyprvx_nested.py run [--background] -- CMD...
+  hyprvx_nested.py dev COMMAND [ARGS...]          # hyprctl hyprvx-dev COMMAND (dev-control.md transport A)
+  hyprvx_nested.py capture PATH                   # grim on the nested output (.png or .ppm)
+  hyprvx_nested.py status | stop | recover
+
+Every command except start and status re-verifies the session before acting: the SO_PEERCRED peer of the nested
+Wayland and socket2 sockets is the recorded compositor PID, the PID has the recorded start time and executable, the
+instance signature differs from the host's, and the runtime directory is a private /tmp/hvx-* directory. A failed
+verification exits 3 and sends nothing. Exit codes: 0 ok, 1 command failed, 2 usage, 3 identity verification failed.
+The nested compositor runs under `flock heavy.lock` (held until it exits), `dbus-run-session` and
+HYPRLAND_NO_SD_VARS=1, from the agent prefix only (never $PATH). Logs stay in the session directory after stop.
+(The V1 Phase 3 commands of this file live on the frozen V1 branch `dev`.)
+"""
 
 import argparse
+import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -15,286 +32,445 @@ import sys
 import tempfile
 import time
 
-
-SESSION_ROOT = Path(f"/tmp/hyprvx-nested-{os.getuid()}")
-SESSION_FILE = SESSION_ROOT / "session.json"
+EXIT_OK, EXIT_FAILED, EXIT_USAGE, EXIT_IDENTITY = 0, 1, 2, 3
 REPO = Path(__file__).resolve().parent.parent
+CONFIG_TEMPLATE = REPO / "tests/native/config/hyprland.conf.in"
+LOCK = Path.home() / ".cache/hyprvx/locks/heavy.lock"
+NESTED_MIN_MEMORY_KIB = 2 * 1024 * 1024  # test-tooling section 2
 
 
-def process_start(pid: int) -> str:
-    # /proc stat field 22, after the parenthesized comm field.
-    fields = Path(f"/proc/{pid}/stat").read_text().rsplit(") ", 1)[1].split()
-    return fields[19]
+class Failed(Exception):
+    pass
 
 
-def peer_pid(path: Path) -> int:
+class IdentityError(Exception):
+    pass
+
+
+def agent():
+    value = os.environ.get("HYPRVX_AGENT", "")
+    if value not in ("claude", "codex"):
+        raise Failed("set HYPRVX_AGENT to claude or codex")
+    return value
+
+
+def cache():
+    return Path.home() / ".cache/hyprvx" / agent()
+
+
+def session_root():
+    # Harness self-tests use a separate root so they never see a real session; only /tmp/hyprvx-nested-test-* is accepted.
+    override = os.environ.get("HYPRVX_NESTED_TEST_ROOT", "")
+    if override:
+        path = Path(override)
+        if path.parent != Path("/tmp") or not path.name.startswith("hyprvx-nested-test-"):
+            raise Failed("HYPRVX_NESTED_TEST_ROOT must be /tmp/hyprvx-nested-test-*")
+        return path
+    return Path(f"/tmp/hyprvx-nested-{os.getuid()}-{agent()}")
+
+
+def session_file():
+    return session_root() / "session.json"
+
+
+def load_build_module():
+    spec = importlib.util.spec_from_file_location("hyprvx_build", REPO / "tools/hyprvx_build.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+# ---- process and socket facts ------------------------------------------------------------------------------------
+
+def process_start(pid):
+    return Path(f"/proc/{pid}/stat").read_text().rsplit(") ", 1)[1].split()[19]
+
+
+def process_state(pid):
+    return Path(f"/proc/{pid}/stat").read_text().rsplit(") ", 1)[1].split()[0]
+
+
+def parent_pid(pid):
+    return int(Path(f"/proc/{pid}/stat").read_text().rsplit(") ", 1)[1].split()[1])
+
+
+def process_exe(pid):
+    return os.path.realpath(f"/proc/{pid}/exe")
+
+
+def alive(pid, start):
+    try:
+        return process_start(pid) == start and process_state(pid) != "Z"
+    except (FileNotFoundError, ProcessLookupError, IndexError):
+        return False
+
+
+def peer_pid(path):
     client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     try:
         client.settimeout(1)
         client.connect(str(path))
         pid, uid, _ = struct.unpack("3i", client.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))
-        if uid != os.getuid():
-            raise RuntimeError(f"socket peer has unexpected uid: {path}")
-        return pid
     finally:
         client.close()
+    if uid != os.getuid():
+        raise IdentityError(f"socket peer has another uid: {path}")
+    return pid
 
 
-def private_file(path: Path, data: dict) -> None:
-    path.write_text(json.dumps(data, sort_keys=True) + "\n")
-    path.chmod(0o600)
+def descends_from(pid, ancestor, depth=8):
+    for _ in range(depth):
+        if pid == ancestor:
+            return True
+        if pid <= 1:
+            return False
+        pid = parent_pid(pid)
+    return False
 
 
-def load_session() -> dict:
-    if not SESSION_FILE.is_file() or SESSION_FILE.is_symlink():
-        raise RuntimeError("no nested session; run 'start' first")
-    data = json.loads(SESSION_FILE.read_text())
+def sha256_file(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def private_runtime_ok(runtime):
+    try:
+        info = os.lstat(runtime)
+    except FileNotFoundError:
+        return False
+    return (runtime.parent == Path("/tmp") and runtime.name.startswith("hvx-") and stat.S_ISDIR(info.st_mode)
+            and info.st_uid == os.getuid() and stat.S_IMODE(info.st_mode) == 0o700)
+
+
+def write_private(path, data):
+    temporary = path.with_name(path.name + ".tmp")
+    fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as handle:
+        json.dump(data, handle, indent=2, sort_keys=True)
+        handle.write("\n")
+    os.replace(temporary, path)
+
+
+def memory_ok():
+    available = next(int(line.split()[1]) for line in Path("/proc/meminfo").read_text().splitlines()
+                     if line.startswith("MemAvailable:"))
+    full = next(line for line in Path("/proc/pressure/memory").read_text().splitlines() if line.startswith("full "))
+    avg10 = float(dict(field.split("=") for field in full.split()[1:])["avg10"])
+    if available < NESTED_MIN_MEMORY_KIB or avg10 > 10:
+        raise Failed(f"BLOCKED: MemAvailable={available} KiB (need {NESTED_MIN_MEMORY_KIB}), PSI full avg10={avg10}")
+
+
+# ---- session -----------------------------------------------------------------------------------------------------
+
+def read_session():
+    path = session_file()
+    if path.is_symlink() or not path.is_file():
+        raise IdentityError("no nested session marker")
+    info = os.lstat(path)
+    if info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) & 0o077:
+        raise IdentityError("session marker is shared or not owned by this user")
+    return json.loads(path.read_text())
+
+
+def verify(data):
+    """Raises IdentityError unless the recorded session is still the nested compositor we started."""
     pid = data["compositor_pid"]
-    if process_start(pid) != data["process_start"]:
-        raise RuntimeError("nested compositor PID is stale")
+    if not alive(pid, data["process_start"]):
+        raise IdentityError("nested compositor PID is gone or reused")
+    if process_exe(pid) != data["binary"]:
+        raise IdentityError("nested compositor executable differs from the recorded agent-prefix binary")
+    host_signature = os.environ.get("HYPRLAND_INSTANCE_SIGNATURE", "")
+    if not data["signature"] or data["signature"] in (data["host_signature"], host_signature):
+        raise IdentityError("nested signature equals the host signature")
     runtime = Path(data["runtime_directory"])
-    if runtime.parent != Path("/tmp") or not runtime.name.startswith("hvx-") or runtime.is_symlink() or not runtime.is_dir():
-        raise RuntimeError("nested runtime directory is outside session root")
-    if data["signature"] == data["host_signature"]:
-        raise RuntimeError("nested signature equals host signature")
+    if not private_runtime_ok(runtime):
+        raise IdentityError("runtime directory is not a private /tmp/hvx-* directory")
     if peer_pid(runtime / data["wayland_display"]) != pid:
-        raise RuntimeError("nested Wayland display peer mismatch")
+        raise IdentityError("nested Wayland socket peer is not the compositor")
     if peer_pid(runtime / "hypr" / data["signature"] / ".socket2.sock") != pid:
-        raise RuntimeError("nested socket2 peer mismatch")
+        raise IdentityError("nested socket2 peer is not the compositor")
     return data
 
 
-def nested_env(data: dict) -> dict:
+def nested_env(data):
     env = os.environ.copy()
-    env.update({
-        "HYPRVX_NESTED_DEV": "1",
-        "HYPRVX_NESTED_MARKER": str(SESSION_FILE),
-        "HYPRLAND_INSTANCE_SIGNATURE": data["signature"],
-        "WAYLAND_DISPLAY": data["wayland_display"],
-        "XDG_RUNTIME_DIR": data["runtime_directory"],
-        "XDG_CONFIG_HOME": data["config_home"],
-        "XDG_STATE_HOME": data["state_home"],
-        "XDG_CACHE_HOME": data["cache_home"],
-    })
+    for name in ("HYPRLAND_INSTANCE_SIGNATURE", "WAYLAND_DISPLAY", "DISPLAY"):
+        env.pop(name, None)
+    env.update({"HYPRLAND_INSTANCE_SIGNATURE": data["signature"], "WAYLAND_DISPLAY": data["wayland_display"],
+                "XDG_RUNTIME_DIR": data["runtime_directory"]})
     return env
 
 
-def start() -> None:
-    SESSION_ROOT.mkdir(mode=0o700, exist_ok=True)
-    if SESSION_FILE.exists():
-        raise RuntimeError("session marker already exists; stop it before starting another")
+def resolve_binary(variant, explicit):
+    prefix_root = (cache() / "prefix").resolve()
+    if explicit:
+        binary = Path(explicit).resolve()
+        if prefix_root not in binary.parents:
+            raise Failed(f"--binary must be inside {prefix_root}")
+        info_path = binary.parent.parent / "build-info.json"
+    else:
+        identifier, _, _ = load_build_module().variant_identity(REPO, variant)
+        binary = (prefix_root / identifier / "bin/Hyprland").resolve()
+        info_path = prefix_root / identifier / "build-info.json"
+    if not binary.is_file() or not os.access(binary, os.X_OK):
+        raise Failed(f"BLOCKED: no {variant} build at {binary}; run scripts/build-hyprland.sh --variant {variant}")
+    try:
+        info = json.loads(info_path.read_text())
+    except (OSError, ValueError) as error:
+        raise Failed(f"BLOCKED: build-info.json unavailable for {binary}: {error}") from error
+    if info.get("binary_sha256") != sha256_file(binary) or info.get("variant") != variant:
+        raise Failed("BLOCKED: binary does not match its build-info.json (variant or sha256)")
+    return binary, info
+
+
+def render_config(path, size, scale):
+    width, height = size
+    text = CONFIG_TEMPLATE.read_text()
+    text = text.replace("@WIDTH@", str(width)).replace("@HEIGHT@", str(height)).replace("@SCALE@", scale)
+    path.write_text(text)
+
+
+def start(args):
+    if session_file().exists() or session_file().is_symlink():
+        raise Failed("a session marker exists; run 'stop' or 'recover' first")
+    memory_ok()
+    binary, info = resolve_binary(args.variant, args.binary)
     host_signature = os.environ.get("HYPRLAND_INSTANCE_SIGNATURE", "")
     host_runtime = Path(os.environ.get("XDG_RUNTIME_DIR", ""))
     host_display = os.environ.get("WAYLAND_DISPLAY", "")
     host_socket = host_runtime / host_display
     if not host_signature or not host_display or not host_socket.is_socket():
-        raise RuntimeError("a Wayland host and its signature are required for nested mode")
-    session = Path(tempfile.mkdtemp(prefix="session-", dir=SESSION_ROOT))
-    # Keep the runtime path short: Hyprland's long signature plus socket2 name
-    # must fit the Linux AF_UNIX sun_path limit.
-    runtime = Path(tempfile.mkdtemp(prefix="hvx-", dir="/tmp"))
-    # Only the parent display socket is linked into the isolated runtime.
-    (runtime / host_display).symlink_to(host_socket)
+        raise Failed("BLOCKED: a host Wayland session (WAYLAND_DISPLAY and its signature) is required for nested mode")
+
+    root = session_root()
+    root.mkdir(mode=0o700, exist_ok=True)
+    if root.is_symlink() or os.lstat(root).st_uid != os.getuid():
+        raise Failed("unsafe session root")
+    session = Path(tempfile.mkdtemp(prefix="session-", dir=root))
+    runtime = Path(tempfile.mkdtemp(prefix="hvx-", dir="/tmp"))  # short path: AF_UNIX sun_path limit
+    os.chmod(runtime, 0o700)
+    (runtime / host_display).symlink_to(host_socket)  # only the parent display socket is shared
     for name in ("config", "state", "cache"):
         (session / name).mkdir(mode=0o700)
     config = session / "hyprland.conf"
-    config.write_text(
-        "# Generated by HyprVX; no production includes.\n"
-        "monitor = , 1280x720@60, 0x0, 1\n"
-        "general { gaps_in = 5; gaps_out = 8; border_size = 1; }\n"
-        "decoration { blur { enabled = false; } }\n"
-        "animations { enabled = false; }\n"
-        "misc { disable_hyprland_logo = true; disable_splash_rendering = true; }\n"
-        "input { kb_layout = us; }\n"
-    )
+    render_config(config, args.size, args.scale)
+
     env = os.environ.copy()
     env.pop("HYPRLAND_INSTANCE_SIGNATURE", None)
-    env.update({
-        "AQ_BACKEND": "wayland",
-        "WAYLAND_DISPLAY": host_display,
-        "XDG_RUNTIME_DIR": str(runtime),
-        "XDG_CONFIG_HOME": str(session / "config"),
-        "XDG_STATE_HOME": str(session / "state"),
-        "XDG_CACHE_HOME": str(session / "cache"),
-        "HYPRVX_NESTED_DEV": "1",
-        "HYPRVX_NESTED_MARKER": str(SESSION_FILE),
-    })
-    log = (session / "hyprland.log").open("w")
-    process = subprocess.Popen(["Hyprland", "--config", str(config)],
-                               env=env, stdout=log, stderr=subprocess.STDOUT,
-                               start_new_session=True)
+    env.update({"WAYLAND_DISPLAY": host_display, "XDG_RUNTIME_DIR": str(runtime),
+                "XDG_CONFIG_HOME": str(session / "config"), "XDG_STATE_HOME": str(session / "state"),
+                "XDG_CACHE_HOME": str(session / "cache"), "HYPRLAND_NO_SD_VARS": "1", "HYPRLAND_NO_SD_NOTIFY": "1"})
+    command = ["flock", "-w", str(args.lock_timeout), str(LOCK), "dbus-run-session", "--", str(binary), "--config", str(config)]
+    log = (session / "launcher.log").open("w")
+    launcher = subprocess.Popen(command, env=env, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
     log.close()
+    launcher_start = process_start(launcher.pid)
     try:
-        deadline = time.monotonic() + 20
-        signature = display = None
-        while time.monotonic() < deadline:
-            if process.poll() is not None:
-                raise RuntimeError(f"nested Hyprland exited ({process.returncode}); see {session / 'hyprland.log'}")
-            sockets = list((runtime / "hypr").glob("*/.socket2.sock"))
+        deadline = time.monotonic() + args.lock_timeout + 30
+        found = None
+        while time.monotonic() < deadline and found is None:
+            if launcher.poll() is not None:
+                raise Failed(f"nested launcher exited ({launcher.returncode}); see {session / 'launcher.log'}")
+            sockets = list((runtime / "hypr").glob("*/.socket2.sock")) if (runtime / "hypr").is_dir() else []
             displays = [p for p in runtime.iterdir()
-                        if p.name.startswith("wayland-")
-                        and not p.is_symlink() and stat.S_ISSOCK(p.stat().st_mode)]
+                        if p.name.startswith("wayland-") and not p.name.endswith(".lock")
+                        and not p.is_symlink() and stat.S_ISSOCK(os.lstat(p).st_mode)]
             if len(sockets) == 1 and len(displays) == 1:
-                candidate_signature = sockets[0].parent.name
-                candidate_display = displays[0].name
-                if (candidate_signature != host_signature and
-                    peer_pid(sockets[0]) == process.pid and
-                    peer_pid(displays[0]) == process.pid):
-                    signature, display = candidate_signature, candidate_display
-                    break
-            time.sleep(0.1)  # startup readiness only; never the runtime frame loop
-        if not signature or not display:
-            raise RuntimeError(f"nested sockets were not safely identified; see {session / 'hyprland.log'}")
+                try:
+                    pid = peer_pid(displays[0])
+                    if (peer_pid(sockets[0]) == pid and sockets[0].parent.name != host_signature
+                            and process_exe(pid) == str(binary) and descends_from(pid, launcher.pid)):
+                        found = (pid, sockets[0].parent.name, displays[0].name)
+                except (OSError, IdentityError):
+                    pass
+            if found is None:
+                time.sleep(0.1)  # startup readiness only; never used for frame readiness
+        if found is None:
+            raise Failed(f"nested sockets were not safely identified; see {session}")
+        pid, signature, display = found
         data = {
-            "signature": signature, "host_signature": host_signature,
-            "wayland_display": display, "runtime_directory": str(runtime),
-            "compositor_pid": process.pid, "process_start": process_start(process.pid),
-            "config_home": str(session / "config"), "state_home": str(session / "state"),
-            "cache_home": str(session / "cache"), "session_directory": str(session),
-            "children": [],
+            "variant": args.variant, "patchset_id": info.get("patchset_id"), "binary": str(binary),
+            "binary_sha256": info["binary_sha256"], "signature": signature, "host_signature": host_signature,
+            "wayland_display": display, "runtime_directory": str(runtime), "compositor_pid": pid,
+            "process_start": process_start(pid), "launcher_pid": launcher.pid, "launcher_start": launcher_start,
+            "session_directory": str(session), "size": list(args.size), "scale": args.scale, "children": [],
         }
-        private_file(SESSION_FILE, data)
-        subprocess.run([str(REPO / "build" / "hyprvx-nested-check")],
-                       env=nested_env(data), check=True)
-        print(f"nested Hyprland ready: {signature} on {display}; pid={process.pid}")
-        print(f"isolated session: {session}")
-    except Exception:
-        log_path = session / "hyprland.log"
-        if log_path.exists():
-            print("nested startup log (last 50 lines):", file=sys.stderr)
-            print("\n".join(log_path.read_text(errors="replace").splitlines()[-50:]), file=sys.stderr)
-        for inner_log in (runtime / "hypr").glob("*/hyprland.log"):
-            print("nested compositor log (last 80 lines):", file=sys.stderr)
-            print("\n".join(inner_log.read_text(errors="replace").splitlines()[-80:]), file=sys.stderr)
-        print("nested runtime entries:", [str(p) for p in runtime.rglob("*")], file=sys.stderr)
-        process.terminate()
-        try:
-            process.wait(timeout=4)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            process.wait()
-        shutil.rmtree(runtime)
-        shutil.rmtree(session)
+        write_private(session_file(), data)
+        verify(data)
+        print(f"nested {args.variant} ready: {signature} on {display}; pid={pid}; session={session}")
+    except BaseException:
+        if alive(launcher.pid, launcher_start):
+            os.killpg(launcher.pid, signal.SIGTERM)
+            try:
+                launcher.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                os.killpg(launcher.pid, signal.SIGKILL)
+                launcher.wait()
+        session_file().unlink(missing_ok=True)
+        shutil.rmtree(runtime, ignore_errors=True)
+        print(f"nested start failed; logs kept in {session}", file=sys.stderr)
         raise
 
 
-def stop() -> None:
-    data = load_session()
-    for child in data.get("children", []):
-        try:
-            if process_start(child["pid"]) == child["start"]:
-                os.kill(child["pid"], signal.SIGTERM)
-        except (FileNotFoundError, ProcessLookupError):
-            pass
-    os.kill(data["compositor_pid"], signal.SIGTERM)
-    for _ in range(40):
-        try:
-            if process_start(data["compositor_pid"]) != data["process_start"]:
-                break
-            if Path(f"/proc/{data['compositor_pid']}/stat").read_text().rsplit(") ", 1)[1][0] == "Z":
-                break
-        except ProcessLookupError:
-            break
-        except FileNotFoundError:
-            break
-        time.sleep(0.1)
-    else:
-        raise RuntimeError("nested compositor did not exit; retaining runtime state for safe recovery")
-    session = Path(data["session_directory"])
-    if session.parent != SESSION_ROOT or session.is_symlink():
-        raise RuntimeError("refusing to remove an unsafe session path")
-    SESSION_FILE.unlink()
-    shutil.rmtree(session)
-    shutil.rmtree(Path(data["runtime_directory"]))
-    print("nested session stopped and temporary state removed")
-
-
-def guarded_command(argv: list[str], background: bool = False) -> None:
-    data = load_session()
+def run(args):
+    data = verify(read_session())
+    command = args.command[1:] if args.command[:1] == ["--"] else args.command
+    if not command:
+        raise Failed("run needs a command after --")
     env = nested_env(data)
-    subprocess.run([str(REPO / "build" / "hyprvx-nested-check")], env=env, check=True)
-    if background:
-        output = (Path(data["session_directory"]) / "children.log").open("a")
-        process = subprocess.Popen(argv, env=env, start_new_session=True,
-                                   stdout=output, stderr=subprocess.STDOUT)
-        output.close()
-        data["children"].append({"pid": process.pid, "start": process_start(process.pid)})
-        private_file(SESSION_FILE, data)
-        print(f"nested child pid={process.pid}: {' '.join(argv)}")
-    else:
-        subprocess.run(argv, env=env, check=True)
+    if args.background:
+        log = (Path(data["session_directory"]) / "children.log").open("a")
+        child = subprocess.Popen(command, env=env, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+        log.close()
+        data["children"].append({"pid": child.pid, "start": process_start(child.pid), "argv": command})
+        write_private(session_file(), data)
+        print(f"nested child pid={child.pid}")
+        return EXIT_OK
+    return subprocess.run(command, env=env).returncode
 
 
-def native_signal(value: int) -> None:
-    data = load_session()
-    expected = (REPO / "build" / "hyprvx-native-dev").resolve()
-    for child in reversed(data.get("children", [])):
+def dev(args):
+    data = verify(read_session())
+    hyprctl = Path(data["binary"]).with_name("hyprctl")
+    result = subprocess.run([str(hyprctl), "--instance", data["signature"], "hyprvx-dev", *args.words],
+                            env=nested_env(data), capture_output=True, text=True)
+    reply = result.stdout.strip()
+    print(reply)
+    if result.returncode != 0 or not (reply == "ok" or reply.startswith("[")):
+        if result.stderr:
+            print(result.stderr.strip(), file=sys.stderr)
+        return EXIT_FAILED
+    return EXIT_OK
+
+
+def capture(args):
+    data = verify(read_session())
+    path = Path(args.path)
+    kind = "ppm" if path.suffix == ".ppm" else "png"
+    return subprocess.run(["grim", "-t", kind, str(path)], env=nested_env(data)).returncode
+
+
+def status(_):
+    try:
+        data = read_session()
+    except IdentityError as error:
+        print(f"no verified session: {error}")
+        return EXIT_IDENTITY
+    try:
+        verify(data)
+    except (IdentityError, OSError) as error:
+        print(f"session {data.get('signature')} FAILED verification: {error}")
+        return EXIT_IDENTITY
+    print(f"nested {data['variant']} verified: {data['signature']} on {data['wayland_display']}; "
+          f"pid={data['compositor_pid']}; session={data['session_directory']}")
+    return EXIT_OK
+
+
+def keep_logs(data):
+    session = Path(data["session_directory"])
+    inner = Path(data["runtime_directory"]) / "hypr" / data["signature"] / "hyprland.log"
+    if inner.is_file() and not inner.is_symlink():
+        shutil.copy2(inner, session / "hyprland.log")
+
+
+def remove_runtime(data):
+    runtime = Path(data["runtime_directory"])
+    if runtime.parent == Path("/tmp") and runtime.name.startswith("hvx-") and not runtime.is_symlink():
+        shutil.rmtree(runtime, ignore_errors=True)
+
+
+def retire_marker(data):
+    session = Path(data["session_directory"])
+    if session.parent == session_root() and not session.is_symlink():
+        shutil.copy2(session_file(), session / "session.json")
+    session_file().unlink()
+
+
+def stop(_):
+    data = verify(read_session())
+    for child in data.get("children", []):
+        if alive(child["pid"], child["start"]):
+            os.kill(child["pid"], signal.SIGTERM)
+    keep_logs(data)
+    os.kill(data["compositor_pid"], signal.SIGTERM)
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline and alive(data["compositor_pid"], data["process_start"]):
+        time.sleep(0.1)
+    if alive(data["compositor_pid"], data["process_start"]):
+        raise Failed("nested compositor did not exit; session kept for 'stop' or 'recover'")
+    retire_marker(data)
+    remove_runtime(data)
+    print(f"nested session stopped; logs kept in {data['session_directory']}")
+    return EXIT_OK
+
+
+def recover(_):
+    path = session_file()
+    if not path.exists() and not path.is_symlink():
+        print("no session marker; nothing to recover")
+        return EXIT_OK
+    data = read_session()
+    if alive(data["compositor_pid"], data["process_start"]):
         try:
-            command = Path(f"/proc/{child['pid']}/cmdline").read_bytes().split(b"\0", 1)[0]
-            if process_start(child["pid"]) == child["start"] and command.decode() == str(expected):
-                os.kill(child["pid"], value)
-                print(f"nested native pid={child['pid']} signal={value}")
-                return
-        except (FileNotFoundError, ProcessLookupError):
-            pass
-    raise RuntimeError("no live guarded native overlay child")
+            verify(data)
+        except (IdentityError, OSError) as error:
+            print(f"a live process holds the recorded PID but fails verification ({error}); nothing signalled")
+            return EXIT_IDENTITY
+        print("the nested compositor is alive and verified; use 'stop'")
+        return EXIT_FAILED
+    retire_marker(data)
+    remove_runtime(data)
+    print(f"stale session cleaned without signalling any process; logs kept in {data['session_directory']}")
+    return EXIT_OK
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=["start", "stop", "status", "exec", "runtime",
-                                             "overlay", "clients", "inspect-layers", "inspect-clients",
-                                             "inspect-plugins", "overlay-stop", "mode", "camera-reset",
-                                             "plugin-load", "plugin-unload", "plugin-control"])
-    parser.add_argument("args", nargs=argparse.REMAINDER)
-    args = parser.parse_args()
-    if args.args[:1] == ["--"]:
-        args.args.pop(0)
-    if args.command == "start":
-        start()
-    elif args.command == "stop":
-        stop()
-    elif args.command == "status":
-        data = load_session()
-        print(f"nested ready: {data['signature']} on {data['wayland_display']}")
-    elif args.command == "exec":
-        if not args.args:
-            raise RuntimeError("exec requires a command")
-        guarded_command(args.args)
-    elif args.command in ("runtime", "overlay"):
-        mode = "--interactive" if args.command == "runtime" else "--passive"
-        guarded_command([str(REPO / "build" / "hyprvx-native-dev"), "--nested-only", mode, *args.args], background=True)
-    elif args.command == "clients":
-        for title in ("HyprVX A", "HyprVX B", "HyprVX C"):
-            guarded_command(["foot", "--title", title, "sh", "-c", "exec sleep 3600"], background=True)
-    elif args.command == "overlay-stop":
-        native_signal(signal.SIGTERM)
-    elif args.command == "mode":
-        native_signal(signal.SIGUSR1)
-    elif args.command == "camera-reset":
-        native_signal(signal.SIGUSR2)
-    else:
-        data = load_session()
-        prefix = ["hyprctl", "--instance", data["signature"]]
-        if args.command == "inspect-layers":
-            guarded_command(prefix + ["-j", "layers"])
-        elif args.command == "inspect-clients":
-            guarded_command(prefix + ["-j", "clients"])
-        elif args.command == "inspect-plugins":
-            guarded_command(prefix + ["plugin", "list"])
-        elif args.command == "plugin-load":
-            guarded_command(prefix + ["plugin", "load", str(REPO / "build" / "libhyprvx_hyprland_plugin.so")])
-        elif args.command == "plugin-unload":
-            guarded_command(prefix + ["plugin", "unload", str(REPO / "build" / "libhyprvx_hyprland_plugin.so")])
-        elif args.command == "plugin-control":
-            if not args.args:
-                raise RuntimeError("plugin-control requires a semantic command")
-            guarded_command(prefix + ["dispatch", "hyprvx:control", " ".join(args.args)])
+def parse_size(text):
+    try:
+        width, height = (int(v) for v in text.lower().split("x"))
+    except ValueError as error:
+        raise argparse.ArgumentTypeError("size must be WxH") from error
+    return width, height
+
+
+def main(argv):
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    commands = parser.add_subparsers(dest="command_name", required=True)
+    p = commands.add_parser("start")
+    p.add_argument("--variant", choices=["stock", "v2", "patched"], required=True)
+    p.add_argument("--size", type=parse_size, default=(1280, 800))
+    p.add_argument("--scale", default="1")
+    p.add_argument("--binary")
+    p.add_argument("--lock-timeout", type=int, default=3600)
+    p.set_defaults(handler=start)
+    p = commands.add_parser("run")
+    p.add_argument("--background", action="store_true")
+    p.add_argument("command", nargs=argparse.REMAINDER)
+    p.set_defaults(handler=run)
+    p = commands.add_parser("dev")
+    p.add_argument("words", nargs="+")
+    p.set_defaults(handler=dev)
+    p = commands.add_parser("capture")
+    p.add_argument("path")
+    p.set_defaults(handler=capture)
+    for name, handler in (("status", status), ("stop", stop), ("recover", recover)):
+        commands.add_parser(name).set_defaults(handler=handler)
+    try:
+        args = parser.parse_args(argv)
+    except SystemExit as error:
+        return EXIT_USAGE if error.code else EXIT_OK
+    try:
+        result = args.handler(args)
+        return EXIT_OK if result is None else result
+    except IdentityError as error:
+        print(f"hyprvx-nested: identity verification failed: {error}; nothing sent", file=sys.stderr)
+        return EXIT_IDENTITY
+    except (Failed, OSError, subprocess.SubprocessError) as error:
+        print(f"hyprvx-nested: {error}", file=sys.stderr)
+        return EXIT_FAILED
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except (RuntimeError, OSError, subprocess.CalledProcessError) as error:
-        print(f"hyprvx-nested: {error}", file=sys.stderr)
-        sys.exit(2)
+    sys.exit(main(sys.argv[1:]))
