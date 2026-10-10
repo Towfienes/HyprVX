@@ -17,7 +17,8 @@ hvx_client_start window 800x600
 hvx_client_start layer 240x140 --layer TOP --position 980,620 --app-id hyprvx-layer
 hvx_capture identity window
 # The layer client draws the same markers; measure the window outside the layer box.
-hvx_analyze identity bbox "$HVX_EVID/identity.png" --expect-box 140,100,800,600 --tolerance 2 --region 0,0,970,800 \
+hvx_analyze identity bbox "$HVX_EVID/identity.png" --expect-box "$(hvx_phys_box 140,100,800,600)" --tolerance 2 \
+    --region "$(hvx_phys_box 0,0,970,800)" \
     || hvx_die_blocked "identity window box not found (setup invalid)"
 result=PASS
 for cam in "0 0 0.5" "100 50 1.5" "-400 -300 0.25"; do
@@ -25,17 +26,17 @@ for cam in "0 0 0.5" "100 50 1.5" "-400 -300 0.25"; do
     name="cam_${px}_${py}_${z}"
     hvx_nested dev camera "$px" "$py" "$z" > /dev/null || hvx_die_blocked "$name: dev camera rejected"
     hvx_capture "$name" window
-    python3 -I - "$HVX_EVID" "$name" "$LAYER_BOX" "$px" "$py" "$z" > "$HVX_EVID/$name.check" << 'PY' || result=FAIL
+    python3 -I - "$HVX_EVID" "$name" "$(hvx_phys_box "$LAYER_BOX")" "$px" "$py" "$z" "$SCALE" > "$HVX_EVID/$name.check" << 'PY' || result=FAIL
 import json, sys
 from pathlib import Path
 from PIL import Image
-evid, name, layer_box, px, py, z = sys.argv[1], sys.argv[2], sys.argv[3], *map(float, sys.argv[4:7])
+evid, name, layer_box, px, py, z, s = sys.argv[1], sys.argv[2], sys.argv[3], *map(float, sys.argv[4:8])
 x, y, w, h = map(int, layer_box.split(","))
 ident = Image.open(Path(evid, "identity.png")).convert("RGB")
 shot = Image.open(Path(evid, f"{name}.png")).convert("RGB")
 layer_ok = list(ident.crop((x, y, x + w, y + h)).getdata()) == list(shot.crop((x, y, x + w, y + h)).getdata())
 b = json.load(open(Path(evid, "identity.json")))["bbox"]
-bx, by = (b["x"] - px) * z, (b["y"] - py) * z
+bx, by = (b["x"] - px * s) * z, (b["y"] - py * s) * z
 bw, bh = b["w"] * z, b["h"] * z
 border = (0x88, 0x88, 0x88)
 def is_border(p):

@@ -11,19 +11,20 @@ TOL="${HVX_TOLERANCE:-2}"
 OUT_W=${SIZE%x*}
 OUT_H=${SIZE#*x}
 
-camera_for() { # B_JSON Z DX DY -> "PX PY" (base centers the window, then panByScreen by d)
+camera_for() { # B_JSON Z DX DY OUT_W OUT_H -> "PX PY" logical (base centers the window, then panByScreen by d)
     python3 -I -c "
 import json, sys
-b = json.load(open(sys.argv[1]))['bbox']; z, dx, dy, ow, oh = map(float, sys.argv[2:7])
-cx, cy = b['x'] + b['w'] / 2, b['y'] + b['h'] / 2
+b = json.load(open(sys.argv[1]))['bbox']; z, dx, dy, ow, oh, s = map(float, sys.argv[2:8])
+ow, oh = ow / s, oh / s
+cx, cy = (b['x'] + b['w'] / 2) / s, (b['y'] + b['h'] / 2) / s
 p0x, p0y = cx - (ow / 2) / z, cy - (oh / 2) / z
-print(repr(p0x - dx / z), repr(p0y - dy / z))" "$@"
+print(repr(p0x - dx / z), repr(p0y - dy / z))" "$@" "$SCALE"
 }
-expected_box() { # B_JSON PX PY Z -> X,Y,W,H
+expected_box() { # B_JSON PX PY Z -> X,Y,W,H in physical px (B physical, P logical, d logical)
     python3 -I -c "
 import json, sys
-b = json.load(open(sys.argv[1]))['bbox']; px, py, z = map(float, sys.argv[2:5])
-print('%d,%d,%d,%d' % (round((b['x'] - px) * z), round((b['y'] - py) * z), round(b['w'] * z), round(b['h'] * z)))" "$@"
+b = json.load(open(sys.argv[1]))['bbox']; px, py, z, s = map(float, sys.argv[2:6])
+print('%d,%d,%d,%d' % (round((b['x'] - px * s) * z), round((b['y'] - py * s) * z), round(b['w'] * z), round(b['h'] * z)))" "$@" "$SCALE"
 }
 
 hvx_init_run patched t_pan
@@ -33,7 +34,7 @@ hvx_start --variant patched --size "$SIZE" --scale "$SCALE" > "$HVX_EVID/session
     || { cat "$HVX_EVID/session.log" >&2; hvx_die_blocked "nested patched session did not start"; }
 hvx_client_start client 400x160
 hvx_capture identity client
-hvx_analyze identity bbox "$HVX_EVID/identity.png" --expect-box 140,100,400,160 --tolerance "$TOL" \
+hvx_analyze identity bbox "$HVX_EVID/identity.png" --expect-box "$(hvx_phys_box 140,100,400,160)" --tolerance "$TOL" \
     || hvx_die_blocked "identity box not found where the window rule puts it (setup invalid)"
 for z in 0.5 1.0; do
     for d in "0 0" "300 0" "-300 0" "0 300" "0 -300"; do

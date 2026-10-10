@@ -129,6 +129,14 @@ hvx_analyze() {
     python3 -I "$HVX_REPO/tools/analyze_frame.py" "$@" --out "$HVX_EVID/$name.json" > /dev/null
 }
 
+# hvx_phys_box X,Y,W,H: a logical box in physical output pixels (the capture is in physical pixels).
+hvx_phys_box() {
+    python3 -I -c "
+import sys
+s = float(sys.argv[2]); x, y, w, h = map(float, sys.argv[1].split(','))
+print('%d,%d,%d,%d' % (round(x * s), round(y * s), round(w * s), round(h * s)))" "$1" "${HVX_OUTPUT_SCALE:-1}"
+}
+
 hvx_copy_build_info() {
     local variant=$1 id
     id=$(python3 -I -c "
