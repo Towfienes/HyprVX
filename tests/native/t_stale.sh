@@ -16,7 +16,7 @@ import random, sys
 rng = random.Random(int(sys.argv[1]))
 for _ in range(int(sys.argv[2])):
     print('%.6f %.6f %.6f' % (rng.uniform(-1200, 1000), rng.uniform(-800, 700), rng.uniform(0.1, 2.0)))" "$SEED" "$STATES" > "$HVX_EVID/cameras.txt"
-hvx_nested start --variant patched --size "$SIZE" --scale "$SCALE" > "$HVX_EVID/session.log" 2>&1 \
+hvx_start --variant patched --size "$SIZE" --scale "$SCALE" > "$HVX_EVID/session.log" 2>&1 \
     || { cat "$HVX_EVID/session.log" >&2; hvx_die_blocked "nested patched session did not start"; }
 hvx_client_start client 800x600
 result=PASS
@@ -30,6 +30,6 @@ while read -r px py z; do
     hvx_analyze "state$i-diff" diff "$HVX_EVID/state$i.png" --reference "$HVX_EVID/state$i-full.png" --max-pixels 0 || result=FAIL
 done < "$HVX_EVID/cameras.txt"
 hvx_nested dev panic > /dev/null || true
-hvx_nested stop >> "$HVX_EVID/session.log" 2>&1 || hvx_die_blocked "session did not stop"
+hvx_stop >> "$HVX_EVID/session.log" 2>&1 || hvx_die_blocked "session did not stop"
 hvx_finish "$result" "T-STALE $STATES random camera states vs full damage (V-12)" "seed $SEED output $SIZE scale $SCALE"
 [[ $result == PASS ]]

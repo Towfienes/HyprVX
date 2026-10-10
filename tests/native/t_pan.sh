@@ -29,7 +29,7 @@ print('%d,%d,%d,%d' % (round((b['x'] - px) * z), round((b['y'] - py) * z), round
 hvx_init_run patched t_pan
 hvx_copy_build_info patched
 result=PASS
-hvx_nested start --variant patched --size "$SIZE" --scale "$SCALE" > "$HVX_EVID/session.log" 2>&1 \
+hvx_start --variant patched --size "$SIZE" --scale "$SCALE" > "$HVX_EVID/session.log" 2>&1 \
     || { cat "$HVX_EVID/session.log" >&2; hvx_die_blocked "nested patched session did not start"; }
 hvx_client_start client 400x160
 hvx_capture identity client
@@ -48,6 +48,6 @@ for z in 0.5 1.0; do
     done
 done
 hvx_nested dev panic > /dev/null || true
-hvx_nested stop >> "$HVX_EVID/session.log" 2>&1 || hvx_die_blocked "session did not stop"
+hvx_stop >> "$HVX_EVID/session.log" 2>&1 || hvx_die_blocked "session did not stop"
 hvx_finish "$result" "T-PAN +-300 px both axes at z=0.5 and 1.0 (V-11)" "output $SIZE scale $SCALE tolerance $TOL px"
 [[ $result == PASS ]]

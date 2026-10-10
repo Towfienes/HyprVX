@@ -38,6 +38,21 @@ hvx_nested() {
     "$HVX_REPO/scripts/nested.sh" "$@"
 }
 
+# Sessions this test started are stopped on any exit (PASS, FAIL or BLOCKED); stop re-verifies identity first.
+HVX_OWN_SESSION=0
+hvx_start() {
+    hvx_nested start "$@" && HVX_OWN_SESSION=1
+}
+hvx_stop() {
+    hvx_nested stop && HVX_OWN_SESSION=0
+}
+hvx_cleanup() {
+    if [[ $HVX_OWN_SESSION == 1 ]]; then
+        hvx_nested stop > /dev/null 2>&1 || echo "WARNING: nested session left running; use scripts/nested.sh stop" >&2
+    fi
+}
+trap hvx_cleanup EXIT
+
 # Builds hyprvx-testclient in the agent cache when missing and prints its path.
 hvx_testclient() {
     local build="$HOME/.cache/hyprvx/$HYPRVX_AGENT/build/testclient"

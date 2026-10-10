@@ -22,7 +22,7 @@ result=PASS
 run_case() { # NAME WINDOW P_X P_Y Z
     local name=$1 window=$2 px=$3 py=$4 z=$5 w h
     IFS=x read -r w h <<< "$window"
-    hvx_nested start --variant patched --size "$SIZE" --scale "$SCALE" > "$HVX_EVID/$name.session.log" 2>&1 \
+    hvx_start --variant patched --size "$SIZE" --scale "$SCALE" > "$HVX_EVID/$name.session.log" 2>&1 \
         || { cat "$HVX_EVID/$name.session.log" >&2; hvx_die_blocked "nested patched session for $name did not start"; }
     hvx_client_start "$name" "$window"
     hvx_capture "$name-identity" "$name"
@@ -35,7 +35,7 @@ run_case() { # NAME WINDOW P_X P_Y Z
     echo "$box" > "$HVX_EVID/$name.expected"
     hvx_analyze "$name" bbox "$HVX_EVID/$name.png" --expect-box "$box" --tolerance "$TOL" || result=FAIL
     hvx_nested dev panic > /dev/null || true
-    hvx_nested stop >> "$HVX_EVID/$name.session.log" 2>&1 || hvx_die_blocked "$name: session did not stop"
+    hvx_stop >> "$HVX_EVID/$name.session.log" 2>&1 || hvx_die_blocked "$name: session did not stop"
 }
 run_case z025 800x600 0 0 0.25
 run_case z05 800x600 0 0 0.5

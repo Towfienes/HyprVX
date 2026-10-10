@@ -10,7 +10,7 @@ SCALE="${HVX_OUTPUT_SCALE:-1}"
 
 hvx_init_run patched t_stale_static
 hvx_copy_build_info patched
-hvx_nested start --variant patched --size "$SIZE" --scale "$SCALE" > "$HVX_EVID/session.log" 2>&1 \
+hvx_start --variant patched --size "$SIZE" --scale "$SCALE" > "$HVX_EVID/session.log" 2>&1 \
     || { cat "$HVX_EVID/session.log" >&2; hvx_die_blocked "nested patched session did not start"; }
 hvx_client_start client 800x600
 hvx_nested dev camera -100 -60 0.75 > /dev/null || hvx_die_blocked "dev camera rejected"
@@ -27,6 +27,6 @@ for k in "${!fills[@]}"; do
 done
 printf '%s\n' "${fills[@]}" > "$HVX_EVID/fills.txt"
 hvx_nested dev panic > /dev/null || true
-hvx_nested stop >> "$HVX_EVID/session.log" 2>&1 || hvx_die_blocked "session did not stop"
+hvx_stop >> "$HVX_EVID/session.log" 2>&1 || hvx_die_blocked "session did not stop"
 hvx_finish "$result" "T-STALE-STATIC partial damage under a fixed camera (V-12b)" "camera P=(-100,-60) z=0.75; output $SIZE scale $SCALE"
 [[ $result == PASS ]]

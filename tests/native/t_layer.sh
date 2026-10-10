@@ -11,7 +11,7 @@ LAYER_BOX="980,620,240,140"
 
 hvx_init_run patched t_layer
 hvx_copy_build_info patched
-hvx_nested start --variant patched --size "$SIZE" --scale "$SCALE" > "$HVX_EVID/session.log" 2>&1 \
+hvx_start --variant patched --size "$SIZE" --scale "$SCALE" > "$HVX_EVID/session.log" 2>&1 \
     || { cat "$HVX_EVID/session.log" >&2; hvx_die_blocked "nested patched session did not start"; }
 hvx_client_start window 800x600
 hvx_client_start layer 240x140 --layer TOP --position 980,620 --app-id hyprvx-layer
@@ -51,6 +51,6 @@ sys.exit(0 if layer_ok and border_ok else 1)
 PY
 done
 hvx_nested dev panic > /dev/null || true
-hvx_nested stop >> "$HVX_EVID/session.log" 2>&1 || hvx_die_blocked "session did not stop"
+hvx_stop >> "$HVX_EVID/session.log" 2>&1 || hvx_die_blocked "session did not stop"
 hvx_finish "$result" "T-LAYER layer untransformed, border encloses transformed surface (V-14)" "layer box $LAYER_BOX; output $SIZE scale $SCALE"
 [[ $result == PASS ]]

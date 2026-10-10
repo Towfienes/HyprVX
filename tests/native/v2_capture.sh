@@ -12,7 +12,7 @@ SCALE="${HVX_OUTPUT_SCALE:-1}"
 
 hvx_init_run v2 v2_capture
 hvx_copy_build_info v2
-hvx_nested start --variant v2 --size "$SIZE" --scale "$SCALE" > "$HVX_EVID/session.log" 2>&1 \
+hvx_start --variant v2 --size "$SIZE" --scale "$SCALE" > "$HVX_EVID/session.log" 2>&1 \
     || { cat "$HVX_EVID/session.log" >&2; hvx_die_blocked "nested v2 session did not start"; }
 hvx_client_start client 800x600
 states="$HVX_EVID/v2_states.jsonl"
@@ -40,5 +40,5 @@ for k in "${!fills[@]}"; do
 done
 v2 hyprvx:reset
 v2 hyprvx:disable
-hvx_nested stop >> "$HVX_EVID/session.log" 2>&1 || hvx_die_blocked "session did not stop"
+hvx_stop >> "$HVX_EVID/session.log" 2>&1 || hvx_die_blocked "session did not stop"
 hvx_finish CAPTURED "V2-as-is captures for GATE-N (V-08)" "output $SIZE scale $SCALE; judged by tests/native/gate_n.sh"

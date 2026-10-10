@@ -15,7 +15,7 @@ import random, sys
 rng = random.Random(int(sys.argv[1]))
 for _ in range(10):
     print('%.6f %.6f %.6f' % (rng.uniform(-1200, 1000), rng.uniform(-800, 700), rng.uniform(0.1, 2.0)))" "$SEED" > "$HVX_EVID/cameras.txt"
-hvx_nested start --variant patched --size "$SIZE" --scale "$SCALE" > "$HVX_EVID/session.log" 2>&1 \
+hvx_start --variant patched --size "$SIZE" --scale "$SCALE" > "$HVX_EVID/session.log" 2>&1 \
     || { cat "$HVX_EVID/session.log" >&2; hvx_die_blocked "nested patched session did not start"; }
 hvx_client_start client 800x600
 hvx_capture identity client
@@ -29,6 +29,6 @@ while read -r px py z; do
     hvx_capture "case$i-off" client
     hvx_analyze "case$i-diff" diff "$HVX_EVID/case$i-off.png" --reference "$HVX_EVID/identity.png" --max-pixels 0 || result=FAIL
 done < "$HVX_EVID/cameras.txt"
-hvx_nested stop >> "$HVX_EVID/session.log" 2>&1 || hvx_die_blocked "session did not stop"
+hvx_stop >> "$HVX_EVID/session.log" 2>&1 || hvx_die_blocked "session did not stop"
 hvx_finish "$result" "T-OFF panic returns to the identity image 10/10 (V-13)" "seed $SEED output $SIZE scale $SCALE"
 [[ $result == PASS ]]

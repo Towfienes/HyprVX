@@ -15,12 +15,12 @@ hvx_copy_build_info patched
 result=PASS
 for i in $(seq 1 "$REPS"); do
     for variant in stock patched; do
-        hvx_nested start --variant "$variant" --size "$SIZE" --scale "$SCALE" > "$HVX_EVID/$variant$i.session.log" 2>&1 \
+        hvx_start --variant "$variant" --size "$SIZE" --scale "$SCALE" > "$HVX_EVID/$variant$i.session.log" 2>&1 \
             || { cat "$HVX_EVID/$variant$i.session.log" >&2; hvx_die_blocked "nested $variant session $i did not start"; }
         hvx_client_start client "800x600"
         hvx_capture "$variant$i" client
         mv "$HVX_EVID/client.jsonl" "$HVX_EVID/$variant$i.client.jsonl"
-        hvx_nested stop >> "$HVX_EVID/$variant$i.session.log" 2>&1 || hvx_die_blocked "nested $variant session $i did not stop"
+        hvx_stop >> "$HVX_EVID/$variant$i.session.log" 2>&1 || hvx_die_blocked "nested $variant session $i did not stop"
     done
     hvx_analyze "tid$i" diff "$HVX_EVID/patched$i.png" --reference "$HVX_EVID/stock$i.png" --max-pixels 0 || result=FAIL
 done
