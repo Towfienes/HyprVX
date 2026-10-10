@@ -1,0 +1,158 @@
+{
+  "run_id": "20261011-014138-tooling-5852ba4",
+  "test": "WO-04 Part A1 / T013 follow-up",
+  "task": "T013",
+  "agent": "codex",
+  "result": "PASS",
+  "variant": "tooling",
+  "patchset_id": "none",
+  "binary_sha256": null,
+  "base_commit": "5852ba4b2d65f672c05df26b6e47cd55f7821049",
+  "raw_path": "/home/towfienes/.cache/hyprvx/codex/evidence/20261011-014138-tooling-5852ba4",
+  "checks": [
+    {
+      "command": "HYPRVX_AGENT=codex bash -n scripts/fetch-hyprland.sh",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex bash scripts/fetch-hyprland.sh --dry-run",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex python3 -I tools/tests/test_build_scripts.py fetch-hyprland.sh -v",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex bash -n scripts/build-scanner.sh",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex bash scripts/build-scanner.sh --dry-run",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex python3 -I tools/tests/test_build_scripts.py build-scanner.sh -v",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex bash -n scripts/apply-patches.sh",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex bash scripts/apply-patches.sh --variant stock --dry-run",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex bash scripts/apply-patches.sh --variant v2 --dry-run",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex bash scripts/apply-patches.sh --variant patched --dry-run",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex python3 -I tools/tests/test_build_scripts.py apply-patches.sh -v",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex bash -n scripts/build-hyprland.sh",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex bash scripts/build-hyprland.sh --variant stock --dry-run",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex bash scripts/build-hyprland.sh --variant v2 --dry-run",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex bash scripts/build-hyprland.sh --variant patched --dry-run",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex git diff --check",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex python3 -I tools/tests/test_build_scripts.py build-hyprland.sh -v",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "build-tests-final.log",
+      "execution": "require_escalated",
+      "passed": 13,
+      "skipped": 0
+    }
+  ],
+  "review_artifact": "migration-review.log",
+  "test_counts": {
+    "build-hyprland": {
+      "passed": 13,
+      "skipped": 0
+    },
+    "other_script_suites_each": {
+      "passed": 2,
+      "skipped": 1,
+      "skip_reason": "NOT RUN: Hyprland resource guard only; không áp dụng cho fetch/scanner/apply."
+    }
+  },
+  "scope": "Sửa payload PSI có NUL, tách module import được; kiểm tra kernel thật và watchdog giả lập, không chạy build.",
+  "escalations": [
+    "auto-review: git fetch origin && git merge --ff-only origin/v3/001-native-spatial-camera (clone Codex)",
+    "auto-review: PSI regression suite qua test_build_scripts.py build-hyprland.sh -v (2 lần)",
+    "auto-review: git add/commit chỉ các file A1 và index evidence trong clone Codex"
+  ],
+  "not_run": [
+    "Part B/T014: chưa được user release; không chạy lại build.",
+    "Không tạo áp lực RAM thật hoặc gọi systemctl thật; watchdog/stop được giả lập.",
+    "Không khởi động/điều khiển compositor, test client hay capture.",
+    "A2 và A3 sẽ ở commit riêng; A1 đã dùng python3 -I cho build module."
+  ],
+  "blockers": [],
+  "contract_questions": [],
+  "routing": {
+    "mode": "DIRECT_PARENT",
+    "reason": "jevctl status: ModuleNotFoundError: jev_native; JEV-NOS NORMAL fallback",
+    "workers": []
+  },
+  "artifacts": [
+    "build-tests-final.log",
+    "build-tests.log",
+    "checks.json",
+    "checks.log",
+    "migration-review.log",
+    "summary.json"
+  ]
+}
