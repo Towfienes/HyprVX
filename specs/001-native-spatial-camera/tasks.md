@@ -5,7 +5,7 @@ description: "Task list for Feature 001 — Native Spatial Camera (Claude Code o
 # Tasks: Native Spatial Camera (Feature 001)
 
 **Input**: `specs/001-native-spatial-camera/` — `spec.md`, `plan.md`, `research.md`, `data-model.md`,
-`contracts/transform-contract.md` (v1.1), `contracts/dev-control.md` (v1.1), `contracts/test-tooling.md` (v1.1),
+`contracts/transform-contract.md` (v1.1), `contracts/dev-control.md` (v1.1), `contracts/test-tooling.md` (v1.2),
 `quickstart.md`, `checklists/verification.md`.
 **Governance**: constitution v1.0.0; master plan §I (Sprint 1); decisions DV3-09..DV3-15.
 
