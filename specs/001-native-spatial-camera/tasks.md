@@ -85,12 +85,12 @@ tools. No user story can be judged before this phase and GATE-A pass.
 
 - [X] T018 [P] Implement `tools/testclient/` (`hyprvx-testclient`): deterministic content, colors and marker sizes exactly as test-tooling §4, `--control` FIFO commands `fill`/`redraw`/`sync`/`quit`, JSONL log with `seq`/`frame_done`, `--layer TOP|OVERLAY`, `--scale-aware`; CMake target under `HYPRVX_WITH_WAYLAND_PLATFORM` in `CMakeLists.txt` (owner: claude)
 - [X] T019 [P] Implement `tools/analyze_frame.py` (`python -I`, modes `bbox` and `diff`, JSON output and exit codes of test-tooling §6) with synthetic-image tests in `tools/tests/test_analyze_frame.py` whose expected answers are computed independently of the analyzer (owner: claude)
-- [ ] T020 [P] Write the shared nested config template `tests/native/config/` (animations off, fixed gaps/borders, identical for all variants; format verified against Hyprland `efb5099` source) and the shared helpers `tests/native/lib.sh` (run-id, ready-signal capture rule of test-tooling §5, raw evidence written to `~/.cache/hyprvx/$HYPRVX_AGENT/evidence/<run-id>/`, `summary.json` and a final `SHA256SUMS` copied to the repo index `evidence/<run-id>/` per test-tooling §8, BLOCKED on timeout) (owner: claude)
+- [X] T020 [P] Write the shared nested config template `tests/native/config/` (animations off, fixed gaps/borders, identical for all variants; format verified against Hyprland `efb5099` source) and the shared helpers `tests/native/lib.sh` (run-id, ready-signal capture rule of test-tooling §5, raw evidence written to `~/.cache/hyprvx/$HYPRVX_AGENT/evidence/<run-id>/`, `summary.json` and a final `SHA256SUMS` copied to the repo index `evidence/<run-id>/` per test-tooling §8, BLOCKED on timeout) (owner: claude)
 - [X] T021 Write `scripts/check-single-transform.sh` (Constitution IV lint): fail if any `patches/hyprland/*.patch` hunk outside the vendored `CameraMath.hpp` contains inline camera arithmetic (`/ zoom`, `* zoom`, `/z`, `*z` on camera fields) or a second forward/inverse formula; self-test against a synthetic bad patch (owner: claude)
 
 ### GATE-A — deterministic baseline
 
-- [ ] T022 GATE-A (V-23): write `tests/native/gate_a_stock_determinism.sh` and run it — three nested stock sessions, reference scene (one 800×600 testclient at a fixed position), captures pixel-identical by `analyze_frame.py diff`; on failure fix the harness, never a tolerance (owner: claude)
+- [X] T022 GATE-A (V-23): write `tests/native/gate_a_stock_determinism.sh` and run it — three nested stock sessions, reference scene (one 800×600 testclient at a fixed position), captures pixel-identical by `analyze_frame.py diff`; on failure fix the harness, never a tolerance (owner: claude)
 
 **Checkpoint**: CameraMath integrated and tested; stock built reproducibly; harness refuses wrong targets; tools
 proven on synthetic data; GATE-A PASS. Claude may write patches during this phase, but none is judged yet.
