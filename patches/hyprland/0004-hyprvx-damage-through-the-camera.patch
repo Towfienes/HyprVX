@@ -66,10 +66,10 @@ index b3910e84..c8061d3b 100644
 +    damageOnChange(monitor);
  }
 diff --git a/src/hyprvx/SceneCamera.cpp b/src/hyprvx/SceneCamera.cpp
-index 9ba03aa8..59103338 100644
+index 1dd8889d..58ea0773 100644
 --- a/src/hyprvx/SceneCamera.cpp
 +++ b/src/hyprvx/SceneCamera.cpp
-@@ -32,3 +32,29 @@ SRenderModifData HyprVX::cameraRenderModif(const Monitor::CMonitor& monitor, con
+@@ -45,3 +45,29 @@ SRenderModifData HyprVX::cameraRenderModif(const Monitor::CMonitor& monitor, con
      modif.modifs.insert(modif.modifs.end(), outer.modifs.begin(), outer.modifs.end());
      return modif;
  }
@@ -100,7 +100,7 @@ index 9ba03aa8..59103338 100644
 +    globalLogical.forEachRect([&monitor](const auto& RECT) { addCameraDamage(monitor, CBox(RECT.x1, RECT.y1, RECT.x2 - RECT.x1, RECT.y2 - RECT.y1)); });
 +}
 diff --git a/src/hyprvx/SceneCamera.hpp b/src/hyprvx/SceneCamera.hpp
-index 4290212d..f33e083e 100644
+index e4082003..f9711785 100644
 --- a/src/hyprvx/SceneCamera.hpp
 +++ b/src/hyprvx/SceneCamera.hpp
 @@ -4,6 +4,7 @@
@@ -111,10 +111,10 @@ index 4290212d..f33e083e 100644
  
  #include <optional>
  
-@@ -15,4 +16,13 @@ namespace HyprVX {
-     // Render modifier equivalent to cammath::forward in monitor pixels, applied before the outer modifiers.
-     // Marked hyprvxCamera so that clip and damage are transformed with it.
-     Render::SRenderModifData cameraRenderModif(const Monitor::CMonitor& monitor, const hyprvx::cammath::CameraState& camera, const Render::SRenderModifData& outer);
+@@ -20,4 +21,13 @@ namespace HyprVX {
+     // quad touches (round out); an interior that is skipped must not cover a touched edge pixel (round in).
+     Hyprutils::Math::CBox roundOutBox(const Hyprutils::Math::CBox& box);
+     Hyprutils::Math::CBox roundInBox(const Hyprutils::Math::CBox& box);
 +
 +    // True when the camera applies and its visible world rect overlaps a global logical box.
 +    bool cameraShows(const Monitor::CMonitor& monitor, const CBox& globalLogical);
