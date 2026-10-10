@@ -5,6 +5,7 @@
   hyprvx_nested.py run [--background] -- CMD...
   hyprvx_nested.py dev COMMAND [ARGS...]          # hyprctl hyprvx-dev COMMAND (dev-control.md transport A)
   hyprvx_nested.py capture PATH                   # grim on the nested output (.png or .ppm)
+  hyprvx_nested.py dispatch hyprvx:NAME [ARGS...] # V2-as-is adapter (variant v2 only): hyprctl dispatch hyprvx:*
   hyprvx_nested.py status | stop | recover
 
 Every command except start and status re-verifies the session before acting: the SO_PEERCRED peer of the nested
@@ -346,6 +347,19 @@ def dev(args):
     return EXIT_OK
 
 
+def dispatch(args):
+    """V2-as-is adapter (T033): V2 has no hyprvx-dev control, only its own hyprvx:* dispatchers."""
+    data = verify(read_session())
+    if data["variant"] != "v2" or not args.words[0].startswith("hyprvx:"):
+        raise Failed("dispatch is limited to hyprvx:* dispatchers on a v2 session")
+    hyprctl = Path(data["binary"]).with_name("hyprctl")
+    result = subprocess.run([str(hyprctl), "--instance", data["signature"], "dispatch", " ".join(args.words)],
+                            env=nested_env(data), capture_output=True, text=True)
+    reply = result.stdout.strip()
+    print(reply)
+    return EXIT_OK if result.returncode == 0 and reply == "ok" else EXIT_FAILED
+
+
 def capture(args):
     data = verify(read_session())
     path = Path(args.path)
@@ -452,6 +466,9 @@ def main(argv):
     p = commands.add_parser("dev")
     p.add_argument("words", nargs="+")
     p.set_defaults(handler=dev)
+    p = commands.add_parser("dispatch")
+    p.add_argument("words", nargs="+")
+    p.set_defaults(handler=dispatch)
     p = commands.add_parser("capture")
     p.add_argument("path")
     p.set_defaults(handler=capture)
