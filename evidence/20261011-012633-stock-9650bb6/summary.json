@@ -1,0 +1,111 @@
+{
+  "run_id": "20261011-012633-stock-9650bb6",
+  "test": "V-01/V-03 stock build retry",
+  "task": "T014",
+  "agent": "codex",
+  "result": "BLOCKED",
+  "variant": "stock",
+  "patchset_id": "none",
+  "binary_sha256": null,
+  "base_commit": "9650bb671b456a920fe0bc6a6fc9ca4d2389e3c3",
+  "upstream_commit": "efb50993780079460b0cbed1363e2166a2de1d9f",
+  "raw_path": "/home/towfienes/.cache/hyprvx/codex/evidence/20261011-012633-stock-9650bb6",
+  "sync": {
+    "command": "git fetch origin && git merge --ff-only origin/v3/001-native-spatial-camera",
+    "exit_code": 0,
+    "result": "PASS",
+    "execution": "require_escalated",
+    "fast_forward_to": "9650bb671b456a920fe0bc6a6fc9ca4d2389e3c3"
+  },
+  "checks": [
+    {
+      "item": "preflight-memory",
+      "command": "cat /proc/meminfo; cat /proc/pressure/memory",
+      "result": "PASS",
+      "MemAvailable_KiB": 8547244,
+      "required_KiB": 6815744,
+      "PSI_full_avg10": 0.0,
+      "artifact": "preflight.log"
+    },
+    {
+      "item": "fetch-pinned-source-and-submodules",
+      "command": "HYPRVX_AGENT=codex scripts/fetch-hyprland.sh",
+      "exit_code": 0,
+      "result": "PASS",
+      "execution": "require_escalated",
+      "artifact": "fetch.log"
+    },
+    {
+      "item": "scanner-v0.4.6-build-install",
+      "command": "HYPRVX_AGENT=codex scripts/build-scanner.sh",
+      "exit_code": 0,
+      "result": "PASS",
+      "execution": "require_escalated",
+      "source_commit": "b8632713a6beaf28b56f2a7b0ab2fb7088dbb404",
+      "artifact": "scanner.log"
+    },
+    {
+      "item": "stock-build",
+      "command": "HYPRVX_AGENT=codex scripts/build-hyprland.sh --variant stock",
+      "exit_code": 1,
+      "result": "BLOCKED",
+      "execution": "require_escalated",
+      "artifact": "build.log",
+      "reason": "Không đăng ký được trigger PSI: [Errno 22] Invalid argument; scope/configure/build/install chưa khởi động."
+    },
+    {
+      "item": "postflight-source-and-lock",
+      "command": "git -C /home/towfienes/.cache/hyprvx/codex/src/hyprland-efb5099/stock rev-parse HEAD; git -C /home/towfienes/.cache/hyprvx/codex/src/hyprland-efb5099/stock status --porcelain; flock -n /home/towfienes/.cache/hyprvx/locks/heavy.lock true",
+      "result": "PASS",
+      "artifact": "postflight.log"
+    }
+  ],
+  "reason": "Không đăng ký được trigger PSI: [Errno 22] Invalid argument; scope/configure/build/install chưa khởi động.",
+  "routing": {
+    "executed_by": "parent Codex",
+    "workers": [],
+    "result": "LOCAL_FALLBACK",
+    "reason": "jevctl status: ModuleNotFoundError: jev_native; fallback NORMAL của JEV-NOS."
+  },
+  "work_orders_read": [
+    "WO-01-codex.md",
+    "WO-02-codex.md",
+    "WO-03-codex.md"
+  ],
+  "not_run": [
+    {
+      "item": "T014 stock configure/build/install and build-info.json",
+      "reason": "Đăng ký trigger PSI thất bại trước khi tạo process systemd-run."
+    },
+    {
+      "item": "Live PSI abort and scoped build provenance",
+      "reason": "Trigger chưa đăng ký thành công; chưa có binary stock."
+    },
+    {
+      "item": "T015,T016,T017,T018,T019,T021,T020 (batch 1b)",
+      "reason": "WO-01 §3 yêu cầu batch 1 không có BLOCKED; §4 yêu cầu dừng."
+    },
+    {
+      "item": "T009 (WO-02)",
+      "reason": "WO-02 đã mở task; chưa thực hiện vì điểm dừng đầu tiên có BLOCKED chặn batch 1b của WO-01."
+    },
+    {
+      "item": "T013 follow-up; T017/T020 transport/config (WO-03)",
+      "reason": "Đã đọc contract 1.1; chưa sửa code vì dừng tại T014. Follow-up T013 vẫn cần -DHYPRVX_DEV=ON chỉ cho patched."
+    },
+    {
+      "item": "T022 GATE-A",
+      "reason": "Điểm dừng WO-01; cần Claude review tooling."
+    }
+  ],
+  "contract_questions": [],
+  "report_to_claude": "Bàn giao qua người dùng theo WO-01 §5; không có công cụ gửi trực tiếp tới Claude.",
+  "artifacts": [
+    "build.log",
+    "fetch.log",
+    "postflight.log",
+    "preflight.log",
+    "scanner.log",
+    "summary.json"
+  ]
+}
