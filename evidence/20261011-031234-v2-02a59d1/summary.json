@@ -1,0 +1,1 @@
+{"run_id": "20261011-031234-v2-02a59d1", "test": "V2-as-is build for T033", "result": "PASS", "agent": "claude", "git_sha": "02a59d120217ccd86812e49928785588921b06a4", "variant": "v2", "patchset_id": "bc05d46c42b0", "artifacts": ["apply.log", "build.log", "build-info.json", "hyprland-version.txt"], "not_run": []}

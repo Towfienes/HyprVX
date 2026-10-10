@@ -61,20 +61,40 @@ state.update(pan=[0.0, 0.0], z=1.0)
 state["pan"][0] += -300; snap("v2_pan_right")
 state["pan"][0] += 300; state["pan"][1] += 300; snap("v2_pan_up")
 
-# ---- S2: camera applied, judged on captures (diff vs identity + border box moved as the V2 camera predicts)
+# ---- S2: camera applied, judged on captures: every non-identity V2 capture differs from the V2 identity capture, and
+#      in every capture where the window border is visible its box is where the V2 camera predicts (at least one such
+#      capture is required). A capture without a visible border is recorded as an observation (V2 drops the border when
+#      zooming out), not used as evidence either way. (Revised 2026-10-11 after the first run picked z=0.5 only, where
+#      V2 draws no border, and border edges outside the output are not compared; see integration-log.md.)
 def border_box(path):
     im = Image.open(path).convert("RGB"); w, h = im.size; px = im.load()
     pts = [(x, y) for y in range(h) for x in range(w) if all(abs(a - 0x88) <= 24 for a in px[x, y])]
     return (min(p[0] for p in pts), min(p[1] for p in pts), max(p[0] for p in pts), max(p[1] for p in pts)) if pts else None
-d = analyze("s2_diff_z05", "diff", str(v2 / "v2_z05.png"), "--reference", str(v2 / "v2_identity.png"))
-zb, zp = cams["v2_z05"]
-bx, by, bw, bh = v2_box(zb, zp)
-measured = border_box(v2 / "v2_z05.png")
-predicted = (bx - 1, by - 1, bx + bw, by + bh)   # 2 px border * z = 1 px just outside the surface box
-border_ok = measured is not None and all(abs(m - p) <= 3 for m, p in zip(measured, predicted))
-s2 = d["verdict"] == "FAIL" and (d["diff"] or {}).get("pixels", 0) > 0 and border_ok
-report["S2"] = {"holds": s2, "diff_pixels_vs_identity": (d["diff"] or {}).get("pixels"), "border_measured": measured,
-                "border_predicted": predicted, "v2_camera_z05": {"zoom": zb, "pan": zp}}
+def edges_match(measured, predicted, tol=3):
+    """Compares only the predicted border edges that lie on the 1280x800 output; off-screen edges cannot be seen."""
+    x0, y0, x1, y1 = predicted
+    checks = []
+    if 0 <= x0 <= 1279: checks.append(abs(measured[0] - x0) <= tol)
+    if 0 <= y0 <= 799: checks.append(abs(measured[1] - y0) <= tol)
+    if 0 <= x1 <= 1279: checks.append(abs(measured[2] - x1) <= tol)
+    if 0 <= y1 <= 799: checks.append(abs(measured[3] - y1) <= tol)
+    return bool(checks) and all(checks)
+s2_details = {}
+for name, (zz, pp) in cams.items():
+    d = analyze(f"s2_diff_{name}", "diff", str(v2 / f"{name}.png"), "--reference", str(v2 / "v2_identity.png"))
+    x, y, w, h = v2_box(zz, pp)
+    border = max(1, round(2 * zz))
+    predicted = (x - border, y - border, x + w + border - 1, y + h + border - 1)
+    measured = border_box(v2 / f"{name}.png")
+    match = None if measured is None else edges_match(measured, predicted)
+    s2_details[name] = {"diff_pixels": (d["diff"] or {}).get("pixels"), "border_measured": measured,
+                        "border_predicted": predicted, "border_match": match, "zoom": zz, "pan": pp}
+all_differ = all((v["diff_pixels"] or 0) > 0 for v in s2_details.values())
+visible = [v for v in s2_details.values() if v["border_match"] is not None]
+s2 = all_differ and bool(visible) and all(v["border_match"] for v in visible)
+report["S2"] = {"holds": s2, "all_differ_from_identity": all_differ, "captures_with_border": len(visible),
+                "observations": sorted(k for k, v in s2_details.items() if v["border_match"] is None),
+                "details": s2_details}
 
 # ---- P: positive control (stock identity from GATE-A, synthetic known-good fixtures)
 p_stock = analyze("p_stock_identity", "bbox", str(gate_a / "stock1.png"), "--expect-box", "140,100,800,600", "--tolerance", "2")
