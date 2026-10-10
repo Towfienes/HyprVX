@@ -282,3 +282,18 @@ Status: accepted (user, 2026-10-10)
 Regular project-local commits are authorized on `v3/001-*` branches and for approved planning changes on
 `v3/spec-foundation`. No push, no destructive cleanup, no merge into `dev`, `main` or `v3/spec-foundation`
 without approval.
+
+### DV3-14 - Codex Auto-review for scoped escalations
+
+Status: accepted (user, 2026-10-11); effective from WO-04. WO-01 to WO-03 keep manual approval.
+
+Codex keeps `workspace-write` and `on-request`. A work order marked "Auto-review: allowed" may run with
+`approvals_reviewer = "auto_review"`, so Codex's automatic reviewer approves escalations instead of the user, only
+for: git commit/fetch/merge inside the Codex clone (no push, rebase or force), allowed source downloads,
+`systemd-run --user --scope` and builds under the heavy lock, unit-test socket binds, and system commands the work
+order lists. Starting or controlling a nested compositor, GPU/`/dev/dri`, or anything touching the host
+Wayland/Hyprland socket stays under manual user approval in a session without the auto reviewer. Writes outside the
+clone, its cache and `/tmp`, host configuration, Caelestia, `/usr` and sudo remain forbidden. Full Access and
+Bypass Permissions are never enabled. A rejection makes the item BLOCKED. Every commit lists auto-approved
+escalations in an `Escalations:` trailer. Acceptance gates, stop conditions and Claude's review and integration of
+every handoff are unchanged. Details: master plan §O3.

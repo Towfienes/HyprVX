@@ -530,6 +530,8 @@ Effort là khoảng thô theo đơn vị *focused engineering-weeks*, độ tin 
 - **DV3-12** Spike U0 time-boxed, chỉ bằng chứng, sau cổng Feature 001.
 - **DV3-13** Ủy quyền commit thường trực trên branch `v3/001-*` (không push, không cleanup phá hủy, không merge vào
   `dev`/`main`/`v3/spec-foundation` khi chưa duyệt).
+- **DV3-14** Codex Auto-review cho escalation trong phạm vi §O3 (workspace-write + on-request giữ nguyên; nested
+  compositor/GPU/socket host vẫn duyệt tay; không Full Access/Bypass), áp dụng từ WO-04.
 
 **Còn mở:**
 - License toàn dự án (D010 của V1). `CameraMath.hpp` đã chốt BSD-3-Clause (DV3-10).
@@ -732,6 +734,27 @@ codex -C /home/towfienes/Projects/HyprVX-v3-codex -s workspace-write -a on-reque
   Lock file được mở read-only để `flock`; khả năng này được kiểm trong smoke test S0.
 - `/tmp` mặc định ghi được trong sandbox Codex (cần cho runtime dir `/tmp/hvx-*` của nested).
 - Push bị vô hiệu ở clone. Codex không bao giờ dùng `--dangerously-bypass-approvals-and-sandbox`.
+
+**Auto-review cho escalation (DV3-14, user duyệt 2026-10-11; áp dụng từ WO-04, WO-01 giữ quy trình cũ).**
+Codex vẫn chạy `-s workspace-write -a on-request`. Work order nào ghi rõ "Auto-review: allowed" thì được khởi động thêm
+`-c 'approvals_reviewer="auto_review"'`: escalation do reviewer tự động của Codex duyệt thay user. Phạm vi:
+
+| Loại thao tác | Duyệt |
+|---|---|
+| `git commit` / `fetch` / `merge` trong clone Codex (không push, không rebase/force); tải source đã cho phép (github.com/hyprwm, đúng tag/commit trong script); `systemd-run --user --scope` và build dưới `heavy.lock`; bind socket UNIX cho unit test; lệnh hệ thống khác chỉ khi work order liệt kê | Auto-review |
+| Khởi động hoặc điều khiển compositor nested (`scripts/nested.sh start/run/dev/capture`, `hyprctl`, `grim`, test client, `/dev/dri`), hoặc bất cứ thứ gì chạm socket Wayland/Hyprland của host | **User duyệt tay**: chạy trong phiên Codex không có `approvals_reviewer` (ví dụ T015–T017 live, T022, T033/T034) |
+| Ghi ngoài clone, `~/.cache/hyprvx/codex` và `/tmp`; `~/.config`, Caelestia, `/usr`, sudo, đổi cấu hình hệ thống | Cấm (không đổi) |
+
+- Không bao giờ bật Full Access (`danger-full-access`) hay Bypass (`--dangerously-bypass-approvals-and-sandbox`).
+- Reviewer từ chối ⇒ mục đó BLOCKED và báo lại; không tìm đường vòng.
+- Mỗi commit thêm trailer `Escalations: <danh sách escalation đã được auto-review duyệt | none>`.
+- Acceptance gate (GATE-A, GATE-N, T-ID, G1), stop condition và quy trình review/tích hợp của Claude (§O4) giữ nguyên.
+
+```fish
+# Phiên Auto-review (chỉ cho work order ghi "Auto-review: allowed"):
+env HYPRVX_AGENT=codex codex -C /home/towfienes/Projects/HyprVX-v3-codex -s workspace-write -a on-request \
+    -c 'approvals_reviewer="auto_review"' --add-dir ~/.cache/hyprvx/codex -m <model>
+```
 
 ### O4. Handoff và tích hợp
 1. Codex commit nhỏ theo task trên `v3/001-codex` với trailer `Task:`, `Verify:`, `Result:`, `Evidence:`, `Not-run:`.
