@@ -35,3 +35,16 @@ Do not copy source code based only on assumptions about its license.
   build time. The complete original notice stays in the vendored XML.
 - Compatibility: permissive with the project's eventual license provided the
   attribution and permission text remain with distributed copies.
+
+## HyprVX files under an explicit license
+
+The project-wide license is still open (V1 D010). The files below carry their own license so that they can be
+vendored into other projects.
+
+| File | License | Decision | Reason |
+|---|---|---|---|
+| `core/include/hyprvx/core/CameraMath.hpp` | BSD-3-Clause (`SPDX-License-Identifier` and copyright line in the file header) | DV3-10 | Vendored unchanged into the Hyprland patch series (`patches/hyprland/0001-*`); Hyprland is BSD-3-Clause |
+
+No third-party code is copied into `CameraMath.hpp`. Its equations come from the HyprVX V1 camera and the V3
+transform contract (`specs/001-native-spatial-camera/contracts/transform-contract.md`), not from DriftWM or any
+other audited project.
