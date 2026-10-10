@@ -12,8 +12,10 @@ description: "Task list for Feature 001 — Native Spatial Camera (Claude Code +
 **Status**: GENERATED, awaiting user approval. No task may start before the user approves this file.
 
 **Tests**: REQUIRED (Constitution II). Native tests are written from the spec by Codex and exist before any patch
-is judged (infra-before-claims). Every PASS needs an artifact under `evidence/<run-id>/` and a row in
-`checklists/verification.md`. A dispatcher reply is never a pass condition.
+is judged (infra-before-claims). Every PASS needs raw evidence that Claude has imported and checksum-verified into
+`~/.local/share/hyprvx/evidence/<agent>/<run-id>/` (`contracts/test-tooling.md` §8) and a row in
+`checklists/verification.md`. A commit trailer never points to evidence that is not on this machine with a verifying
+`SHA256SUMS`. A dispatcher reply is never a pass condition.
 
 ## Format: `[ID] [P?] [Story] Description (owner: …)`
 
@@ -44,12 +46,12 @@ is judged (infra-before-claims). Every PASS needs an artifact under `evidence/<r
 
 **Purpose**: freeze interfaces, isolate the two agents, prove the Codex sandbox can do the lane's work.
 
-- [ ] T001 K0 contract freeze: confirm `specs/001-native-spatial-camera/contracts/transform-contract.md` is v1.1 and `contracts/test-tooling.md` is v1.0, then create `specs/001-native-spatial-camera/integration-log.md` with the columns task, branch@sha, verify command, result, artifacts, review verdict, ownership transfers (owner: claude)
-- [ ] T002 Create the Codex clone and per-agent caches exactly as master plan §O3: `git clone --no-hardlinks --branch v3/001-native-spatial-camera /home/towfienes/Projects/HyprVX /home/towfienes/Projects/HyprVX-v3-codex`, branch `v3/001-codex`, push URL `DISABLED`, `~/.cache/hyprvx/{claude,codex,locks}`, `~/.cache/hyprvx/locks/heavy.lock`; record in `specs/001-native-spatial-camera/integration-log.md` (owner: claude)
-- [ ] T003 S0 sandbox smoke test, run by the user-launched Codex session in `/home/towfienes/Projects/HyprVX-v3-codex` and recorded as PASS/BLOCKED per item: write under `~/.cache/hyprvx/codex`; `flock` on the read-only `~/.cache/hyprvx/locks/heavy.lock`; `systemd-run --user --scope -p MemoryMax=1G true`; read access to `/dev/dri`; `git commit` via on-request escalation; results in commit trailer, items BLOCKED fall back to the user or Claude (owner: codex)
-- [ ] T004 [P] Add `build-v3/` and the evidence policy of `contracts/test-tooling.md` §8 (`evidence/*/*` ignored except `summary.json` and `SHA256SUMS`) to `.gitignore` (owner: codex)
+- [ ] T001 K0 contract freeze: confirm `specs/001-native-spatial-camera/contracts/transform-contract.md` is v1.1 and `contracts/test-tooling.md` is v1.0, then create `specs/001-native-spatial-camera/integration-log.md` with the columns task, branch@sha, verify command, result, evidence run-id, archive path, `sha256sum -c` result, review verdict, ownership transfers (owner: claude)
+- [ ] T002 Create the Codex clone and per-agent caches exactly as master plan §O3: `git clone --no-hardlinks --branch v3/001-native-spatial-camera /home/towfienes/Projects/HyprVX /home/towfienes/Projects/HyprVX-v3-codex`, branch `v3/001-codex`, push URL `DISABLED`, `~/.cache/hyprvx/{claude,codex,locks}`, `~/.cache/hyprvx/locks/heavy.lock`, evidence archive `~/.local/share/hyprvx/evidence/{claude,codex}` (test-tooling §1, §8); record in `specs/001-native-spatial-camera/integration-log.md` (owner: claude)
+- [ ] T003 S0 sandbox smoke test, run by the user-launched Codex session in `/home/towfienes/Projects/HyprVX-v3-codex` and recorded as PASS/BLOCKED per item: write under `~/.cache/hyprvx/codex`; `flock` on the read-only `~/.cache/hyprvx/locks/heavy.lock`; `systemd-run --user --scope -p MemoryMax=1G true`; read access to `/dev/dri`; `git commit` via on-request escalation; command outputs saved as an evidence run per test-tooling §8 (if the cache is not writable, the item is BLOCKED and the outputs are given in the session for the user and Claude); items BLOCKED fall back to the user or Claude (owner: codex)
+- [ ] T004 [P] Add `build-v3/` and the evidence policy of `contracts/test-tooling.md` §8 to `.gitignore` (raw evidence lives outside the repo; as a safeguard `evidence/*/*` is ignored except `summary.json` and `SHA256SUMS`) (owner: codex)
 - [ ] T005 [P] Add options `HYPRVX_WITH_SDL`, `HYPRVX_WITH_WAYLAND_PLATFORM`, `HYPRVX_WITH_HYPRLAND_PLUGIN` (default OFF) to `CMakeLists.txt`; each gates its targets, tests (`test_native_event_bridge.cpp`, `test_overlay_state.cpp`, `test_plugin_compatibility.cpp` as applicable) and dependency discovery (`CMakeLists.txt:161-211`); replace absolute `/usr/share/wayland-protocols` paths with `pkg_get_variable(wayland-protocols pkgdatadir)` (owner: codex)
-- [ ] T006 V-05: configure fresh `build-v3/` headless (all options OFF) and fully enabled; build `-j2`; run `ctest --test-dir build-v3 --output-on-failure`; report test counts for both configurations in the commit trailer (owner: codex)
+- [ ] T006 V-05: configure fresh `build-v3/` headless (all options OFF) and fully enabled; build `-j2`; run `ctest --test-dir build-v3 --output-on-failure`; save configure/build/ctest logs for both configurations as an evidence run per test-tooling §8 and cite its run-id in the commit trailer (owner: codex)
 
 **Checkpoint**: interfaces frozen; Codex isolated; headless core build and V1 tests reproducible.
 
@@ -72,7 +74,7 @@ tools. No user story can be judged before this phase and GATE-A pass.
 - [ ] T011 [P] Write `scripts/build-scanner.sh`: build `hyprwayland-scanner` v0.4.6 into `~/.cache/hyprvx/$HYPRVX_AGENT/tools` without system installation (owner: codex)
 - [ ] T012 Write `scripts/apply-patches.sh`: `git am` an ordered patch directory (`patches/hyprland/` or `research/v2-drift-mvp/` for variant `v2`, none for `stock`) onto the variant worktree, using only `*.patch` files in lexical order (e.g. `research/v2-drift-mvp/*.patch`, never `PROVENANCE.md`/`SHA256SUMS`); print `patchset_id = sha256(cat patches in order)[:12]` (owner: codex)
 - [ ] T013 Write `scripts/build-hyprland.sh --variant stock|v2|patched`: heavy lock, `MemAvailable ≥ 6.5 GiB` check, PSI abort, `systemd-run --user --scope -p MemoryMax=6G`, CMake + Ninja `-j4`, ccache in the agent cache, `-DNO_HYPRPM=TRUE`, real `GIT_COMMIT_HASH`, `GIT_DIRTY=hyprvx-<patchset_id>` (or `clean-upstream` for stock), `HYPRVX_DEV` defined for `patched`, install to `~/.cache/hyprvx/$HYPRVX_AGENT/prefix/<patchset_id|stock|v2-…>`, write `build-info.json` per test-tooling §3 (owner: codex)
-- [ ] T014 V-01, V-03: run fetch + build for variant `stock` (heavy job); attach `build-info.json` and the build log path in the commit trailer (owner: codex)
+- [ ] T014 V-01, V-03: run fetch + build for variant `stock` (heavy job); copy `build-info.json` and the build log into an evidence run per test-tooling §8 and cite its run-id in the commit trailer (owner: codex)
 
 ### Hardened nested harness (Constitution I, test-tooling §7)
 
@@ -84,7 +86,7 @@ tools. No user story can be judged before this phase and GATE-A pass.
 
 - [ ] T018 [P] Implement `tools/testclient/` (`hyprvx-testclient`): deterministic content, colors and marker sizes exactly as test-tooling §4, `--control` FIFO commands `fill`/`redraw`/`sync`/`quit`, JSONL log with `seq`/`frame_done`, `--layer TOP|OVERLAY`, `--scale-aware`; CMake target under `HYPRVX_WITH_WAYLAND_PLATFORM` in `CMakeLists.txt` (the CMake hunk is committed after T009 to avoid concurrent edits of the same file) (owner: codex)
 - [ ] T019 [P] Implement `tools/analyze_frame.py` (`python -I`, modes `bbox` and `diff`, JSON output and exit codes of test-tooling §6) with synthetic-image tests in `tools/tests/test_analyze_frame.py` whose expected answers are computed independently of the analyzer (owner: codex)
-- [ ] T020 [P] Write the shared nested config template `tests/native/config/` (animations off, fixed gaps/borders, identical for all variants; format verified against Hyprland `efb5099` source) and the shared helpers `tests/native/lib.sh` (run-id, ready-signal capture rule of test-tooling §5, `summary.json`, `SHA256SUMS`, BLOCKED on timeout) (owner: codex)
+- [ ] T020 [P] Write the shared nested config template `tests/native/config/` (animations off, fixed gaps/borders, identical for all variants; format verified against Hyprland `efb5099` source) and the shared helpers `tests/native/lib.sh` (run-id, ready-signal capture rule of test-tooling §5, raw evidence written to `~/.cache/hyprvx/$HYPRVX_AGENT/evidence/<run-id>/`, `summary.json` and a final `SHA256SUMS` copied to the repo index `evidence/<run-id>/` per test-tooling §8, BLOCKED on timeout) (owner: codex)
 - [ ] T021 Write `scripts/check-single-transform.sh` (Constitution IV lint): fail if any `patches/hyprland/*.patch` hunk outside the vendored `CameraMath.hpp` contains inline camera arithmetic (`/ zoom`, `* zoom`, `/z`, `*z` on camera fields) or a second forward/inverse formula; self-test against a synthetic bad patch (owner: codex)
 
 ### GATE-A — deterministic baseline
@@ -131,8 +133,8 @@ proven on synthetic data; GATE-A PASS. Claude may write patches during this phas
 
 ### Negative control (U1, GATE-N)
 
-- [ ] T033 [US2] V-08: build variant `v2` (heavy job) and capture z = 0.5 / 0.25 and a zoom/pan sequence, driving V2 through its own `hyprvx:*` dispatchers (research R2: `KeybindManager.cpp:123-266`, zoom clamp [0.2, 1.5], centre-anchored) via a variant adapter in `tests/native/lib.sh`, since V2 has no `hyprvx-dev:*` control; store evidence of the clip/stale artifacts (confirms U1 / RC1–RC2) (owner: codex)
-- [ ] T034 [US2] GATE-N (V-24): the analyzer reports FAIL on the T033 captures; if it reports PASS, the analyzer is broken and Sprint 1 judging stops until fixed (owner: codex)
+- [ ] T033 [US2] V-08: build variant `v2` (heavy job) and capture z = 0.5 / 0.25 and a zoom/pan sequence, driving V2 through its own `hyprvx:*` dispatchers (research R2: `KeybindManager.cpp:123-266`, zoom clamp [0.2, 1.5], centre-anchored) via a variant adapter in `tests/native/lib.sh`, since V2 has no `hyprvx-dev:*` control; in the same run-id also capture the V2 identity image and record the inputs for checks S1 (variant provenance) and S2 (camera applied, judged on captures) of test-tooling §6.1 (owner: codex)
+- [ ] T034 [US2] GATE-N (V-24): run the analyzer on the T033 captures, on the stock identity capture of GATE-A and on synthetic known-good fixtures; write a GATE-N report in the run's `summary.json` that evaluates S1, S2, P and N and classifies the outcome exactly per the decision table in test-tooling §6.1 (PASS / BLOCKED invalid setup / FAIL defective analyzer / BLOCKED V2 defect not reproduced). Claude performs check H (visual confirmation on the archived PNGs) during integration review; GATE-N is PASS only when S1, S2, P, N and H all hold. Any other outcome stops Sprint 1 patch judging, and an alternative negative control needs user approval (owner: codex)
 
 ### Implementation for User Story 2 (Claude lane; all hunks call `CameraMath`, Constitution IV)
 
@@ -172,7 +174,7 @@ proven on synthetic data; GATE-A PASS. Claude may write patches during this phas
 - [ ] T046 [P] V-02, V-04: clean rebuild twice from scratch dirs; same `patchset_id` and same test results (reproducibility levels input + test-result; binary sha256 reported as observed) (owner: codex)
 - [ ] T047 [P] V-22: audit harness logs and host state notes — no host `hyprctl`, plugin or config change during Sprint 1 runs; record in `checklists/verification.md` (owner: claude)
 - [ ] T048 V-20 preparation: assemble the Sprint 1 image set (paths and run-ids) in `specs/001-native-spatial-camera/checklists/verification.md` for human review; the user signs SC-005 (NOT AUTOMATABLE) (owner: claude)
-- [ ] T049 Update `checklists/verification.md` (V-01..V-15, V-20, V-22..V-25), `integration-log.md`, `.ai/CURRENT_STATE.md` and `.ai/NEXT_TASK.md` with artifact paths and honest statuses (owner: claude)
+- [ ] T049 Update `checklists/verification.md` (V-01..V-15, V-20, V-22..V-25), `integration-log.md`, `.ai/CURRENT_STATE.md` and `.ai/NEXT_TASK.md` with archive paths (`~/.local/share/hyprvx/evidence/<agent>/<run-id>/`), run-ids, `sha256sum -c` results and honest statuses (owner: claude)
 - [ ] T050 Validate `quickstart.md` steps 1–4 against the delivered scripts; correct documentation drift in `specs/001-native-spatial-camera/quickstart.md` (owner: claude)
 - [ ] T051 Constitution re-check of delivered Sprint 1 code against principles I–X; record exceptions in `plan.md` Complexity Tracking (owner: claude)
 - [ ] T052 Merge-readiness review: every Codex commit reviewed and re-verified, no file edited by both owners (`integration-log.md` ownership transfers), `git rev-parse dev == 15f75b0` (owner: claude)
@@ -193,7 +195,7 @@ Note: "Phase N" headings in this file are Spec Kit task phases; "master-plan Pha
 
 ### Tests for User Story 3
 
-- [ ] T054 [US3] Vendor `wlr-virtual-pointer-unstable-v1.xml` under `tools/vpointer/protocols/` and implement `tools/vpointer/` (`zwlr_virtual_pointer_v1`, absolute motion and buttons, connects only to the nested `WAYLAND_DISPLAY` given by `scripts/nested.sh`); non-gating, may start during Sprint 1 after T018 (owner: codex)
+- [ ] T054 [US3] Vendor `wlr-virtual-pointer-unstable-v1.xml` under `tools/vpointer/protocols/` and implement `tools/vpointer/` (`zwlr_virtual_pointer_v1`, absolute motion and buttons, connects only to the nested `WAYLAND_DISPLAY` given by `scripts/nested.sh`); starts only after T053 and user approval, like every Phase 2 task (owner: codex)
 - [ ] T055 [US3] Record the license of the vendored virtual-pointer protocol XML in `docs/THIRD_PARTY.md` (Constitution IX) before T054 is integrated, and bump `specs/001-native-spatial-camera/contracts/test-tooling.md` to v1.1 with the testclient `--popup`/`--subsurface` modes and the `hyprvx-vpointer` CLI before T056/T057 start (owner: claude)
 - [ ] T056 [P] [US3] Add an `xdg_popup` mode (`--popup` at a fixed parent-relative offset, popup logs its own JSONL events) and a `wl_subsurface` mode (`--subsurface` with distinct marker colors) to `tools/testclient/`, per `contracts/test-tooling.md` v1.1 from T055 (owner: codex)
 - [ ] T057 [P] [US3] Write `tests/native/t_pointer.sh`: z = 0.25 plus pan, ≥ 20 sampled points per camera state, `enter`/`motion` local = `surfaceLocal(S)` ± 1 (US3.1, V-16) (owner: codex)
@@ -257,7 +259,7 @@ Note: "Phase N" headings in this file are Spec Kit task phases; "master-plan Pha
 | T026 | T022, T023, T025, T013 |
 | T027–T032 | T020 (authoring); runs need patches |
 | T033 | T013, T027, T029 |
-| T034 GATE-N | T033, T019 |
+| T034 GATE-N | T033, T019, T022 (stock identity capture = positive control P) |
 | T035–T038 | T025 (series order 0001→0005) |
 | T039 | T021, T038 |
 | T040 | T022, T034, T039, T027–T032 |
@@ -267,7 +269,8 @@ Note: "Phase N" headings in this file are Spec Kit task phases; "master-plan Pha
 | T045 (informational) | T040, T043 |
 | T053 G1 | T044–T052 |
 | T056, T057 | T055 (contract v1.1) |
-| T054–T071 | T053 + user approval (T054 may start early, non-gating) |
+| T054–T071 | T053 + user approval (no exceptions) |
+| T054 | T055 (license recorded before integration), T018 |
 
 ### Parallel opportunities (two lanes)
 - **Claude lane**: T001 → T002 → T007 → T008 → T024 → T025 → T035 → T036 → T037 → T038 → T039 (authoring overlaps all

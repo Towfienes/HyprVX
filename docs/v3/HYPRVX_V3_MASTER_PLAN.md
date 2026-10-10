@@ -460,8 +460,12 @@ Effort là khoảng thô theo đơn vị *focused engineering-weeks*, độ tin 
 - **Hai lane** (mục O): Claude giữ contract, `CameraMath.hpp`, patch 0001–0005, debug, tích hợp. Codex giữ CMake,
   script build/provenance, harness, testclient, analyzer, kịch bản T-*, baseline và review độc lập.
 - **Checkpoint mới:** K0 (contract freeze: `transform-contract.md` v1.1, `test-tooling.md` v1.0), GATE-A (stock vs
-  stock ×3 pixel-identical, V-23), GATE-N (analyzer báo FAIL trên V2-as-is, V-24).
-- `tools/vpointer` **không gating** Sprint 1 (input thuộc Phase 2).
+  stock ×3 pixel-identical, V-23), GATE-N (V-24; chỉ PASS khi đủ 5 điều kiện S1 setup hợp lệ, S2 camera thực sự áp
+  dụng, P analyzer PASS trên ảnh tốt, N analyzer FAIL đúng loại lỗi trên V2-as-is, H xác nhận bằng mắt; bảng phân
+  loại analyzer hỏng / setup sai / V2 không tái hiện ở `contracts/test-tooling.md` §6.1).
+- `tools/vpointer` thuộc Phase 2 (T054), **không** làm trong Sprint 1 (sửa 2026-10-11 để tôn trọng cổng duyệt Phase 2).
+- Evidence: raw ở `~/.cache/hyprvx/<agent>/evidence/<run-id>/`, Claude import + `sha256sum -c` vào archive
+  `~/.local/share/hyprvx/evidence/<agent>/<run-id>/` trước khi tick task (`contracts/test-tooling.md` §8).
 - License: `CameraMath.hpp` mang `SPDX-License-Identifier: BSD-3-Clause` (DV3-10), nên patch 0001 không còn bị chặn.
 - Tái lập được báo cáo ở 3 mức tách biệt: input / test-result / binary (`contracts/test-tooling.md` §3).
 
@@ -476,7 +480,7 @@ Effort là khoảng thô theo đơn vị *focused engineering-weeks*, độ tin 
    - Chạy trong `systemd-run --user --scope -p MemoryMax=6G`.
 3. **Test infra trước claim** (viết song song với patch; schema trong `specs/001-native-spatial-camera/contracts/test-tooling.md`):
    - `tools/testclient` (C++, xdg_toplevel SHM): vẽ nền đặc, 4 marker màu ở góc, lưới 50 px; log JSON `enter/motion/button` surface-local.
-   - `tools/vpointer`: zwlr_virtual_pointer_v1, absolute motion.
+   - `tools/vpointer`: zwlr_virtual_pointer_v1, absolute motion. **Thuộc Phase 2 (T054), không làm trong Sprint 1.**
    - `tools/analyze_frame.py`: chạy `python -I`, đọc PNG (Pillow nếu có, nếu không thì PPM qua `grim -t ppm`), tìm bbox theo màu marker.
    - Harness: port `hyprvx_nested.py` + re-verify mỗi lệnh + `--binary` trỏ prefix.
 4. **Baseline bằng chứng:** build V2 patch as-is ⇒ chụp z = 0.5 / 0.25 ⇒ kỳ vọng thấy clip/stale (xác nhận U1). Lưu ảnh vào `evidence/`.
@@ -713,7 +717,8 @@ git clone --no-hardlinks --branch v3/001-native-spatial-camera \
     /home/towfienes/Projects/HyprVX /home/towfienes/Projects/HyprVX-v3-codex
 git -C /home/towfienes/Projects/HyprVX-v3-codex switch -c v3/001-codex
 git -C /home/towfienes/Projects/HyprVX-v3-codex remote set-url --push origin DISABLED
-mkdir -p ~/.cache/hyprvx/codex ~/.cache/hyprvx/claude ~/.cache/hyprvx/locks
+mkdir -p ~/.cache/hyprvx/codex ~/.cache/hyprvx/claude ~/.cache/hyprvx/locks \
+         ~/.local/share/hyprvx/evidence/claude ~/.local/share/hyprvx/evidence/codex
 touch ~/.cache/hyprvx/locks/heavy.lock
 
 # User tự khởi động Codex (không đổi config, auth hay model mặc định):
@@ -732,7 +737,9 @@ codex -C /home/towfienes/Projects/HyprVX-v3-codex -s workspace-write -a on-reque
 1. Codex commit nhỏ theo task trên `v3/001-codex` với trailer `Task:`, `Verify:`, `Result:`, `Evidence:`, `Not-run:`.
 2. Claude lấy commit **từ bên ngoài clone** và không bao giờ chạy lệnh git bên trong clone (tránh hook/config của
    clone): `git fetch /home/towfienes/Projects/HyprVX-v3-codex v3/001-codex:refs/codex/v3/001-codex`.
-3. Claude review diff (`git diff v3/001-native-spatial-camera...refs/codex/v3/001-codex`), chạy lại lệnh verify, rồi
+3. Claude review diff (`git diff v3/001-native-spatial-camera...refs/codex/v3/001-codex`), import evidence của
+   run-id trong trailer vào `~/.local/share/hyprvx/evidence/codex/<run-id>/` và chạy `sha256sum -c SHA256SUMS`
+   (thiếu file hoặc lệch checksum ⇒ từ chối handoff, kết quả coi là NOT RUN), chạy lại lệnh verify, rồi
    `git merge --no-ff refs/codex/v3/001-codex` vào `v3/001-native-spatial-camera`, tick `tasks.md`, ghi `integration-log.md`.
 4. Acceptance fail thì không merge. Codex lấy cập nhật bằng `git fetch origin` + `git merge` (không rebase/force).
 5. Phụ thuộc chưa xong: code theo contract đã freeze, không theo HEAD dở của bên kia; bị chặn thì ghi BLOCKED và

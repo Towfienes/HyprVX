@@ -341,3 +341,12 @@ Production safety: host Hyprland and Caelestia untouched; no plugin loaded; no p
   on scratch repos). Codex will use a separate `--no-hardlinks` clone with no access to the shared `.git`.
 - Next gate: user approval of `specs/001-native-spatial-camera/tasks.md` on branch `v3/001-native-spatial-camera`.
 - Build/compositor verification: NOT RUN (documentation and task generation only).
+
+## Pre-approval consistency fixes (2026-10-11)
+
+- Evidence handoff: raw evidence in `~/.cache/hyprvx/<agent>/evidence/<run-id>/`; Claude imports and verifies
+  (`sha256sum -c`) into the retained archive `~/.local/share/hyprvx/evidence/<agent>/<run-id>/` before ticking.
+- GATE-N: PASS only with S1/S2/P/N/H (`contracts/test-tooling.md` §6.1); analyzer defect, invalid setup and
+  unreproduced V2 defect are classified separately and never PASS.
+- `tools/vpointer` (T054) is fully inside the blocked Phase 2; no early start.
+- Build/compositor verification: NOT RUN.

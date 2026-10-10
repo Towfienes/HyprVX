@@ -59,7 +59,8 @@ core/include/hyprvx/core/CameraMath.hpp     # NEW header-only transform contract
 patches/hyprland/0001-*.patch … 000N-*.patch # NEW ordered series on efb5099
 scripts/fetch-hyprland.sh apply-patches.sh build-hyprland.sh nested.sh
 tools/testclient/  tools/vpointer/  tools/analyze_frame.py  tools/hyprvx_nested.py (ported + hardened)
-tests/native/       # L4/L5/L5b scenario scripts producing evidence/<run-id>/
+tests/native/       # L4/L5/L5b scenario scripts; raw evidence in ~/.cache/hyprvx/<agent>/evidence/<run-id>/,
+                    # committed index evidence/<run-id>/ (summary.json, SHA256SUMS); archive per test-tooling §8
 ```
 **Structure Decision**: Extend the V1 tree (Constitution VIII). Hyprland source lives outside the repo
 (`~/.cache/hyprvx/src`); only patches are versioned.
@@ -77,7 +78,7 @@ tests/native/       # L4/L5/L5b scenario scripts producing evidence/<run-id>/
      `noSimplify`, dim outside, scanout block); 0003 culling; 0004 damage; 0005 dev control.
    - Tests: T-ID, T-Z*, T-PAN, T-STALE, T-STALE-STATIC, T-OFF (`contracts/test-tooling.md`).
    - Gates before any patch is judged: GATE-A (stock vs stock ×3 pixel-identical) and GATE-N (the analyzer
-     detects the U1 artifacts in V2-as-is).
+     reliably detects the U1 artifacts in V2-as-is; decision rules S1/S2/P/N/H in `contracts/test-tooling.md` §6.1).
 3. **Phase 2, input proof + delivery spike**
    - Patches: 0006 hit-test (`windowAt` monitor by screen pos, `windowSurfaceAt`, `surfaceLocalAt`); 0007
      seat-local paths (fallback local, held-button, constraints, warps); 0008 decoration/corner hit selection

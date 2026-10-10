@@ -27,10 +27,11 @@ cmake --build build-v3 -j4; and ctest --test-dir build-v3 --output-on-failure
 
 # 4. Nested session (identity re-verified before every command)
 bash scripts/nested.sh start --variant patched --size 1280x800 --scale 1
-bash scripts/nested.sh run hyprvx-testclient --size 800x600 --log evidence/<run-id>/client.jsonl
+set E ~/.cache/hyprvx/$HYPRVX_AGENT/evidence/<run-id>      # raw evidence root (test-tooling §8)
+bash scripts/nested.sh run hyprvx-testclient --size 800x600 --log $E/client.jsonl
 bash scripts/nested.sh dev camera 0 0 0.25
-bash scripts/nested.sh capture evidence/<run-id>/z025.png    # after the frame-ready rule in test-tooling.md
-python -I tools/analyze_frame.py bbox evidence/<run-id>/z025.png --expect-box 0,0,200,150 --tolerance 2 --out evidence/<run-id>/z025.json
+bash scripts/nested.sh capture $E/z025.png                  # after the frame-ready rule in test-tooling.md
+python -I tools/analyze_frame.py bbox $E/z025.png --expect-box 0,0,200,150 --tolerance 2 --out $E/z025.json
 bash scripts/nested.sh dev panic
 bash scripts/nested.sh stop               # refuses unless PID/start-time/signature still match
 ```
@@ -40,5 +41,7 @@ bash scripts/nested.sh stop               # refuses unless PID/start-time/signat
   is not a private `/tmp/hvx-*`, or if the `SO_PEERCRED` PID or start time differ from the recorded nested
   compositor.
 - Never use `ydotool`/uinput. Pointer tests use `tools/vpointer` connected to the nested `WAYLAND_DISPLAY` only.
-- Evidence (images, JSONL, logs, `build-info.json`) is kept under `evidence/<run-id>/` and referenced from
+- Raw evidence (images, JSONL, logs, `build-info.json`) is written under `~/.cache/hyprvx/<agent>/evidence/<run-id>/`;
+  only `summary.json` and `SHA256SUMS` are committed under `evidence/<run-id>/`. Claude imports and verifies each run
+  into `~/.local/share/hyprvx/evidence/<agent>/<run-id>/` (inspect with `sha256sum -c SHA256SUMS`). Runs are referenced from
   `checklists/verification.md`.

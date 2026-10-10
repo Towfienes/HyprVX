@@ -1,6 +1,7 @@
 # Contract: Test Tooling, Evidence and Resource Locks (Feature 001)
 
-**Contract version**: 1.0 (2026-10-10; replan P5). Owner: Claude (contract). Implementers: see `tasks.md`.
+**Contract version**: 1.0 (2026-10-10; replan P5; revised 2026-10-11 before the K0 freeze: evidence handoff §8,
+GATE-N decision rules §6.1). Owner: Claude (contract). Implementers: see `tasks.md`.
 Changes require a version bump and an entry in `../integration-log.md`. Consumers code against this contract,
 never against another agent's unfinished branch.
 
@@ -15,7 +16,9 @@ PASS unconditionally, and a dispatcher reply is never a pass condition.
 | `~/.cache/hyprvx/<agent>/build/`, `prefix/<patchset-id>/` | Build trees and install prefixes | that agent only |
 | `~/.cache/hyprvx/<agent>/ccache/`, `tools/` | ccache, locally built `hyprwayland-scanner` v0.4.6 | that agent only |
 | `~/.cache/hyprvx/locks/heavy.lock` | Heavy-job lock file, created once by Claude | opened read-only by all |
-| `evidence/<run-id>/` (in each repo checkout) | Run artifacts | the running agent |
+| `~/.cache/hyprvx/<agent>/evidence/<run-id>/` | **Raw evidence** (captures, logs, analyzer JSON, `build-info.json` copy, `summary.json`, `SHA256SUMS`) | that agent only; readable by Claude and the user |
+| `~/.local/share/hyprvx/evidence/<agent>/<run-id>/` | **Retained archive**, imported and checksum-verified by Claude (§8); files read-only; never deleted by any tool | Claude only |
+| `evidence/<run-id>/` (in each repo checkout) | **Committed index**: `summary.json` and `SHA256SUMS` only | the running agent |
 
 `<agent>` ∈ {`claude`, `codex`} from `HYPRVX_AGENT` (scripts refuse to run when it is unset). Agents never share a
 source tree, build tree, prefix or ccache, so neither can alter the other's binaries. `run-id` is
@@ -115,8 +118,37 @@ Output JSON:
  "diff": null, "reasons": []}
 ```
 Exit codes: 0 PASS, 1 FAIL, 2 BLOCKED (unreadable input or bad arguments). The analyzer has its own tests on
-synthetic images with known answers. **GATE-N**: on V2-as-is captures (U1) it must report FAIL; otherwise the
-analyzer is considered broken.
+synthetic images with known answers. Every FAIL lists machine-readable `reasons` (`marker_missing:<corner>`,
+`bbox_mismatch`, `scale_mismatch`, `displacement_mismatch`, `pixels_differ`).
+
+### 6.1 GATE-N decision rules (V-24)
+
+GATE-N proves that the analyzer can detect the defect class Sprint 1 must catch. The V2-as-is run (V-08) records,
+in one run-id and with the same scene and nested config:
+- **S1 setup validity**: `build-info.json` shows variant `v2` and `patchset_id` = the hash of
+  `research/v2-drift-mvp/*.patch`; all ready signals arrived (no BLOCKED timeout).
+- **S2 camera applied**: the non-identity V2 capture differs from the V2 identity capture by `diff`, and the window
+  border box changed position or size as the V2 camera predicts (research R2: decorations do transform in V2).
+  This is judged on captures, never on a dispatcher reply.
+- **P positive control**: the analyzer reports PASS on the stock identity capture of the same scene (from GATE-A)
+  and on the synthetic known-good fixtures.
+- **N detection**: the analyzer reports FAIL on the V2 non-identity captures with at least one reason in the
+  expected class (`marker_missing`, `bbox_mismatch`, `scale_mismatch` for RC1 clipping; `pixels_differ` against the
+  full-damage frame for RC2 stale regions).
+- **H visual confirmation**: Claude inspects the same archived PNGs (and the user may, at V-20) and confirms that a
+  clip or stale artifact is visible where the analyzer reports it.
+
+| Observation | GATE-N result | Classification | Action |
+|---|---|---|---|
+| S1, S2, P, N and H all hold | **PASS** | Negative control detected reliably | Patch judging may proceed (with GATE-A) |
+| S1 or S2 fails, or a ready signal timed out | **BLOCKED** | Invalid test setup | Fix build/adapter/harness, rerun; the analyzer is not judged |
+| S1, S2 hold; P fails (analyzer also fails good images) | **FAIL** | Defective analyzer (over-reports) | Fix analyzer, add the images as regression fixtures, rerun |
+| S1, S2, P hold; analyzer PASS on V2 but H shows a visible artifact | **FAIL** | Defective analyzer (misses defects) | Fix analyzer, add the images as regression fixtures, rerun |
+| S1, S2, P hold; N holds but H finds no artifact at the reported place | **FAIL** | Defective analyzer (wrong reason) | Fix analyzer, rerun |
+| S1, S2, P hold; analyzer PASS on V2 and H confirms no visible artifact | **BLOCKED** | V2 defect not reproduced in this scene (U1 unconfirmed) | Record as a research finding against RC1/RC2; try the documented V2 failure scenes (zoom 0.25, pan sequence); if still not reproduced, stop and ask the user to approve an alternative negative control |
+
+GATE-N is never marked PASS without S1, S2, P, N and H. An alternative negative control (for example a
+deliberately broken build) requires user approval and its own entry in `checklists/verification.md`.
 
 ## 7. `scripts/nested.sh`
 
@@ -136,12 +168,32 @@ Failed verification ⇒ exit 3 and nothing sent.
 
 Exit codes: 0 ok, 1 command failed, 2 usage, 3 identity verification failed. Logs are kept after `stop`.
 
-## 8. Evidence layout and Git policy
+## 8. Evidence layout, handoff and retention
 
-`evidence/<run-id>/` holds `build-info.json` (copy), `session.json`, captures, analyzer JSON, client JSONL,
-`summary.json` and `SHA256SUMS`. Only `summary.json` and `SHA256SUMS` are committed; images and logs stay local
-and are never deleted by tools. `checklists/verification.md` references run-ids, and Claude re-runs any check
-before ticking it.
+**Write.** Tests write raw evidence to `~/.cache/hyprvx/$HYPRVX_AGENT/evidence/<run-id>/`: `build-info.json`
+(copy), `session.json`, captures, analyzer JSON, client JSONL, logs, `summary.json`, and last `SHA256SUMS`
+(`sha256sum` format, relative names, covering every other file in the directory). The same `summary.json` and
+`SHA256SUMS` are copied to the repo index `evidence/<run-id>/` and committed. Raw files are never committed and
+never deleted by tools.
+
+**Commit trailer.** `Evidence:` names the run-id and the raw directory, for example
+`Evidence: 20261012-141500-stock-1a2b3c4 ~/.cache/hyprvx/codex/evidence/20261012-141500-stock-1a2b3c4/`.
+A trailer may only reference a run whose raw directory exists on this machine and whose committed `SHA256SUMS`
+verifies. Results without such evidence are reported as NOT RUN, never PASS.
+
+**Import (Claude, at every integration).** Before ticking a task:
+1. Confirm `evidence/<run-id>/SHA256SUMS` in the reviewed commit is byte-identical to the one in the raw directory.
+2. Copy the raw directory to `~/.local/share/hyprvx/evidence/<agent>/<run-id>/` (`cp -a`), make the copy read-only
+   (`chmod -R a-w`), and run `sha256sum -c SHA256SUMS` inside the copy.
+3. Record run-id, archive path and the `sha256sum -c` result in `../integration-log.md`.
+Any missing file or checksum mismatch rejects the handoff: the task is not ticked and its result is NOT RUN until a
+new run is handed off. Claude's own runs are archived the same way.
+
+**Inspect (user).** `cd ~/.local/share/hyprvx/evidence/<agent>/<run-id>/ && sha256sum -c SHA256SUMS`, then open
+the PNGs and read `summary.json`. `checklists/verification.md` cites the archive path and run-id for every PASS.
+
+**Retain.** The archive is outside both repos and outside the agent caches, so deleting the Codex clone or a cache
+does not lose evidence. Nothing deletes it automatically; pruning is the user's decision.
 
 `summary.json`:
 ```json

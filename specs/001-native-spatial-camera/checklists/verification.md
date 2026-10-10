@@ -1,6 +1,8 @@
 # Verification Checklist: Feature 001 — Native Spatial Camera
 
-Status legend: PASS / FAIL / BLOCKED / NOT RUN / NOT AUTOMATABLE. **Every PASS needs an artifact path.**
+Status legend: PASS / FAIL / BLOCKED / NOT RUN / NOT AUTOMATABLE. **Every PASS needs an artifact path** in the
+retained archive `~/.local/share/hyprvx/evidence/<agent>/<run-id>/` whose `SHA256SUMS` verified at import
+(`contracts/test-tooling.md` §8).
 A dispatcher `ok` is never an artifact.
 
 | ID | Level | Check | Status | Artifact |
@@ -29,5 +31,5 @@ A dispatcher `ok` is never an artifact.
 | V-21 | — | Delivery spike report (hooks vs patch) written | NOT RUN | `delivery-decision.md` |
 | V-22 | — | Host untouched: no host hyprctl/plugin/config change during the run | NOT RUN | harness audit log |
 | V-23 | L5 | GATE-A: stock vs stock ×3 pixel-identical with the shared nested config (precondition for V-09) | NOT RUN | |
-| V-24 | L5 | GATE-N: analyzer reports FAIL on the V2-as-is captures of V-08 (negative control) | NOT RUN | |
+| V-24 | L5 | GATE-N per `contracts/test-tooling.md` §6.1: setup valid (S1), camera applied (S2), analyzer PASS on stock and good fixtures (P), analyzer FAIL with expected reasons on V2-as-is (N), artifact visually confirmed (H). Any other outcome is FAIL or BLOCKED with its classification, never PASS | NOT RUN | |
 | V-25 | L2 | V1 equivalence: `Camera` (M = 0) equals `CameraMath` forward/inverse; existing camera tests unchanged | NOT RUN | |
