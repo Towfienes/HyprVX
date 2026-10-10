@@ -1,0 +1,4 @@
+{"run_id": "20261011-021447-stock-256676c", "test": "T014 V-01/V-03 stock build", "result": "NOT RUN", "agent": "claude", "git_sha": "256676c",
+ "reason": "stopped by Claude at the user's pause request after configure succeeded (glaze offline OK) and compile reached 698/953; no binary, no build-info.json",
+ "checks": {"fetch": "PASS (Hyprland efb5099 + submodules, glaze b518eec)", "scanner": "PASS (v0.4.6)", "configure": "PASS", "compile": "interrupted at 698/953"},
+ "artifacts": ["preflight.log", "fetch.log", "scanner.log", "build.log"], "not_run": ["install", "build-info.json", "binary_sha256"]}
