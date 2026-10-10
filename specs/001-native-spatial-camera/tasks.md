@@ -104,13 +104,13 @@ proven on synthetic data; GATE-A PASS. Claude may write patches during this phas
 
 ### Tests for User Story 1 (written before patches are judged)
 
-- [ ] T023 [US1] Write `tests/native/t_id.sh`: stock vs patched identity, same scene and config, `diff` with `--max-pixels 0`, three repetitions; records `hyprvx-dev:state` `passElementsAdded` as a supplementary diagnostic artifact only. US1.2 evidence is this pixel identity plus the independent source verification of the FR-002 identity early return in T044 (a dispatcher readout is never a pass condition, Constitution II) (owner: claude)
+- [X] T023 [US1] Write `tests/native/t_id.sh`: stock vs patched identity, same scene and config, `diff` with `--max-pixels 0`, three repetitions; records `hyprvx-dev:state` `passElementsAdded` as a supplementary diagnostic artifact only. US1.2 evidence is this pixel identity plus the independent source verification of the FR-002 identity early return in T044 (a dispatcher readout is never a pass condition, Constitution II) (owner: claude)
 
 ### Implementation for User Story 1
 
 - [X] T024 [US1] Prepare the Claude upstream worktree `~/.cache/hyprvx/claude/src/hyprland-efb5099/v3-dev` with `scripts/fetch-hyprland.sh` (manual clone of the same commit is acceptable for drafting; the scripted fetch is used for every judged build) (owner: claude)
-- [ ] T025 [US1] Author `patches/hyprland/0001-*.patch`: vendor `CameraMath.hpp` unchanged, add per-monitor camera state (`origin`, `zoom`, `revision` per `data-model.md`: origin finite; zoom finite and `z_min ≤ z ≤ z_max` (MVP 0.1 … 2.0); revision incremented on every change), default `identityFor(M)`, no render change (owner: claude)
-- [ ] T026 [US1] V-09: build `patched` (heavy job, Claude cache) and run `tests/native/t_id.sh` ×3 against the stock build of T014; record evidence; T-ID FAIL is a stop condition (owner: claude)
+- [X] T025 [US1] Author `patches/hyprland/0001-*.patch`: vendor `CameraMath.hpp` unchanged, add per-monitor camera state (`origin`, `zoom`, `revision` per `data-model.md`: origin finite; zoom finite and `z_min ≤ z ≤ z_max` (MVP 0.1 … 2.0); revision incremented on every change), default `identityFor(M)`, no render change (owner: claude)
+- [X] T026 [US1] V-09: build `patched` (heavy job, Claude cache) and run `tests/native/t_id.sh` ×3 against the stock build of T014; record evidence; T-ID FAIL is a stop condition (owner: claude)
 
 **Checkpoint**: identity path proven for the current series head. T-ID is re-run after every later patch (T040).
 
@@ -137,10 +137,10 @@ proven on synthetic data; GATE-A PASS. Claude may write patches during this phas
 
 ### Implementation for User Story 2 (Claude lane; all hunks call `CameraMath`, Constitution IV)
 
-- [ ] T035 [US2] Author `patches/hyprland/0002-*.patch` render seam: hint at `RENDER_PRE_WINDOWS` composed with any existing geometry modifier, reset before `RENDER_POST_WINDOWS`; no hint and no `noSimplify` when identity (FR-002); `drawSurface` clip, `visibleRegion` and `clipBox` via `forwardBox` (RC1); `noSimplify` while non-identity (RC2); special-workspace dim rect outside the hint; corner radius × z; direct scanout / solitary blocked while non-identity (likely not exercised by the nested Wayland backend; record as NOT AUTOMATABLE (nested) with source evidence at the gate) (owner: claude)
-- [ ] T036 [US2] Author `patches/hyprland/0003-*.patch` culling: `shouldRenderWindow` / `visibleOnMonitor` use `visibleWorldRect ∩ W(w)` (FR-006; window outside the monitor's logical rect but inside the visible world rect is rendered) (owner: claude)
-- [ ] T037 [US2] Author `patches/hyprland/0004-*.patch` damage: `damageSurface` / `damageWindow` / `damageBox` / `damageRegion` for window-owned content via `cammath::damageBox` (decorations included); camera change damages the whole output; layer popups/subsurfaces never transformed (FR-005) (owner: claude)
-- [ ] T038 [US2] Author `patches/hyprland/0005-*.patch` dev control exactly as `contracts/dev-control.md` (`camera`, `camera-mon`, `panic`, `state`, `full-damage`), compiled only with `HYPRVX_DEV`, validation through `cammath::validate` (FR-008, FR-009) (owner: claude)
+- [X] T035 [US2] Author `patches/hyprland/0002-*.patch` render seam: hint at `RENDER_PRE_WINDOWS` composed with any existing geometry modifier, reset before `RENDER_POST_WINDOWS`; no hint and no `noSimplify` when identity (FR-002); `drawSurface` clip, `visibleRegion` and `clipBox` via `forwardBox` (RC1); `noSimplify` while non-identity (RC2); special-workspace dim rect outside the hint; corner radius × z; direct scanout / solitary blocked while non-identity (likely not exercised by the nested Wayland backend; record as NOT AUTOMATABLE (nested) with source evidence at the gate) (owner: claude)
+- [X] T036 [US2] Author `patches/hyprland/0003-*.patch` culling: `shouldRenderWindow` / `visibleOnMonitor` use `visibleWorldRect ∩ W(w)` (FR-006; window outside the monitor's logical rect but inside the visible world rect is rendered) (owner: claude)
+- [X] T037 [US2] Author `patches/hyprland/0004-*.patch` damage: `damageSurface` / `damageWindow` / `damageBox` / `damageRegion` for window-owned content via `cammath::damageBox` (decorations included); camera change damages the whole output; layer popups/subsurfaces never transformed (FR-005) (owner: claude)
+- [X] T038 [US2] Author `patches/hyprland/0005-*.patch` dev control exactly as `contracts/dev-control.md` (`camera`, `camera-mon`, `panic`, `state`, `full-damage`), compiled only with `HYPRVX_DEV`, validation through `cammath::validate` (FR-008, FR-009) (owner: claude)
 - [X] T039 [US2] Run `scripts/check-single-transform.sh` on the series; fix every finding in the patches (owner: claude)
 - [ ] T040 [US2] Build `patched` (0001–0005), run `tests/native/run_sprint1.sh` after GATE-A (T022) and GATE-N (T034) pass; debug and fix in the patches until V-09, V-10, V-11, V-12, V-12b, V-14, V-15 PASS or a stop condition is reached; log each run (owner: claude)
 

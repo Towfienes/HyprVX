@@ -15,7 +15,7 @@ A dispatcher `ok` is never an artifact.
 | V-06 | L2 | CameraMath invariants 1–6 (≥ 10⁴ random cases) | NOT RUN | |
 | V-07 | L4 | Harness refuses a host-like target (negative test: wrong PID / signature / runtime dir) | NOT RUN | |
 | V-08 | L5 | U1: V2-as-is shows clip/stale artifacts (confirms RC1/RC2) | NOT RUN | |
-| V-09 | L5 | T-ID: patched identity vs stock pixel-identical (×3) | NOT RUN | |
+| V-09 | L5 | T-ID: patched identity vs stock pixel-identical (×3) | PASS | `~/.local/share/hyprvx/evidence/claude/20261011-031143-patched-1531f90/` (stock vs patched x3, diff 0 px; all 6 captures sha256 6d7f6bd6…) |
 | V-10 | L5 | T-Z025 / T-Z05 / T-Z2 ± 2 px, 4 markers | NOT RUN | |
 | V-11 | L5 | T-PAN displacement ± 2 px | NOT RUN | |
 | V-12 | L5 | T-STALE 50 states, 0 mismatches | NOT RUN | |
