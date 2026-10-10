@@ -1,0 +1,4 @@
+{"run_id": "20261011-013513-psi-1f57245", "test": "T014 blocker diagnosis: PSI trigger write terminator", "result": "PASS", "agent": "claude",
+ "git_sha": "1f5724531b7a0666f4fa5e7b9c3d238661567a0b",
+ "finding": "kernel psi_write() sets the last byte of the written buffer to NUL; build-hyprland.sh writes b'full 100000 2000000' without a terminator, so the kernel parses window 200000 us (< 500 ms minimum, and not a multiple of 2 s required for unprivileged triggers) and returns EINVAL. Writing with a trailing NUL or newline registers the trigger.",
+ "artifacts": ["psi_repro.py", "psi_repro.out", "host.txt"], "not_run": ["build (Codex T014)"]}
