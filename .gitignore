@@ -1,4 +1,5 @@
 build/
+build-v3/
 cmake-build-*/
 .cache/
 *.log
@@ -10,3 +11,8 @@ compile_commands.json
 
 benchmarks/local/
 local/
+
+# Raw evidence stays in the agent cache; only its index is committed.
+evidence/*/*
+!evidence/*/summary.json
+!evidence/*/SHA256SUMS
