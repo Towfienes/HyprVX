@@ -1,0 +1,1 @@
+{"run_id": "20261011-030107-tooling-6c3606f-t017", "test": "T017 V-07 identity refusal", "result": "PASS", "agent": "claude", "git_sha": "6c3606f3d5c890a932fbbddebca1559c137fd87d", "artifacts": ["test_identity_refusal.log"], "not_run": []}

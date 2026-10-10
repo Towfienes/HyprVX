@@ -1,0 +1,28 @@
+{
+ "run_id": "20261011-030052-stock-6c3606f-smoke",
+ "test": "T015/T016/T018 live smoke: nested stock start, testclient, sync/frame_done, capture, stop",
+ "result": "PASS",
+ "agent": "claude",
+ "git_sha": "6c3606f3d5c890a932fbbddebca1559c137fd87d",
+ "checks": {
+  "start_verified": "identity verified (SO_PEERCRED, start time, exe, signature != host, private runtime dir)",
+  "testclient": "configure 800x600, commit/frame_done seq 1-2, sync frame_done",
+  "capture": "1280x800 from headless HVX-1, bbox exactly 140,100,800,600, no notifications",
+  "stop": "compositor exited, logs kept, runtime dir removed, heavy lock released",
+  "status_after_stop": "exit 3 (no session)"
+ },
+ "artifacts": [
+  "hyprland.conf",
+  "launcher.log",
+  "monitors.json",
+  "session.json",
+  "smoke1-host-sized-with-notifications.png",
+  "smoke4-bbox.json",
+  "smoke4-client.jsonl",
+  "smoke4-headless-clean.png",
+  "status-after-stop.txt"
+ ],
+ "not_run": [
+  "patched and v2 sessions (later tasks)"
+ ]
+}
