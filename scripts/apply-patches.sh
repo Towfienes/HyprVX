@@ -8,11 +8,13 @@ case ${HYPRVX_AGENT:-} in
 esac
 variant=patched
 dry_run=false
+reset=false
 while [[ $# -gt 0 ]]; do
     case $1 in
         --variant) [[ $# -ge 2 ]] || exit 2; variant=$2; shift 2 ;;
         --dry-run) dry_run=true; shift ;;
-        *) echo 'Usage: apply-patches.sh [--variant stock|v2|patched] [--dry-run]' >&2; exit 2 ;;
+        --reset) reset=true; shift ;;
+        *) echo 'Usage: apply-patches.sh [--variant stock|v2|patched] [--reset] [--dry-run]' >&2; exit 2 ;;
     esac
 done
 readonly repo="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -36,6 +38,22 @@ run() {
     if "$dry_run"; then printf 'DRY RUN:'; printf ' %q' "$@"; printf '\n'; else "$@"; fi
 }
 
+# --reset re-applies a changed series: the agent's own variant worktree goes back to the pin (it must have no
+# uncommitted changes) and its variant branch is dropped; every dropped commit is reproducible from the patch files.
+if "$reset" && [[ $variant != stock ]]; then
+    if ! "$dry_run"; then
+        [[ ! -L "$worktree" && -e "$worktree/.git" &&
+           $(git -C "$worktree" rev-parse --path-format=absolute --git-common-dir) == "$src/.git" &&
+           -z $(git -C "$worktree" status --porcelain) ]] || {
+            echo 'BLOCKED: reset needs a clean worktree of this agent clone.' >&2; exit 1;
+        }
+        git -C "$worktree" merge-base --is-ancestor "$pin" HEAD || { echo 'BLOCKED: worktree is not based on the pin.' >&2; exit 1; }
+    fi
+    run git -C "$worktree" checkout -q --detach "$pin"
+    if "$dry_run" || git -C "$worktree" show-ref -q --verify "refs/heads/hyprvx/0.56.2-$variant"; then
+        run git -C "$worktree" branch -D "hyprvx/0.56.2-$variant"
+    fi
+fi
 if ! "$dry_run"; then
     [[ ! -L "$worktree" && -e "$worktree/.git" ]] || {
         echo 'BLOCKED: fetch the agent worktrees first.' >&2; exit 1;

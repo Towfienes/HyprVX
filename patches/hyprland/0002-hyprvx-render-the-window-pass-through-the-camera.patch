@@ -20,6 +20,10 @@ Patch 0002 of the HyprVX V3 series (Feature 001, Sprint 1).
   with the camera. SRenderModifData gains a hyprvxCamera flag so the
   stock path (including stock geometry modifiers) is unchanged.
 - RC2: pass simplification is disabled while a camera applies.
+- Borders: renderBorder skips the drawn (modified) window interior under
+  the camera hint instead of the logical one; otherwise the border
+  disappears where it overlaps the untransformed window box (found by
+  the first native zoom run, T040).
 - No solitary client and no direct scanout while the camera is not
   identity (reported as SC_TRANSFORM / DS_BLOCK_TRANSFORM).
 
@@ -29,9 +33,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  src/hyprvx/SceneCamera.hpp     | 18 ++++++++++++++++++
  src/output/Monitor.cpp         | 14 ++++++++++++++
  src/render/ElementRenderer.cpp | 22 ++++++++++++++++++----
+ src/render/OpenGL.cpp          | 12 ++++++++++--
  src/render/Renderer.cpp        | 27 +++++++++++++++++++++++++++
  src/render/types.hpp           |  2 ++
- 6 files changed, 113 insertions(+), 4 deletions(-)
+ 7 files changed, 123 insertions(+), 6 deletions(-)
  create mode 100644 src/hyprvx/SceneCamera.cpp
  create mode 100644 src/hyprvx/SceneCamera.hpp
 
@@ -206,6 +211,36 @@ index 50b5a797..fd00570e 100644
      g_pHyprRenderer->pushMonitorTransformEnabled(element->m_data.flipEndFrame);
      m_renderData.currentWindow = element->m_data.pWindow;
  
+diff --git a/src/render/OpenGL.cpp b/src/render/OpenGL.cpp
+index baee1ad2..6be49cf2 100644
+--- a/src/render/OpenGL.cpp
++++ b/src/render/OpenGL.cpp
+@@ -2226,7 +2226,11 @@ void CHyprOpenGLImpl::renderBorder(const CBox& box, const Config::CGradientValue
+     // calculate the border's region, which we need to render over. No need to run the shader on
+     // things outside there
+     CRegion borderRegion = g_pHyprRenderer->m_renderData.damage.copy().intersect(newBox);
+-    borderRegion.subtract(box.copy().expand(-scaledBorderSize - round));
++    // HyprVX: the interior to skip is the drawn (modified) window box under the camera hint, not the logical one
++    CBox interior = box;
++    if UNLIKELY (m_renderData.renderModif.enabled && m_renderData.renderModif.hyprvxCamera)
++        m_renderData.renderModif.applyToBox(interior);
++    borderRegion.subtract(interior.expand(-scaledBorderSize - round));
+ 
+     if (g_pHyprRenderer->m_renderData.clipBox.width != 0 && g_pHyprRenderer->m_renderData.clipBox.height != 0)
+         borderRegion.intersect(g_pHyprRenderer->m_renderData.clipBox);
+@@ -2314,7 +2318,11 @@ void CHyprOpenGLImpl::renderBorder(const CBox& box, const Config::CGradientValue
+     // calculate the border's region, which we need to render over. No need to run the shader on
+     // things outside there
+     CRegion borderRegion = g_pHyprRenderer->m_renderData.damage.copy().intersect(newBox);
+-    borderRegion.subtract(box.copy().expand(-scaledBorderSize - round));
++    // HyprVX: the interior to skip is the drawn (modified) window box under the camera hint, not the logical one
++    CBox interior = box;
++    if UNLIKELY (m_renderData.renderModif.enabled && m_renderData.renderModif.hyprvxCamera)
++        m_renderData.renderModif.applyToBox(interior);
++    borderRegion.subtract(interior.expand(-scaledBorderSize - round));
+ 
+     if (g_pHyprRenderer->m_renderData.clipBox.width != 0 && g_pHyprRenderer->m_renderData.clipBox.height != 0)
+         borderRegion.intersect(g_pHyprRenderer->m_renderData.clipBox);
 diff --git a/src/render/Renderer.cpp b/src/render/Renderer.cpp
 index 249f0843..b1492d70 100644
 --- a/src/render/Renderer.cpp

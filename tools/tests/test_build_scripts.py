@@ -294,8 +294,26 @@ class VersionProvenanceTest(unittest.TestCase):
             build.check_version_provenance(self.HEADER.replace("clean-upstream", "clean"), head, "clean-upstream")
 
 
+class ApplyResetTest(unittest.TestCase):
+    def test_reset_dry_run_detaches_to_pin_and_drops_the_variant_branch(self):
+        result = subprocess.run(["bash", str(SCRIPT), "--variant", "patched", "--reset", "--dry-run"],
+                                env=os.environ | {"HYPRVX_AGENT": "claude"}, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("checkout -q --detach efb50993780079460b0cbed1363e2166a2de1d9f", result.stdout)
+        self.assertIn("branch -D hyprvx/0.56.2-patched", result.stdout)
+        self.assertLess(result.stdout.index("branch -D"), result.stdout.index(" am -- "))
+
+    def test_reset_never_applies_to_stock(self):
+        result = subprocess.run(["bash", str(SCRIPT), "--variant", "stock", "--reset", "--dry-run"],
+                                env=os.environ | {"HYPRVX_AGENT": "claude"}, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("branch -D", result.stdout)
+
+
 def load_tests(loader, tests, pattern):
     suite = loader.loadTestsFromTestCase(BuildScriptTest)
+    if SCRIPT.name == "apply-patches.sh":
+        suite.addTests(loader.loadTestsFromTestCase(ApplyResetTest))
     if SCRIPT.name == "build-hyprland.sh":
         suite.addTests(loader.loadTestsFromTestCase(PsiTriggerTest))
         suite.addTests(loader.loadTestsFromTestCase(PsiWatchdogTest))
