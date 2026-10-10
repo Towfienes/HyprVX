@@ -147,7 +147,7 @@ def main(repo, variant, dry_run):
                  "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache", "-DCMAKE_C_COMPILER_LAUNCHER=ccache",
                  "-DCMAKE_DISABLE_FIND_PACKAGE_Git=TRUE"]
     if variant == "patched":
-        configure.append("-DCMAKE_CXX_FLAGS=-DHYPRVX_DEV=1")
+        configure.append("-DHYPRVX_DEV=ON")
     commands = [configure, ["cmake", "--build", str(build), "-j4"], ["cmake", "--install", str(build)]]
     unit = "hyprvx-build-" + agent + "-" + uuid.uuid4().hex + ".scope"
     scope = ["systemd-run", "--user", "--scope", "--unit=" + unit, "-p", "MemoryMax=6G", "--",

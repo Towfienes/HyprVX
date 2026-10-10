@@ -36,18 +36,28 @@ class BuildScriptTest(unittest.TestCase):
                 stub = root / tool
                 stub.write_text(f"#!/bin/sh\nprintf called >> '{marker}'\nexit 97\n")
                 stub.chmod(0o700)
-            result = subprocess.run(
-                ["bash", str(SCRIPT), *DRY_RUN_ARGS, "--dry-run"],
-                env=os.environ | {"HYPRVX_AGENT": "codex", "PATH": f"{root}:{os.defpath}"},
-                capture_output=True, text=True,
-            )
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("DRY RUN:", result.stdout)
-            self.assertFalse(marker.exists(), result.stdout)
-            if SCRIPT.name == "apply-patches.sh":
-                self.assertIn("patchset_id=bc05d46c42b0", result.stdout)
-                self.assertNotIn("PROVENANCE.md", result.stdout)
-                self.assertNotIn("SHA256SUMS", result.stdout)
+            variants = ("stock", "v2", "patched") if SCRIPT.name == "build-hyprland.sh" else (None,)
+            for variant in variants:
+                with self.subTest(variant=variant):
+                    args = ["--variant", variant] if variant else DRY_RUN_ARGS
+                    result = subprocess.run(
+                        ["bash", str(SCRIPT), *args, "--dry-run"],
+                        env=os.environ | {"HYPRVX_AGENT": "codex", "PATH": f"{root}:{os.defpath}"},
+                        capture_output=True, text=True,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertIn("DRY RUN:", result.stdout)
+                    self.assertFalse(marker.exists(), result.stdout)
+                    if variant:
+                        if variant == "patched":
+                            self.assertIn("-DHYPRVX_DEV=ON", result.stdout)
+                        else:
+                            self.assertNotIn("HYPRVX_DEV", result.stdout)
+                        self.assertNotIn("-DCMAKE_CXX_FLAGS=", result.stdout)
+                    if SCRIPT.name == "apply-patches.sh":
+                        self.assertIn("patchset_id=bc05d46c42b0", result.stdout)
+                        self.assertNotIn("PROVENANCE.md", result.stdout)
+                        self.assertNotIn("SHA256SUMS", result.stdout)
 
     @unittest.skipUnless(SCRIPT.name == "build-hyprland.sh", "Hyprland resource guard only")
     def test_low_memory_stops_before_lock_or_build(self):
