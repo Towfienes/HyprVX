@@ -300,3 +300,33 @@ agreement. Physical input was wired through the existing adapters, but live
 pointer/keyboard injection was not part of the safe nested smoke. Continue
 development only in the simulator and nested compositor until those gaps are
 resolved.
+
+
+## V3 planning baseline (2026-10-10, worktree HyprVX-v3, branch v3/spec-foundation)
+
+Architecture approved by the user. **No implementation has started.**
+
+Done in the planning session (documentation only):
+- Read-only audit of V1 (`dev@15f75b0`), V2 (`v2/drift-mvp@31086d7`, nested `14d1232`) and upstream Hyprland
+  `efb5099`, with file:line evidence in `specs/001-native-spatial-camera/research.md`.
+- V2 visual failure root causes identified from source: RC1 (surface scissor uses an untransformed box) and
+  RC2 (pass simplify uses untransformed bounds). The "renderModif overwritten" hypothesis is refuted for the
+  default path.
+- V1 "298/298 PASS" came from stale binaries. `build/CMakeCache.txt` points at the deleted `/tmp/hyprland-src`.
+  No V1 test measures compositor behavior.
+- V1 Phase 4 patch and V2 patch copied to `research/` with matching SHA-256.
+- Spec Kit initialised; constitution v1.0.0; feature 001 spec/plan/research/data-model/contracts/quickstart/checklist.
+- Master plan: `docs/v3/HYPRVX_V3_MASTER_PLAN.md`.
+
+Not run in this session: any build, any test, any nested or host compositor command (status NOT RUN).
+
+Production safety: host Hyprland and Caelestia untouched; no plugin loaded; no package changes.
+
+## GitHub handoff (2026-10-10)
+
+- Publication target: private repository `https://github.com/Towfienes/HyprVX`, branch `v3/spec-foundation`.
+- Local worktree remains `HyprVX-v3`; repository naming does not change its path.
+- V3 planning documents, Spec Kit skills and read-only research references are included in the handoff.
+- `CLAUDE.md` directs Claude Code to the shared agent instructions and current feature.
+- Gitleaks found no secrets in the working tree or the 27 existing commits on this branch.
+- Build/compositor verification: NOT RUN; this milestone changes documentation and Git publication only.

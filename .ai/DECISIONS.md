@@ -181,3 +181,65 @@ apart from projected World geometry. The installed window-transformer API
 does not provide matching inverse input hit testing and excludes popups;
 enabling native content translation is therefore refused. Compositor zoom is
 deferred. No compositor model mutation or ownership echo is introduced.
+
+## V3 decisions (2026-10-10) — see docs/v3/HYPRVX_V3_MASTER_PLAN.md §J
+
+### DV3-01 - Hybrid: patch the mechanism, plugin the policy
+
+Status: accepted (user)
+
+A narrow, ordered Hyprland patch series on pinned v0.56.2 (`efb5099`) provides the view-transform seams:
+render clip, pass simplification, culling, damage, hit-test, seat-local coordinates, drag and popups.
+Policy (mode, gestures, offsets, snap, persistence) lives in a plugin controller that reuses `hyprvx_core`.
+The production delivery mechanism (plugin hooks on stock Hyprland vs a side-by-side patched build) is decided
+at the Phase 2 spike gate. Supersedes the D009 deferral for V3.
+
+### DV3-02 - V3 lives in a separate linked worktree
+
+Status: accepted (user)
+
+`/home/towfienes/Projects/HyprVX-v3`, branch `v3/spec-foundation`, from `dev@15f75b0`. The V1 working tree
+(including the untracked Phase 4 patch) is preserved untouched. V2 is a read-only reference. Copies with
+SHA-256 are in `research/`.
+
+### DV3-03 - Option A for MVP, unified world (Option B) is the final requirement
+
+Status: accepted (user)
+
+The MVP uses a per-workspace canvas. The data model (`DriftScene`, per-window world offset) is not coupled to a
+single workspace. A unified cross-workspace world without ownership reassignment is an explicit milestone (U)
+with acceptance tests U-1..U-6. An overview of separate canvases does not satisfy it.
+
+### DV3-04 - Single transform contract
+
+Status: accepted (plan approval)
+
+`CameraMath.hpp` is the only implementation of forward/inverse/anchor math. See
+`specs/001-native-spatial-camera/contracts/transform-contract.md`.
+
+### DV3-05 - Drift is a pure view
+
+Status: accepted (plan approval)
+
+`W(w) = L(w) + O(w)`. Hyprland's logical geometry, workspace ownership and layout state are never written by
+Drift. Turning Drift off restores Hyprland by construction.
+
+### DV3-06 - Rewrite the patch series cleanly
+
+Status: accepted (plan approval)
+
+The V1 Phase 4 patch and the V2 series are references only. Root causes of the V2 visual failure (RC1 surface
+clip, RC2 pass simplify) are documented in `specs/001-native-spatial-camera/research.md`.
+
+### DV3-07 - No DriftWM code
+
+Status: accepted (plan approval)
+
+DriftWM is GPL-3.0-or-later and serves as a behavioral reference only.
+
+### DV3-08 - Spec Kit workflow
+
+Status: accepted (user)
+
+Spec Kit 1.1.3 with the Claude integration. Constitution: `.specify/memory/constitution.md`. Features live in
+`specs/NNN-*`. `tasks.md` and implementation start only after user approval.

@@ -27,3 +27,15 @@ Core rules:
 - Trackpad, mouse and keyboard are all first-class inputs.
 - Never copy third-party source until its license has been audited and recorded.
 - Update CURRENT_STATE.md and NEXT_TASK.md after meaningful milestones.
+
+## V3 (worktree `HyprVX-v3`, branch `v3/spec-foundation`)
+
+V3 work additionally requires reading, before any change:
+
+1. `.specify/memory/constitution.md` (non-negotiable principles I–X)
+2. `docs/v3/HYPRVX_V3_MASTER_PLAN.md`
+3. The active feature in `specs/NNN-*/` (`spec.md`, `plan.md`, `research.md`, `contracts/`)
+
+Workflow: Spec Kit skills `/speckit-specify` → `/speckit-clarify` → `/speckit-plan` → `/speckit-tasks` →
+`/speckit-analyze` → `/speckit-implement`. Do not run `/speckit-tasks` or `/speckit-implement` for a feature
+until the user approves it. `research/` is read-only reference material (V1 Phase 4 patch, V2 patch).

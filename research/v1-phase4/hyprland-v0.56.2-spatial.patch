@@ -1,0 +1,437 @@
+diff --git a/src/desktop/state/ViewHitTester.cpp b/src/desktop/state/ViewHitTester.cpp
+index 1b7ecdc..946e0a0 100644
+--- a/src/desktop/state/ViewHitTester.cpp
++++ b/src/desktop/state/ViewHitTester.cpp
+@@ -31,6 +31,10 @@ PHLWINDOW CViewHitTester::windowAt(const Vector2D& pos, uint16_t properties, PHL
+     if (!PMONITOR)
+         return nullptr;
+ 
++    auto testPos = pos;
++    if (PMONITOR->m_spatialCamera.enabled && std::isfinite(PMONITOR->m_spatialCamera.zoom) && PMONITOR->m_spatialCamera.zoom > 0.0001f)
++        testPos = PMONITOR->m_position + PMONITOR->m_spatialCamera.pan + (pos - PMONITOR->m_position) / PMONITOR->m_spatialCamera.zoom;
++
+     static auto PRESIZEONBORDER       = CConfigValue<Config::INTEGER>("general:resize_on_border");
+     static auto PBORDERSIZE           = CConfigValue<Config::INTEGER>("general:border_size");
+     static auto PBORDERGRABEXTEND     = CConfigValue<Config::INTEGER>("general:extend_border_grab_area");
+@@ -60,11 +64,11 @@ PHLWINDOW CViewHitTester::windowAt(const Vector2D& pos, uint16_t properties, PHL
+                 CBox       box = BB.copy().expand(!w->isX11OverrideRedirect() ? BORDER_GRAB_AREA : 0);
+                 if (HITBOX_SHRINK > 0 && w != LASTFOCUSED)
+                     box = box.copy().expand(-HITBOX_SHRINK);
+-                if (box.containsPoint(pos))
++                if (box.containsPoint(testPos))
+                     return w;
+ 
+                 if (!w->m_isX11) {
+-                    if (w->hasPopupAt(pos))
++                    if (w->hasPopupAt(testPos))
+                         return w;
+                 }
+             }
+@@ -103,7 +107,7 @@ PHLWINDOW CViewHitTester::windowAt(const Vector2D& pos, uint16_t properties, PHL
+                     CBox       box = BB.copy().expand(!w->isX11OverrideRedirect() ? BORDER_GRAB_AREA : 0);
+                     if (HITBOX_SHRINK > 0 && w != LASTFOCUSED)
+                         box = box.copy().expand(-HITBOX_SHRINK);
+-                    if (box.containsPoint(pos)) {
++                    if (box.containsPoint(testPos)) {
+                         if (w->m_isX11 && w->isX11OverrideRedirect() && !w->m_xwaylandSurface->wantsFocus()) {
+                             // Override Redirect
+                             return focusState()->window(); // we kinda trick everything here.
+@@ -114,7 +118,7 @@ PHLWINDOW CViewHitTester::windowAt(const Vector2D& pos, uint16_t properties, PHL
+                     }
+ 
+                     if (!w->m_isX11) {
+-                        if (w->hasPopupAt(pos))
++                        if (w->hasPopupAt(testPos))
+                             return w;
+                     }
+                 }
+@@ -143,7 +147,7 @@ PHLWINDOW CViewHitTester::windowAt(const Vector2D& pos, uint16_t properties, PHL
+                 return nullptr;
+ 
+             // for maximized windows, don't return a window if we are not directly on it.
+-            if (!Fullscreen::controller()->isFullscreen(FS_WINDOW, Fullscreen::FSMODE_MAXIMIZED) || FS_WINDOW->getWindowBoxUnified(properties).containsPoint(pos))
++            if (!Fullscreen::controller()->isFullscreen(FS_WINDOW, Fullscreen::FSMODE_MAXIMIZED) || FS_WINDOW->getWindowBoxUnified(properties).containsPoint(testPos))
+                 return Fullscreen::controller()->getFullscreenWindow(PWORKSPACE);
+             else
+                 return nullptr;
+@@ -166,7 +170,7 @@ PHLWINDOW CViewHitTester::windowAt(const Vector2D& pos, uint16_t properties, PHL
+ 
+             if (!w->m_isX11 && !w->m_isFloating && w->m_isMapped && w->workspaceID() == WSPID && w->acceptsInput() && !w->m_X11ShouldntFocus &&
+                 !w->m_ruleApplicator->noFocus().valueOrDefault() && w != ignoreWindow && !isShadowedByModal(w)) {
+-                if (w->hasPopupAt(pos))
++                if (w->hasPopupAt(testPos))
+                     return w;
+             }
+         }
+@@ -232,7 +236,7 @@ PHLWINDOW CViewHitTester::windowAt(const Vector2D& pos, uint16_t properties, PHL
+                 }
+                 if (HITBOX_SHRINK > 0 && w != LASTFOCUSED)
+                     box = box.copy().expand(-HITBOX_SHRINK);
+-                if (box.containsPoint(pos))
++                if (box.containsPoint(testPos))
+                     return w;
+             }
+         }
+@@ -260,16 +264,21 @@ SP<CWLSurfaceResource> CViewHitTester::windowSurfaceAt(const Vector2D& pos, PHLW
+ 
+     RASSERT(!window->m_isX11, "Cannot call windowSurfaceAt on an X11 window!");
+ 
++    auto testPos = pos;
++    const auto PMONITOR = window->m_monitor.lock();
++    if (PMONITOR && PMONITOR->m_spatialCamera.enabled && std::isfinite(PMONITOR->m_spatialCamera.zoom) && PMONITOR->m_spatialCamera.zoom > 0.0001f)
++        testPos = PMONITOR->m_position + PMONITOR->m_spatialCamera.pan + (pos - PMONITOR->m_position) / PMONITOR->m_spatialCamera.zoom;
++
+     // try popups first
+-    const auto PPOPUP = window->m_popupHead->at(pos);
++    const auto PPOPUP = window->m_popupHead->at(testPos);
+ 
+     if (PPOPUP) {
+         const auto OFF = PPOPUP->coordsRelativeToParent();
+-        surfaceLocal   = pos - window->position(Desktop::View::IGeometric::GEOMETRIC_GOAL) - OFF;
++        surfaceLocal   = testPos - window->position(Desktop::View::IGeometric::GEOMETRIC_GOAL) - OFF;
+         return PPOPUP->wlSurface()->resource();
+     }
+ 
+-    auto [surf, local] = window->wlSurface()->resource()->at(pos - window->position(Desktop::View::IGeometric::GEOMETRIC_GOAL), true);
++    auto [surf, local] = window->wlSurface()->resource()->at(testPos - window->position(Desktop::View::IGeometric::GEOMETRIC_GOAL), true);
+     if (surf) {
+         surfaceLocal = local;
+         return surf;
+@@ -282,12 +291,17 @@ Vector2D CViewHitTester::surfaceLocalAt(const Vector2D& pos, PHLWINDOW window, S
+     if (!validMapped(window))
+         return {};
+ 
++    auto testPos = pos;
++    const auto PMONITOR = window->m_monitor.lock();
++    if (PMONITOR && PMONITOR->m_spatialCamera.enabled && std::isfinite(PMONITOR->m_spatialCamera.zoom) && PMONITOR->m_spatialCamera.zoom > 0.0001f)
++        testPos = PMONITOR->m_position + PMONITOR->m_spatialCamera.pan + (pos - PMONITOR->m_position) / PMONITOR->m_spatialCamera.zoom;
++
+     if (window->m_isX11)
+-        return pos - window->position(Desktop::View::IGeometric::GEOMETRIC_GOAL);
++        return testPos - window->position(Desktop::View::IGeometric::GEOMETRIC_GOAL);
+ 
+-    const auto PPOPUP = window->m_popupHead->at(pos);
++    const auto PPOPUP = window->m_popupHead->at(testPos);
+     if (PPOPUP)
+-        return pos - PPOPUP->coordsGlobal();
++        return testPos - PPOPUP->coordsGlobal();
+ 
+     std::tuple<SP<CWLSurfaceResource>, Vector2D> iterData = {surface, {-1337, -1337}};
+ 
+@@ -302,9 +316,9 @@ Vector2D CViewHitTester::surfaceLocalAt(const Vector2D& pos, PHLWINDOW window, S
+     CBox geom = window->m_xdgSurface->m_current.geometry;
+ 
+     if (std::get<1>(iterData) == Vector2D{-1337, -1337})
+-        return pos - window->position(Desktop::View::IGeometric::GEOMETRIC_GOAL);
++        return testPos - window->position(Desktop::View::IGeometric::GEOMETRIC_GOAL);
+ 
+-    return pos - window->position(Desktop::View::IGeometric::GEOMETRIC_GOAL) - std::get<1>(iterData) + Vector2D{geom.x, geom.y};
++    return testPos - window->position(Desktop::View::IGeometric::GEOMETRIC_GOAL) - std::get<1>(iterData) + Vector2D{geom.x, geom.y};
+ }
+ 
+ SP<CWLSurfaceResource> CViewHitTester::layerPopupSurfaceAt(const Vector2D& pos, PHLMONITOR monitor, Vector2D* surfaceCoords, PHLLS* layerFound) const {
+diff --git a/src/desktop/view/Window.cpp b/src/desktop/view/Window.cpp
+index 8836f73..817cf69 100644
+--- a/src/desktop/view/Window.cpp
++++ b/src/desktop/view/Window.cpp
+@@ -449,7 +449,7 @@ void CWindow::uncacheWindowDecos() {
+ }
+ 
+ bool CWindow::checkInputOnDecos(const eInputType type, const Vector2D& mouseCoords, std::any data) {
+-    if (type != INPUT_TYPE_DRAG_END && hasPopupAt(mouseCoords))
++    if (type != INPUT_TYPE_DRAG_END && hasPopupAtScreen(mouseCoords))
+         return false;
+ 
+     for (auto const& wd : m_windowDecorations) {
+@@ -1054,7 +1054,7 @@ bool CWindow::isInCurvedCorner(double x, double y) {
+     return false;
+ }
+ 
+-// checks if the wayland window has a popup at pos
++// checks if the wayland window has a popup at pos (pos is in logical window/monitor coords)
+ bool CWindow::hasPopupAt(const Vector2D& pos) {
+     if (m_isX11 || !m_popupHead)
+         return false;
+@@ -1067,6 +1067,22 @@ bool CWindow::hasPopupAt(const Vector2D& pos) {
+     return popup && popup->wlSurface()->resource();
+ }
+ 
++// checks if the wayland window has a popup at raw screen pos (screenPos is transformed via spatial camera)
++bool CWindow::hasPopupAtScreen(const Vector2D& screenPos) {
++    if (m_isX11 || !m_popupHead)
++        return false;
++
++    if (m_popupHead->popupTreeCount() == 0)
++        return false;
++
++    auto testPos = screenPos;
++    const auto PMONITOR = m_monitor.lock();
++    if (PMONITOR && PMONITOR->m_spatialCamera.enabled && std::isfinite(PMONITOR->m_spatialCamera.zoom) && PMONITOR->m_spatialCamera.zoom > 0.0001f)
++        testPos = PMONITOR->m_position + PMONITOR->m_spatialCamera.pan + (screenPos - PMONITOR->m_position) / PMONITOR->m_spatialCamera.zoom;
++
++    return hasPopupAt(testPos);
++}
++
+ Vector2D CWindow::middle() {
+     return m_realPosition->goal() + m_realSize->goal() / 2.f;
+ }
+@@ -1192,6 +1208,13 @@ bool CWindow::visibleOnMonitor(PHLMONITOR pMonitor) {
+     if (m_isFloating)
+         wbox = getFullWindowBoundingBox();
+ 
++    if (pMonitor && pMonitor->m_spatialCamera.enabled && std::isfinite(pMonitor->m_spatialCamera.zoom) && pMonitor->m_spatialCamera.zoom > 0.0001f) {
++        wbox.translate(-pMonitor->m_position);
++        wbox.translate(-pMonitor->m_spatialCamera.pan);
++        wbox.scale(pMonitor->m_spatialCamera.zoom);
++        wbox.translate(pMonitor->m_position);
++    }
++
+     return !wbox.intersection({pMonitor->m_position, pMonitor->m_size}).empty();
+ }
+ 
+diff --git a/src/desktop/view/Window.hpp b/src/desktop/view/Window.hpp
+index 94681cc..c1784ac 100644
+--- a/src/desktop/view/Window.hpp
++++ b/src/desktop/view/Window.hpp
+@@ -386,6 +386,7 @@ namespace Desktop::View {
+         void                              onGlowAngleAnimEnd(WP<Hyprutils::Animation::CBaseAnimatedVariable> pav);
+         bool                              isInCurvedCorner(double x, double y);
+         bool                              hasPopupAt(const Vector2D& pos);
++        bool                              hasPopupAtScreen(const Vector2D& screenPos);
+         int                               popupsCount();
+         void                              setAnimationsToMove();
+         void                              onWorkspaceAnimUpdate();
+diff --git a/src/layout/supplementary/DragController.cpp b/src/layout/supplementary/DragController.cpp
+index d73a3a8..5cce6ea 100644
+--- a/src/layout/supplementary/DragController.cpp
++++ b/src/layout/supplementary/DragController.cpp
+@@ -359,9 +359,15 @@ void CDragStateController::mouseMove(const Vector2D& mousePos) {
+     if (TRACKMOTION)
+         previousFull = MOTIONWINDOW->getFullWindowBoundingBox();
+ 
++    auto effectiveDelta = DELTA;
++    if (const auto W = DRAGGINGTARGET->window(); W) {
++        if (const auto PMONITOR = W->m_monitor.lock(); PMONITOR && PMONITOR->m_spatialCamera.enabled && std::isfinite(PMONITOR->m_spatialCamera.zoom) && PMONITOR->m_spatialCamera.zoom > 0.0001f)
++            effectiveDelta = effectiveDelta / PMONITOR->m_spatialCamera.zoom;
++    }
++
+     if (m_dragMode == MBIND_MOVE) {
+ 
+-        Vector2D newPos  = m_beginDragPositionXY + DELTA;
++        Vector2D newPos  = m_beginDragPositionXY + effectiveDelta;
+         Vector2D newSize = DRAGGINGTARGET->position().size();
+ 
+         if (*SNAPENABLED && !m_draggingTiled)
+@@ -381,14 +387,14 @@ void CDragStateController::mouseMove(const Vector2D& mousePos) {
+             Vector2D newPos  = m_beginDragPositionXY;
+ 
+             if (edgeRight(m_grabbedCorner))
+-                newSize.x += DELTA.x;
++                newSize.x += effectiveDelta.x;
+             else if (edgeLeft(m_grabbedCorner))
+-                newSize.x -= DELTA.x;
++                newSize.x -= effectiveDelta.x;
+ 
+             if (edgeBottom(m_grabbedCorner))
+-                newSize.y += DELTA.y;
++                newSize.y += effectiveDelta.y;
+             else if (edgeTop(m_grabbedCorner))
+-                newSize.y -= DELTA.y;
++                newSize.y -= effectiveDelta.y;
+ 
+             eMouseBindMode mode = m_dragMode;
+             if (DRAGGINGTARGET->window() && DRAGGINGTARGET->window()->m_ruleApplicator->keepAspectRatio().valueOrDefault() && mode != MBIND_RESIZE_BLOCK_RATIO)
+diff --git a/src/managers/input/InputManager.cpp b/src/managers/input/InputManager.cpp
+index 187dbe8..008975e 100644
+--- a/src/managers/input/InputManager.cpp
++++ b/src/managers/input/InputManager.cpp
+@@ -628,7 +628,13 @@ void CInputManager::mouseMoveUnified(uint32_t time, bool refocus, bool mouse, st
+ 
+     m_emptyFocusCursorSet = false;
+ 
+-    Vector2D surfaceLocal = surfacePos == Vector2D(-1337, -1337) ? surfaceCoords : mouseCoords - surfacePos;
++    Vector2D effectiveMouseCoords = mouseCoords;
++    if (const auto PMONITOR = pFoundWindow ? pFoundWindow->m_monitor.lock() : Desktop::focusState()->monitor()) {
++        if (PMONITOR && PMONITOR->m_spatialCamera.enabled && std::isfinite(PMONITOR->m_spatialCamera.zoom) && PMONITOR->m_spatialCamera.zoom > 0.0001f)
++            effectiveMouseCoords = PMONITOR->m_position + PMONITOR->m_spatialCamera.pan + (mouseCoords - PMONITOR->m_position) / PMONITOR->m_spatialCamera.zoom;
++    }
++
++    Vector2D surfaceLocal = surfacePos == Vector2D(-1337, -1337) ? surfaceCoords : effectiveMouseCoords - surfacePos;
+ 
+     if (pFoundWindow && pFoundWindow->m_isX11) // for x11 force scale zero
+         surfaceLocal = surfaceLocal * pFoundWindow->m_X11SurfaceScaledBy;
+@@ -656,7 +662,7 @@ void CInputManager::mouseMoveUnified(uint32_t time, bool refocus, bool mouse, st
+ 
+     if (pFoundWindow && foundSurface == pFoundWindow->wlSurface()->resource() && !m_cursorImageOverridden) {
+         const auto BOX = pFoundWindow->getWindowMainSurfaceBox();
+-        if (VECNOTINRECT(mouseCoords, BOX.x, BOX.y, BOX.x + BOX.width, BOX.y + BOX.height))
++        if (VECNOTINRECT(effectiveMouseCoords, BOX.x, BOX.y, BOX.x + BOX.width, BOX.y + BOX.height))
+             g_pHyprRenderer->setCursorFromName("left_ptr");
+         else
+             restoreCursorIconToApp();
+@@ -665,7 +671,7 @@ void CInputManager::mouseMoveUnified(uint32_t time, bool refocus, bool mouse, st
+     if (pFoundWindow) {
+         // change cursor icon if hovering over border
+         if (*PRESIZEONBORDER && *PRESIZECURSORICON) {
+-            if (!Fullscreen::controller()->isFullscreen(pFoundWindow) && !pFoundWindow->hasPopupAt(mouseCoords))
++            if (!Fullscreen::controller()->isFullscreen(pFoundWindow) && !pFoundWindow->hasPopupAt(effectiveMouseCoords))
+                 setCursorIconOnBorder(pFoundWindow);
+             else if (m_borderIconDirection != BORDERICON_NONE) {
+                 m_borderIconDirection = BORDERICON_NONE;
+@@ -882,10 +888,15 @@ void CInputManager::processMouseDownNormal(const IPointer::SButtonEvent& e, SP<I
+     // TODO detect click on LS properly
+     if (*PRESIZEONBORDER && !g_pSessionLockManager->isSessionLocked() && !m_lastFocusOnLS && e.state == WL_POINTER_BUTTON_STATE_PRESSED && (!w || !w->isX11OverrideRedirect())) {
+         if (w && !Fullscreen::controller()->isFullscreen(w)) {
++            Vector2D logicalMouse = mouseCoords;
++            if (const auto PMONITOR = w->m_monitor.lock()) {
++                if (PMONITOR->m_spatialCamera.enabled && std::isfinite(PMONITOR->m_spatialCamera.zoom) && PMONITOR->m_spatialCamera.zoom > 0.0001f)
++                    logicalMouse = PMONITOR->m_position + PMONITOR->m_spatialCamera.pan + (mouseCoords - PMONITOR->m_position) / PMONITOR->m_spatialCamera.zoom;
++            }
+             const CBox real = w->geometricBox(Desktop::View::IGeometric::GEOMETRIC_CURRENT);
+             const CBox grab = {real.x - BORDER_GRAB_AREA, real.y - BORDER_GRAB_AREA, real.width + 2 * BORDER_GRAB_AREA, real.height + 2 * BORDER_GRAB_AREA};
+ 
+-            if ((grab.containsPoint(mouseCoords) && (!real.containsPoint(mouseCoords) || w->isInCurvedCorner(mouseCoords.x, mouseCoords.y))) && !w->hasPopupAt(mouseCoords)) {
++            if ((grab.containsPoint(logicalMouse) && (!real.containsPoint(logicalMouse) || w->isInCurvedCorner(logicalMouse.x, logicalMouse.y))) && !w->hasPopupAt(logicalMouse)) {
+                 g_pKeybindManager->resizeWithBorder(e);
+                 return;
+             }
+@@ -1012,14 +1023,19 @@ void CInputManager::onMouseWheel(IPointer::SAxisEvent e, SP<IPointer> pointer) {
+                 return;
+ 
+             if (*POFFWINDOWAXIS != 1) {
++                Vector2D logicalMouse = MOUSECOORDS;
++                if (const auto PMONITOR = PWINDOW->m_monitor.lock()) {
++                    if (PMONITOR->m_spatialCamera.enabled && std::isfinite(PMONITOR->m_spatialCamera.zoom) && PMONITOR->m_spatialCamera.zoom > 0.0001f)
++                        logicalMouse = PMONITOR->m_position + PMONITOR->m_spatialCamera.pan + (MOUSECOORDS - PMONITOR->m_position) / PMONITOR->m_spatialCamera.zoom;
++                }
+                 const auto BOX = PWINDOW->getWindowMainSurfaceBox();
+ 
+-                if (!BOX.containsPoint(MOUSECOORDS) && !PWINDOW->hasPopupAt(MOUSECOORDS)) {
++                if (!BOX.containsPoint(logicalMouse) && !PWINDOW->hasPopupAt(logicalMouse)) {
+                     if (*POFFWINDOWAXIS == 0)
+                         return;
+ 
+-                    const auto TEMPCURX = std::clamp(MOUSECOORDS.x, BOX.x, BOX.x + BOX.w - 1);
+-                    const auto TEMPCURY = std::clamp(MOUSECOORDS.y, BOX.y, BOX.y + BOX.h - 1);
++                    const auto TEMPCURX = std::clamp(logicalMouse.x, BOX.x, BOX.x + BOX.w - 1);
++                    const auto TEMPCURY = std::clamp(logicalMouse.y, BOX.y, BOX.y + BOX.h - 1);
+ 
+                     if (*POFFWINDOWAXIS == 3)
+                         Pointer::pointerController()->warpTo({TEMPCURX, TEMPCURY}, true);
+@@ -2156,14 +2172,19 @@ void CInputManager::setCursorIconOnBorder(PHLWINDOW w) {
+     // give a small leeway (10 px) for corner icon
+     const auto           CORNER           = ROUNDING + BORDERSIZE + 10;
+     const auto           mouseCoords      = getMouseCoordsInternal();
++    Vector2D             logicalMouse     = mouseCoords;
++    if (const auto PMONITOR = w->m_monitor.lock()) {
++        if (PMONITOR->m_spatialCamera.enabled && std::isfinite(PMONITOR->m_spatialCamera.zoom) && PMONITOR->m_spatialCamera.zoom > 0.0001f)
++            logicalMouse = PMONITOR->m_position + PMONITOR->m_spatialCamera.pan + (mouseCoords - PMONITOR->m_position) / PMONITOR->m_spatialCamera.zoom;
++    }
+     CBox                 box              = w->getWindowMainSurfaceBox();
+     eBorderIconDirection direction        = BORDERICON_NONE;
+     CBox                 boxFullGrabInput = {box.x - *PEXTENDBORDERGRAB - BORDERSIZE, box.y - *PEXTENDBORDERGRAB - BORDERSIZE, box.width + 2 * (*PEXTENDBORDERGRAB + BORDERSIZE),
+                                              box.height + 2 * (*PEXTENDBORDERGRAB + BORDERSIZE)};
+ 
+-    if (w->hasPopupAt(mouseCoords))
++    if (w->hasPopupAt(logicalMouse))
+         direction = BORDERICON_NONE;
+-    else if (!boxFullGrabInput.containsPoint(mouseCoords) || (!m_currentlyHeldButtons.empty() && !g_layoutManager->dragController()->target()))
++    else if (!boxFullGrabInput.containsPoint(logicalMouse) || (!m_currentlyHeldButtons.empty() && !g_layoutManager->dragController()->target()))
+         direction = BORDERICON_NONE;
+     else {
+ 
+diff --git a/src/output/Monitor.hpp b/src/output/Monitor.hpp
+index 945fecd..73514fd 100644
+--- a/src/output/Monitor.hpp
++++ b/src/output/Monitor.hpp
+@@ -37,6 +37,12 @@
+ class CSyncTimeline;
+ class CEventLoopTimer;
+ 
++struct SSpatialCameraTransform {
++    bool     enabled = false;
++    Vector2D pan     = {0, 0};
++    float    zoom    = 1.0f;
++};
++
+ namespace Monitor {
+     class CMonitorResources;
+     class CMonitorFrameScheduler;
+@@ -372,6 +378,8 @@ namespace Monitor {
+         bool                                m_blurFBDirty        = true;
+         bool                                m_blurFBShouldRender = false;
+ 
++        SSpatialCameraTransform             m_spatialCamera;
++
+         // For the list lookup
+ 
+         bool operator==(const CMonitor& rhs) {
+diff --git a/src/render/Renderer.cpp b/src/render/Renderer.cpp
+index 249f084..7bcac12 100644
+--- a/src/render/Renderer.cpp
++++ b/src/render/Renderer.cpp
+@@ -1178,6 +1178,16 @@ void IHyprRenderer::renderAllClientsForWorkspace(PHLMONITOR pMonitor, PHLWORKSPA
+     if (preBlurQueued(pMonitor))
+         m_renderPass.add(makeUnique<CPreBlurElement>());
+ 
++    const bool HAS_SPATIAL = pMonitor->m_spatialCamera.enabled && std::isfinite(pMonitor->m_spatialCamera.zoom) && pMonitor->m_spatialCamera.zoom > 0.0001f;
++    if (HAS_SPATIAL) {
++        SRenderModifData SPATIALMODIF;
++        if (pMonitor->m_spatialCamera.pan != Vector2D{0, 0})
++            SPATIALMODIF.modifs.emplace_back(SRenderModifData::eRenderModifType::RMOD_TYPE_TRANSLATE, -pMonitor->m_spatialCamera.pan * pMonitor->m_scale);
++        if (pMonitor->m_spatialCamera.zoom != 1.f)
++            SPATIALMODIF.modifs.emplace_back(SRenderModifData::eRenderModifType::RMOD_TYPE_SCALE, pMonitor->m_spatialCamera.zoom);
++        m_renderPass.add(makeUnique<CRendererHintsPassElement>(CRendererHintsPassElement::SData{SPATIALMODIF}));
++    }
++
+     if UNLIKELY /* subjective? */ (Fullscreen::controller()->hasFullscreen(pWorkspace))
+         renderWorkspaceWindowsFullscreen(pMonitor, pWorkspace, time);
+     else
+@@ -1228,6 +1238,13 @@ void IHyprRenderer::renderAllClientsForWorkspace(PHLMONITOR pMonitor, PHLWORKSPA
+         renderWindow(w, pMonitor, time, true, RENDER_PASS_ALL);
+     }
+ 
++    if (HAS_SPATIAL) {
++        if (!RENDERMODIFDATA.modifs.empty())
++            m_renderPass.add(makeUnique<CRendererHintsPassElement>(CRendererHintsPassElement::SData{RENDERMODIFDATA}));
++        else
++            m_renderPass.add(makeUnique<CRendererHintsPassElement>(CRendererHintsPassElement::SData{SRenderModifData{}}));
++    }
++
+     Event::bus()->m_events.render.stage.emit(RENDER_POST_WINDOWS);
+ 
+     // Render surfaces above windows for monitor
+@@ -2741,11 +2758,20 @@ void IHyprRenderer::damageSurface(SP<CWLSurfaceResource> pSurface, double x, dou
+     for (auto const& m : State::monitorState()->monitors()) {
+         if (!m->m_output)
+             continue;
+-        if (!EXTENTS.overlaps(m->logicalBox()))
++        const bool IS_LAYER = WLSURF && WLSURF->view() && Desktop::View::CLayerSurface::fromView(WLSURF->view());
++        CBox testExtents = EXTENTS;
++        if (m->m_spatialCamera.enabled && !IS_LAYER && std::isfinite(m->m_spatialCamera.zoom) && m->m_spatialCamera.zoom > 0.0001f) {
++            testExtents.translate(-m->m_position).translate(-m->m_spatialCamera.pan).scale(m->m_spatialCamera.zoom).translate(m->m_position);
++        }
++        if (!testExtents.overlaps(m->logicalBox()))
+             continue;
+ 
+         damageBoxForEach.set(damageBox);
+-        damageBoxForEach.translate({-m->m_position.x, -m->m_position.y}).scale(m->m_scale);
++        damageBoxForEach.translate({-m->m_position.x, -m->m_position.y});
++        if (m->m_spatialCamera.enabled && !IS_LAYER && std::isfinite(m->m_spatialCamera.zoom) && m->m_spatialCamera.zoom > 0.0001f) {
++            damageBoxForEach.translate(-m->m_spatialCamera.pan).scale(m->m_spatialCamera.zoom);
++        }
++        damageBoxForEach.scale(m->m_scale);
+ 
+         m->addDamage(damageBoxForEach);
+     }
+@@ -2767,6 +2793,10 @@ void IHyprRenderer::damageWindow(PHLWINDOW pWindow, bool forceFull) {
+     for (auto const& m : State::monitorState()->monitors()) {
+         if (forceFull || shouldRenderWindow(pWindow, m)) { // only damage if window is rendered on monitor
+             CBox fixedDamageBox = {windowBox.x - m->m_position.x, windowBox.y - m->m_position.y, windowBox.width, windowBox.height};
++            if (m->m_spatialCamera.enabled && std::isfinite(m->m_spatialCamera.zoom) && m->m_spatialCamera.zoom > 0.0001f) {
++                fixedDamageBox.translate(-m->m_spatialCamera.pan);
++                fixedDamageBox.scale(m->m_spatialCamera.zoom);
++            }
+             fixedDamageBox.scale(m->m_scale).round();
+             m->addDamage(fixedDamageBox);
+         }
