@@ -1,0 +1,26 @@
+{
+  "run_id": "20261011-005226-tooling-7363be0",
+  "test": "T010 authoring/self-check",
+  "task": "T010",
+  "agent": "codex",
+  "result": "PASS",
+  "variant": "tooling",
+  "patchset_id": "none",
+  "binary_sha256": null,
+  "source_commit": "7363be0",
+  "raw_path": "/home/towfienes/.cache/hyprvx/codex/evidence/20261011-005226-tooling-7363be0",
+  "checks": [
+    {
+      "command": "HYPRVX_AGENT=codex bash -n scripts/fetch-hyprland.sh && HYPRVX_AGENT=codex bash scripts/fetch-hyprland.sh --dry-run && HYPRVX_AGENT=codex python3 -I tools/tests/test_build_scripts.py fetch-hyprland.sh && git diff --check",
+      "exit_code": 0,
+      "artifact": "checks.log"
+    }
+  ],
+  "not_run": [
+    "Live network fetch and real worktree/submodule creation (T014)."
+  ],
+  "artifacts": [
+    "checks.log",
+    "summary.json"
+  ]
+}

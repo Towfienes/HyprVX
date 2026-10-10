@@ -1,0 +1,26 @@
+{
+  "run_id": "20261011-005519-tooling-8de9380",
+  "test": "T012 authoring/self-check",
+  "task": "T012",
+  "agent": "codex",
+  "result": "FAIL",
+  "variant": "tooling",
+  "patchset_id": "none",
+  "binary_sha256": null,
+  "source_commit": "8de9380",
+  "raw_path": "/home/towfienes/.cache/hyprvx/codex/evidence/20261011-005519-tooling-8de9380",
+  "checks": [
+    {
+      "command": "HYPRVX_AGENT=codex bash -n scripts/apply-patches.sh && HYPRVX_AGENT=codex bash scripts/apply-patches.sh --variant stock --dry-run && HYPRVX_AGENT=codex bash scripts/apply-patches.sh --variant v2 --dry-run && HYPRVX_AGENT=codex python3 -I tools/tests/test_build_scripts.py apply-patches.sh && git diff --check",
+      "exit_code": 1,
+      "artifact": "checks.log"
+    }
+  ],
+  "not_run": [
+    "Actual git am, receipt write and rollback on real source; no fetched source is present."
+  ],
+  "artifacts": [
+    "checks.log",
+    "summary.json"
+  ]
+}

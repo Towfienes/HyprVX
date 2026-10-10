@@ -1,0 +1,27 @@
+{
+  "run_id": "20261011-005352-tooling-f7cb63c",
+  "test": "T011 authoring/self-check",
+  "task": "T011",
+  "agent": "codex",
+  "result": "PASS",
+  "variant": "tooling",
+  "patchset_id": "none",
+  "binary_sha256": null,
+  "source_commit": "f7cb63c",
+  "raw_path": "/home/towfienes/.cache/hyprvx/codex/evidence/20261011-005352-tooling-f7cb63c",
+  "checks": [
+    {
+      "command": "HYPRVX_AGENT=codex bash -n scripts/build-scanner.sh && HYPRVX_AGENT=codex bash scripts/build-scanner.sh --dry-run && HYPRVX_AGENT=codex python3 -I tools/tests/test_build_scripts.py build-scanner.sh && git diff --check",
+      "exit_code": 0,
+      "artifact": "checks.log"
+    }
+  ],
+  "not_run": [
+    "Scanner clone, actual build and local install; needed at T014 if its resource prerequisites hold."
+  ],
+  "artifacts": [
+    "checks.log",
+    "summary.json"
+  ],
+  "primary_source": "https://raw.githubusercontent.com/hyprwm/hyprwayland-scanner/v0.4.6/CMakeLists.txt"
+}
