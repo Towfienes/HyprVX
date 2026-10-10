@@ -1,0 +1,127 @@
+{
+  "run_id": "20261011-004030-s0-76b97aa",
+  "test": "S0",
+  "task": "T003",
+  "agent": "codex",
+  "result": "PASS",
+  "variant": "s0",
+  "patchset_id": "none",
+  "binary_sha256": null,
+  "base_commit": "76b97aaf4126206c0c95e8a6ef440e903ec8ff1b",
+  "synced_commit": "5b2203534b1243f5b8a1fa9d1b8491eaed13b37e",
+  "branch": "v3/001-codex",
+  "raw_path": "/home/towfienes/.cache/hyprvx/codex/evidence/20261011-004030-s0-76b97aa",
+  "work_order": "specs/001-native-spatial-camera/work-orders/WO-01-codex.md",
+  "checks": [
+    {
+      "item": "cache-write-delete",
+      "cmd": "HYPRVX_AGENT=codex python3 -c 'from pathlib import Path; import tempfile; root=Path(\"/home/towfienes/.cache/hyprvx/codex\"); fd,name=tempfile.mkstemp(prefix=\"s0-probe.\", dir=root); import os; os.close(fd); p=Path(name); p.write_text(\"s0\\n\"); assert p.read_text()==\"s0\\n\"; print(\"write/read: PASS\"); p.unlink(); assert not p.exists(); print(\"delete: PASS\")'",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "cache-write-delete-sandbox.log"
+    },
+    {
+      "item": "heavy-lock",
+      "cmd": "HYPRVX_AGENT=codex flock -n /home/towfienes/.cache/hyprvx/locks/heavy.lock true",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "heavy-lock-sandbox.log"
+    },
+    {
+      "item": "jev-status",
+      "cmd": "HYPRVX_AGENT=codex jevctl status",
+      "exit_code": 1,
+      "result": "NOT RUN",
+      "artifact": "jev-status-sandbox.log"
+    },
+    {
+      "item": "systemd-scope",
+      "cmd": "HYPRVX_AGENT=codex systemd-run --user --scope -p MemoryMax=1G true",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "systemd-scope-escalated.log",
+      "execution": "require_escalated"
+    },
+    {
+      "item": "dri-list-and-read-open",
+      "cmd": "HYPRVX_AGENT=codex python3 -c 'import os, subprocess; result=subprocess.run([\"ls\", \"-l\", \"/dev/dri\"], check=False); print(\"ls exit_code:\", result.returncode, flush=True); result.check_returncode(); fd=os.open(\"/dev/dri/renderD128\", os.O_RDONLY | os.O_CLOEXEC); print(\"read open: PASS\"); os.close(fd)'",
+      "artifact": "dri-escalated.log",
+      "exit_code": 0,
+      "result": "PASS",
+      "execution": "require_escalated"
+    },
+    {
+      "item": "hyprland-tag-network",
+      "cmd": "HYPRVX_AGENT=codex git ls-remote https://github.com/hyprwm/Hyprland refs/tags/v0.56.2",
+      "artifact": "hyprland-tag-network.log",
+      "exit_code": 0,
+      "result": "PASS",
+      "execution": "require_escalated"
+    },
+    {
+      "cmd": "git add -- evidence/20261011-004030-s0-76b97aa/summary.json evidence/20261011-004030-s0-76b97aa/SHA256SUMS && git commit -F /home/towfienes/.cache/hyprvx/codex/evidence/20261011-004030-s0-76b97aa/commit-message.txt",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "git-commit-probe.log",
+      "execution": "require_escalated"
+    }
+  ],
+  "sandbox_attempts": [
+    {
+      "item": "systemd-scope",
+      "cmd": "HYPRVX_AGENT=codex systemd-run --user --scope -p MemoryMax=1G true",
+      "exit_code": 1,
+      "result": "PENDING_ESCALATION",
+      "artifact": "systemd-scope-sandbox.log"
+    },
+    {
+      "item": "dri-list",
+      "cmd": "HYPRVX_AGENT=codex ls -l /dev/dri",
+      "exit_code": 2,
+      "result": "PENDING_ESCALATION",
+      "artifact": "dri-list-sandbox.log"
+    },
+    {
+      "item": "render-read-open",
+      "cmd": "HYPRVX_AGENT=codex python3 -c 'import os; fd=os.open(\"/dev/dri/renderD128\", os.O_RDONLY | os.O_CLOEXEC); print(\"read open: PASS\"); os.close(fd)'",
+      "exit_code": 1,
+      "result": "PENDING_ESCALATION",
+      "artifact": "render-read-open-sandbox.log"
+    }
+  ],
+  "sync": {
+    "cmd": "git fetch origin && git merge --ff-only origin/v3/001-native-spatial-camera",
+    "exit_code": 0,
+    "artifact": "git-sync.log",
+    "execution": "require_escalated",
+    "result": "PASS"
+  },
+  "routing": {
+    "status": "LOCAL_FALLBACK",
+    "reason": "jevctl status fails: ModuleNotFoundError: jev_native; jev-nos NORMAL fallback permits direct parent work.",
+    "executed_by": "parent Codex",
+    "workers": []
+  },
+  "not_run": [
+    "No Hyprland build, nested session, client or capture was run for S0."
+  ],
+  "contract_questions": [],
+  "previous_run_preserved": "20261011-003427-s0-76b97aa",
+  "artifacts": [
+    "cache-write-delete-sandbox.log",
+    "commit-final-message.txt",
+    "commit-message.txt",
+    "dri-escalated.log",
+    "dri-list-sandbox.log",
+    "git-commit-probe.log",
+    "git-state.log",
+    "git-sync.log",
+    "heavy-lock-sandbox.log",
+    "hyprland-tag-network.log",
+    "jev-status-sandbox.log",
+    "render-read-open-sandbox.log",
+    "summary.json",
+    "systemd-scope-escalated.log",
+    "systemd-scope-sandbox.log"
+  ]
+}
