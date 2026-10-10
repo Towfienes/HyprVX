@@ -73,7 +73,7 @@ tools. No user story can be judged before this phase and GATE-A pass.
 - [X] T011 [P] Write `scripts/build-scanner.sh`: build `hyprwayland-scanner` v0.4.6 into `~/.cache/hyprvx/$HYPRVX_AGENT/tools` without system installation (owner: codex)
 - [X] T012 Write `scripts/apply-patches.sh`: `git am` an ordered patch directory (`patches/hyprland/` or `research/v2-drift-mvp/` for variant `v2`, none for `stock`) onto the variant worktree, using only `*.patch` files in lexical order (e.g. `research/v2-drift-mvp/*.patch`, never `PROVENANCE.md`/`SHA256SUMS`); print `patchset_id = sha256(cat patches in order)[:12]` (owner: codex)
 - [X] T013 Write `scripts/build-hyprland.sh --variant stock|v2|patched`: heavy lock, `MemAvailable ≥ 6.5 GiB` check, PSI abort, `systemd-run --user --scope -p MemoryMax=6G`, CMake + Ninja `-j4`, ccache in the agent cache, `-DNO_HYPRPM=TRUE`, real `GIT_COMMIT_HASH`, `GIT_DIRTY=hyprvx-<patchset_id>` (or `clean-upstream` for stock), `HYPRVX_DEV` defined for `patched`, install to `~/.cache/hyprvx/$HYPRVX_AGENT/prefix/<patchset_id|stock|v2-…>`, write `build-info.json` per test-tooling §3 (owner: codex)
-- [ ] T014 V-01, V-03: run fetch + build for variant `stock` (heavy job); copy `build-info.json` and the build log into an evidence run per test-tooling §8 and cite its run-id in the commit trailer (owner: claude)
+- [X] T014 V-01, V-03: run fetch + build for variant `stock` (heavy job); copy `build-info.json` and the build log into an evidence run per test-tooling §8 and cite its run-id in the commit trailer (owner: claude)
 
 ### Hardened nested harness (Constitution I, test-tooling §7)
 
@@ -108,7 +108,7 @@ proven on synthetic data; GATE-A PASS. Claude may write patches during this phas
 
 ### Implementation for User Story 1
 
-- [ ] T024 [US1] Prepare the Claude upstream worktree `~/.cache/hyprvx/claude/src/hyprland-efb5099/v3-dev` with `scripts/fetch-hyprland.sh` (manual clone of the same commit is acceptable for drafting; the scripted fetch is used for every judged build) (owner: claude)
+- [X] T024 [US1] Prepare the Claude upstream worktree `~/.cache/hyprvx/claude/src/hyprland-efb5099/v3-dev` with `scripts/fetch-hyprland.sh` (manual clone of the same commit is acceptable for drafting; the scripted fetch is used for every judged build) (owner: claude)
 - [ ] T025 [US1] Author `patches/hyprland/0001-*.patch`: vendor `CameraMath.hpp` unchanged, add per-monitor camera state (`origin`, `zoom`, `revision` per `data-model.md`: origin finite; zoom finite and `z_min ≤ z ≤ z_max` (MVP 0.1 … 2.0); revision incremented on every change), default `identityFor(M)`, no render change (owner: claude)
 - [ ] T026 [US1] V-09: build `patched` (heavy job, Claude cache) and run `tests/native/t_id.sh` ×3 against the stock build of T014; record evidence; T-ID FAIL is a stop condition (owner: claude)
 

@@ -1,0 +1,5 @@
+{"run_id": "20261011-024500-stock-514f8d8", "test": "T014 V-01/V-03 stock build; T024 scripted upstream worktrees", "result": "PASS", "agent": "claude", "git_sha": "2df562d7af45e3561b27533ea00433f49cac102a",
+ "variant": "stock", "patchset_id": "none", "binary_sha256": "927f6f64f4f1135a3228294602195af86175dbbd54dfd70011f94e80428beea9",
+ "checks": {"fetch": "PASS (efb5099 + submodules; worktrees stock, v2, v3-dev; glaze b518eec)", "configure_build_install": "PASS (scope MemoryMax=6G, -j4, heavy lock, PSI trigger registered)",
+            "provenance": "version.h GIT_COMMIT_HASH efb5099, GIT_DIRTY clean-upstream", "binary_sha256_matches_build_info": "true"},
+ "artifacts": ["preflight.log", "fetch.log", "build.log", "build-info.json", "version.h", "postflight.log", "hyprland-version.txt"], "not_run": []}
