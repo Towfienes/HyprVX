@@ -55,7 +55,7 @@ if "$dry_run"; then
     printf 'DRY RUN: record verified patchset and applied HEAD in %s\n' "$receipt"
 else
     applied_head=$(git -C "$worktree" rev-parse HEAD)
-    python3 - "$receipt" "$patchset_id" "$applied_head" <<'PY'
+    python3 -I - "$receipt" "$patchset_id" "$applied_head" <<'PY'
 import json
 import os
 from pathlib import Path

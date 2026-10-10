@@ -1,0 +1,159 @@
+{
+  "run_id": "20261011-014535-tooling-c30b391",
+  "test": "WO-04 Part A3 / R-3; final Part A verification",
+  "task": "T012",
+  "agent": "codex",
+  "result": "PASS",
+  "variant": "tooling",
+  "patchset_id": "none",
+  "binary_sha256": null,
+  "base_commit": "c30b3918401ed53d4d6fb8aadff82c6178a851e4",
+  "raw_path": "/home/towfienes/.cache/hyprvx/codex/evidence/20261011-014535-tooling-c30b391",
+  "checks": [
+    {
+      "command": "HYPRVX_AGENT=codex bash -n scripts/fetch-hyprland.sh",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex bash scripts/fetch-hyprland.sh --dry-run",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex python3 -I tools/tests/test_build_scripts.py fetch-hyprland.sh -v",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex bash -n scripts/build-scanner.sh",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex bash scripts/build-scanner.sh --dry-run",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex python3 -I tools/tests/test_build_scripts.py build-scanner.sh -v",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex bash -n scripts/apply-patches.sh",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex bash scripts/apply-patches.sh --variant stock --dry-run",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex bash scripts/apply-patches.sh --variant v2 --dry-run",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex bash scripts/apply-patches.sh --variant patched --dry-run",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex python3 -I tools/tests/test_build_scripts.py apply-patches.sh -v",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex bash -n scripts/build-hyprland.sh",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex bash scripts/build-hyprland.sh --variant stock --dry-run",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex bash scripts/build-hyprland.sh --variant v2 --dry-run",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex bash scripts/build-hyprland.sh --variant patched --dry-run",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex rg -n python3 scripts/apply-patches.sh scripts/build-hyprland.sh",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex git diff --check",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex python3 -I tools/tests/test_build_scripts.py build-hyprland.sh -v",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "build-tests.log",
+      "execution": "require_escalated",
+      "passed": 13,
+      "skipped": 0
+    }
+  ],
+  "test_counts": {
+    "build-hyprland": {
+      "passed": 13,
+      "skipped": 0
+    },
+    "other_script_suites_each": {
+      "passed": 2,
+      "skipped": 1,
+      "skip_reason": "NOT RUN: Hyprland resource guard only; không áp dụng cho fetch/scanner/apply."
+    },
+    "total": {
+      "passed": 19,
+      "skipped_not_applicable": 3
+    }
+  },
+  "scope": "Python của apply-patches chạy -I; build wrapper đã dùng -I ở A1. Bộ tests toàn tools/tests, bash -n và dry-run mỗi variant đều đạt.",
+  "escalations": [
+    "auto-review: final PSI regression suite qua test_build_scripts.py build-hyprland.sh -v",
+    "auto-review: git add/commit chỉ apply-patches.sh và index evidence trong clone Codex"
+  ],
+  "not_run": [
+    "Part B/T014: chưa release; không chạy build hoặc systemd-run.",
+    "Watchdog scope-stop với áp lực RAM thật: NOT RUN; dùng fake poller/avg10/stop command.",
+    "Live git am/patch receipt: NOT RUN; chỉ syntax/dry-run/source verification.",
+    "T009, batch 1b, T022 và R-2: ngoài Part A."
+  ],
+  "blockers": [],
+  "contract_questions": [],
+  "artifacts": [
+    "build-tests.log",
+    "checks.json",
+    "checks.log",
+    "summary.json"
+  ]
+}
