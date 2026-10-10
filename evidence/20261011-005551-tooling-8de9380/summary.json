@@ -1,0 +1,31 @@
+{
+  "run_id": "20261011-005551-tooling-8de9380",
+  "test": "T012 authoring/self-check",
+  "task": "T012",
+  "agent": "codex",
+  "result": "PASS",
+  "variant": "tooling",
+  "patchset_id": "none",
+  "binary_sha256": null,
+  "source_commit": "8de9380",
+  "raw_path": "/home/towfienes/.cache/hyprvx/codex/evidence/20261011-005551-tooling-8de9380",
+  "checks": [
+    {
+      "command": "HYPRVX_AGENT=codex bash -n scripts/apply-patches.sh && HYPRVX_AGENT=codex bash scripts/apply-patches.sh --variant stock --dry-run && HYPRVX_AGENT=codex bash scripts/apply-patches.sh --variant v2 --dry-run && HYPRVX_AGENT=codex python3 -I tools/tests/test_build_scripts.py apply-patches.sh && git diff --check",
+      "exit_code": 0,
+      "artifact": "checks.log"
+    }
+  ],
+  "not_run": [
+    "Live git am and atomic receipt write; patched series is not yet provided in this checkout."
+  ],
+  "artifacts": [
+    "checks.log",
+    "summary.json"
+  ],
+  "previous_attempt": {
+    "run_id": "20261011-005519-tooling-8de9380",
+    "result": "FAIL",
+    "reason": "Self-check used default patched variant before its patches exist; adjusted the test to the documented V2 fixture."
+  }
+}
