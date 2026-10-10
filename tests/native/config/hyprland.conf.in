@@ -4,7 +4,11 @@
 # extension selects the legacy parser in Hyprland efb5099 (src/config/ConfigManager.cpp). Every key below was
 # checked against src/config/values/ConfigValues.cpp of efb5099; a config error would draw an error bar into captures.
 
-monitor = , @WIDTH@x@HEIGHT@@60, 0x0, @SCALE@
+# Tests render on a headless output with a fixed mode, created by tools/hyprvx_nested.py after start
+# (`hyprctl output create headless HVX-1`). The Wayland-backend output (the nested window on the host) gets whatever
+# size the host layout gives it, so it is disabled and never captured.
+monitor = HVX-1, @WIDTH@x@HEIGHT@@60, 0x0, @SCALE@
+monitor = WAYLAND-1, disable
 
 general {
     gaps_in = 0
@@ -35,6 +39,10 @@ misc {
     force_default_wallpaper = 0
     background_color = rgb(111111)
     disable_autoreload = true
+    # Startup notifications would be drawn into captures; tools/hyprvx_nested.py also dismisses the remaining
+    # unconditional .conf-format notice right after start.
+    disable_watchdog_warning = true
+    disable_hyprland_guiutils_check = true
 }
 
 cursor {
@@ -53,6 +61,10 @@ input {
 render {
     direct_scanout = 0
 }
+
+# Startup marker: exec-once runs in the same event-loop callback that posts the startup notifications, so once
+# this file exists a hyprctl request (dismissnotify) is handled after them (tools/hyprvx_nested.py).
+exec-once = touch "$XDG_RUNTIME_DIR/hyprvx-exec-once"
 
 # The test client floats at a fixed logical position with its own fixed size (min = max size).
 windowrule = match:class ^(hyprvx-testclient)$, float on, move 140 100
