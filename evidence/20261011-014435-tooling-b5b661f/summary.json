@@ -1,0 +1,76 @@
+{
+  "run_id": "20261011-014435-tooling-b5b661f",
+  "test": "WO-04 Part A2 / WO-03 T013 follow-up",
+  "task": "T013",
+  "agent": "codex",
+  "result": "PASS",
+  "variant": "tooling",
+  "patchset_id": "none",
+  "binary_sha256": null,
+  "base_commit": "b5b661f2e5a8513eb13175aeca2e10f899d1a2a9",
+  "raw_path": "/home/towfienes/.cache/hyprvx/codex/evidence/20261011-014435-tooling-b5b661f",
+  "checks": [
+    {
+      "command": "HYPRVX_AGENT=codex bash -n scripts/build-hyprland.sh",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex python3 -I tools/tests/test_build_scripts.py build-hyprland.sh BuildScriptTest -v",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex bash scripts/build-hyprland.sh --variant stock --dry-run",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex bash scripts/build-hyprland.sh --variant v2 --dry-run",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex bash scripts/build-hyprland.sh --variant patched --dry-run",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    },
+    {
+      "command": "HYPRVX_AGENT=codex git diff --check",
+      "exit_code": 0,
+      "result": "PASS",
+      "artifact": "checks.log"
+    }
+  ],
+  "test_counts": {
+    "BuildScriptTest": {
+      "passed": 3,
+      "skipped": 0,
+      "dry_run_variants": [
+        "stock",
+        "v2",
+        "patched"
+      ]
+    }
+  },
+  "scope": "Chỉ patched truyền -DHYPRVX_DEV=ON; stock/v2 không truyền. Dry-run cả 3 dùng fake executable và xác minh không chạy build/fetch/lock.",
+  "escalations": [
+    "auto-review: git add/commit chỉ các file A2 và index evidence trong clone Codex"
+  ],
+  "not_run": [
+    "Part B/T014 chưa release; không chạy build stock/patched/v2.",
+    "A1 kernel/watchdog tests không chạy lại ở A2; đã PASS ở 20261011-014138-tooling-5852ba4."
+  ],
+  "blockers": [],
+  "contract_questions": [],
+  "artifacts": [
+    "checks.json",
+    "checks.log",
+    "summary.json"
+  ]
+}
