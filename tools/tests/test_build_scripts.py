@@ -230,12 +230,48 @@ class BuildMemoryTest(unittest.TestCase):
                 start.assert_not_called()
 
 
+class GlazePinTest(unittest.TestCase):
+    def fake_git(self, head=None, status=""):
+        head = build.GLAZE_COMMIT if head is None else head
+        return lambda *args: head if args[0] == "rev-parse" else status
+
+    def test_pinned_clean_source_is_accepted(self):
+        with tempfile.TemporaryDirectory(prefix="hvx-glaze-") as directory:
+            (Path(directory) / ".git").mkdir()
+            build.check_glaze_source(Path(directory), self.fake_git())
+
+    def test_wrong_commit_dirty_tree_or_missing_source_blocks(self):
+        with tempfile.TemporaryDirectory(prefix="hvx-glaze-") as directory:
+            root = Path(directory)
+            (root / ".git").mkdir()
+            for git in (self.fake_git(head="0" * 40), self.fake_git(status=" M CMakeLists.txt")):
+                with self.assertRaisesRegex(SystemExit, "BLOCKED: glaze source is not clean"):
+                    build.check_glaze_source(root, git)
+            with self.assertRaisesRegex(SystemExit, "BLOCKED: pinned glaze source is missing"):
+                build.check_glaze_source(root / "absent", self.fake_git())
+            link = root / "link"
+            link.symlink_to(root)
+            with self.assertRaisesRegex(SystemExit, "BLOCKED: pinned glaze source is missing"):
+                build.check_glaze_source(link, self.fake_git())
+
+    def test_dry_run_configures_offline_glaze_and_keeps_git_disabled(self):
+        for variant in ("stock", "v2", "patched"):
+            result = subprocess.run(["bash", str(SCRIPT), "--variant", variant, "--dry-run"],
+                                    env=os.environ | {"HYPRVX_AGENT": "claude"}, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("-DCMAKE_DISABLE_FIND_PACKAGE_Git=TRUE", result.stdout)
+            self.assertIn("-DFETCHCONTENT_FULLY_DISCONNECTED=ON", result.stdout)
+            self.assertIn("-DFETCHCONTENT_SOURCE_DIR_GLAZE=", result.stdout)
+            self.assertIn("glaze-" + build.GLAZE_TAG, result.stdout)
+
+
 def load_tests(loader, tests, pattern):
     suite = loader.loadTestsFromTestCase(BuildScriptTest)
     if SCRIPT.name == "build-hyprland.sh":
         suite.addTests(loader.loadTestsFromTestCase(PsiTriggerTest))
         suite.addTests(loader.loadTestsFromTestCase(PsiWatchdogTest))
         suite.addTests(loader.loadTestsFromTestCase(BuildMemoryTest))
+        suite.addTests(loader.loadTestsFromTestCase(GlazePinTest))
     return suite
 
 

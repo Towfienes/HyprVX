@@ -30,6 +30,21 @@ def full_avg10():
 
 PSI_TRIGGER = b"full 100000 2000000\0"
 
+# Pinned by scripts/fetch-hyprland.sh; used offline through FETCHCONTENT_SOURCE_DIR_GLAZE because Git discovery is
+# disabled for truthful version provenance.
+GLAZE_TAG = "v7.2.0"
+GLAZE_COMMIT = "b518eec7a22e56ffa238b072c07f47efa7cea97f"
+
+
+def check_glaze_source(path, git_output=None):
+    if git_output is None:
+        def git_output(*args):
+            return output(["git", "-C", str(path), *args])
+    if path.is_symlink() or not (path / ".git").exists():
+        blocked("pinned glaze source is missing; run scripts/fetch-hyprland.sh: " + str(path))
+    if git_output("rev-parse", "HEAD") != GLAZE_COMMIT or git_output("status", "--porcelain"):
+        blocked("glaze source is not clean at " + GLAZE_COMMIT)
+
 
 def register_pressure_trigger():
     # psi_write replaces the last byte with NUL, so retain the full 2 s window.
@@ -99,6 +114,7 @@ def main(repo, variant, dry_run):
     env["PATH"] = str(cache / "tools/bin") + os.pathsep + env["PATH"]
     env["PKG_CONFIG_PATH"] = str(cache / "tools/lib/pkgconfig") + os.pathsep + env.get("PKG_CONFIG_PATH", "")
     build = cache / "build" / (identifier + "-fresh")
+    glaze_src = cache / "src" / ("glaze-" + GLAZE_TAG)
 
     if not dry_run:
         available = int(next(line.split()[1] for line in Path("/proc/meminfo").read_text().splitlines()
@@ -127,6 +143,7 @@ def main(repo, variant, dry_run):
             if receipt != {"patchset_id": patchset_id, "head": head}:
                 blocked("patch hashes or applied HEAD differ from the receipt")
             subprocess.run(["git", "-C", str(src), "merge-base", "--is-ancestor", pin, head], check=True)
+        check_glaze_source(glaze_src)
         if not os.access(cache / "tools/bin/hyprwayland-scanner", os.X_OK):
             blocked("run scripts/build-scanner.sh first")
         scanner_version = output(["pkg-config", "--modversion", "hyprwayland-scanner"], env)
@@ -145,7 +162,8 @@ def main(repo, variant, dry_run):
                  "-DCMAKE_BUILD_TYPE=RelWithDebInfo", "-DNO_HYPRPM=TRUE",
                  "-DCMAKE_INSTALL_PREFIX=" + str(prefix), "-DCMAKE_PREFIX_PATH=" + str(cache / "tools"),
                  "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache", "-DCMAKE_C_COMPILER_LAUNCHER=ccache",
-                 "-DCMAKE_DISABLE_FIND_PACKAGE_Git=TRUE"]
+                 "-DCMAKE_DISABLE_FIND_PACKAGE_Git=TRUE",
+                 "-DFETCHCONTENT_FULLY_DISCONNECTED=ON", "-DFETCHCONTENT_SOURCE_DIR_GLAZE=" + str(glaze_src)]
     if variant == "patched":
         configure.append("-DHYPRVX_DEV=ON")
     commands = [configure, ["cmake", "--build", str(build), "-j4"], ["cmake", "--install", str(build)]]
@@ -186,7 +204,9 @@ def main(repo, variant, dry_run):
             "cmake": output(["cmake", "--version"]).splitlines()[0],
             "libs": {lib: output(["pkg-config", "--modversion", lib], env)
                      for lib in ("aquamarine", "hyprutils", "hyprlang", "hyprgraphics", "hyprcursor")},
-            "scanner": "hyprwayland-scanner v" + scanner_version, "built_at": datetime.now().astimezone().isoformat()}
+            "scanner": "hyprwayland-scanner v" + scanner_version,
+            "deps": {"glaze": {"tag": GLAZE_TAG, "commit": GLAZE_COMMIT}},
+            "built_at": datetime.now().astimezone().isoformat()}
     fd, temporary = tempfile.mkstemp(prefix="build-info.", dir=prefix)
     try:
         with os.fdopen(fd, "w") as handle:

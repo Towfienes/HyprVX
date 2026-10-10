@@ -15,6 +15,11 @@ esac
 
 readonly pin=efb50993780079460b0cbed1363e2166a2de1d9f
 readonly src="$HOME/.cache/hyprvx/$HYPRVX_AGENT/src/hyprland-efb5099"
+# Hyprland's CMake fetches glaze v7.2.0 with FetchContent; the build disables Git discovery for truthful provenance,
+# so glaze is pinned here and handed to CMake as FETCHCONTENT_SOURCE_DIR_GLAZE.
+readonly glaze_tag=v7.2.0
+readonly glaze_pin=b518eec7a22e56ffa238b072c07f47efa7cea97f
+readonly glaze_src="$HOME/.cache/hyprvx/$HYPRVX_AGENT/src/glaze-$glaze_tag"
 run() {
     if "$dry_run"; then printf 'DRY RUN:'; printf ' %q' "$@"; printf '\n'; else "$@"; fi
 }
@@ -53,4 +58,18 @@ for variant in stock v2 v3-dev; do
     fi
     run git -C "$worktree" submodule update --init --recursive
 done
-printf 'Source: %s\n' "$src"
+
+[[ ! -L "$glaze_src" ]] || { echo 'BLOCKED: glaze directory is a symlink.' >&2; exit 1; }
+if [[ ! -e "$glaze_src" ]]; then
+    run git clone --depth 1 --branch "$glaze_tag" https://github.com/stephenberry/glaze.git "$glaze_src"
+elif [[ ! -d "$glaze_src/.git" ]]; then
+    echo 'BLOCKED: existing glaze directory is not the expected clone.' >&2; exit 1
+fi
+if "$dry_run"; then
+    printf 'Expected glaze HEAD: %s\n' "$glaze_pin"
+else
+    [[ $(git -C "$glaze_src" rev-parse HEAD) == "$glaze_pin" && -z $(git -C "$glaze_src" status --porcelain) ]] || {
+        echo 'BLOCKED: glaze checkout is not clean at the pin.' >&2; exit 1;
+    }
+fi
+printf 'Source: %s\nglaze: %s\n' "$src" "$glaze_src"

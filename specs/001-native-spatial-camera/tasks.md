@@ -5,7 +5,7 @@ description: "Task list for Feature 001 — Native Spatial Camera (Claude Code o
 # Tasks: Native Spatial Camera (Feature 001)
 
 **Input**: `specs/001-native-spatial-camera/` — `spec.md`, `plan.md`, `research.md`, `data-model.md`,
-`contracts/transform-contract.md` (v1.1), `contracts/dev-control.md`, `contracts/test-tooling.md` (v1.0),
+`contracts/transform-contract.md` (v1.1), `contracts/dev-control.md` (v1.1), `contracts/test-tooling.md` (v1.1),
 `quickstart.md`, `checklists/verification.md`.
 **Governance**: constitution v1.0.0; master plan §I (Sprint 1); decisions DV3-09..DV3-15.
 
@@ -108,7 +108,7 @@ proven on synthetic data; GATE-A PASS. Claude may write patches during this phas
 
 ### Implementation for User Story 1
 
-- [ ] T024 [US1] Prepare the Claude upstream worktree `~/.cache/hyprvx/claude/src/hyprland-efb5099/v3-dev` with `scripts/fetch-hyprland.sh` once T010 is integrated (manual clone of the same commit is acceptable for drafting; the scripted fetch is used for every judged build) (owner: claude)
+- [ ] T024 [US1] Prepare the Claude upstream worktree `~/.cache/hyprvx/claude/src/hyprland-efb5099/v3-dev` with `scripts/fetch-hyprland.sh` (manual clone of the same commit is acceptable for drafting; the scripted fetch is used for every judged build) (owner: claude)
 - [ ] T025 [US1] Author `patches/hyprland/0001-*.patch`: vendor `CameraMath.hpp` unchanged, add per-monitor camera state (`origin`, `zoom`, `revision` per `data-model.md`: origin finite; zoom finite and `z_min ≤ z ≤ z_max` (MVP 0.1 … 2.0); revision incremented on every change), default `identityFor(M)`, no render change (owner: claude)
 - [ ] T026 [US1] V-09: build `patched` (heavy job, Claude cache) and run `tests/native/t_id.sh` ×3 against the stock build of T014; record evidence; T-ID FAIL is a stop condition (owner: claude)
 

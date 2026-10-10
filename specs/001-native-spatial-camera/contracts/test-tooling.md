@@ -1,6 +1,6 @@
 # Contract: Test Tooling, Evidence and Resource Locks (Feature 001)
 
-**Contract version**: 1.0 (2026-10-10; replan P5; revised 2026-10-11 before the K0 freeze: evidence handoff §8,
+**Contract version**: 1.1 (2026-10-11; T014: `build-info.json` records the pinned FetchContent dependency `deps.glaze`. 1.0 frozen at `966e6b6`)
 GATE-N decision rules §6.1). Owner: Claude (contract). Implementers: see `tasks.md`.
 Changes require a version bump and an entry in `../integration-log.md`. Consumers code against this contract,
 never against another agent's unfinished branch.
@@ -51,12 +51,16 @@ source tree, build tree, prefix or ccache, so neither can alter the other's bina
   "cmake": "4.4.4",
   "libs": {"aquamarine": "0.15.1", "hyprutils": "0.14.2", "hyprlang": "0.6.8", "hyprgraphics": "0.5.1", "hyprcursor": "0.1.13"},
   "scanner": "hyprwayland-scanner v0.4.6",
+  "deps": {"glaze": {"tag": "v7.2.0", "commit": "b518eec7a22e56ffa238b072c07f47efa7cea97f"}},
   "built_at": "2026-10-12T14:15:00+07:00"
 }
 ```
 
 Reproducibility is reported at three separate levels, never one claim for all three:
-1. **Input**: same upstream commit, same ordered patch hashes, same toolchain and library versions.
+1. **Input**: same upstream commit, same ordered patch hashes, same toolchain and library versions, same pinned
+   FetchContent sources (glaze is cloned at its commit by `scripts/fetch-hyprland.sh` and configured offline with
+   `FETCHCONTENT_SOURCE_DIR_GLAZE` and `FETCHCONTENT_FULLY_DISCONNECTED=ON`; Git discovery stays disabled so that
+   `GIT_DIRTY` is the truthful `hyprvx-<patchset_id>` / `clean-upstream`).
 2. **Test result**: the same L1–L5 results from two clean builds of the same input.
 3. **Binary**: identical `binary_sha256`. This is not required (timestamps); report it as observed.
 
