@@ -7,10 +7,14 @@
 are retired, the Codex clone is a read-only historical reference. Phase 2 (T054–T071) and U0 stay blocked until
 T053 and user approval.
 
-- Done: T001–T008, T010–T013 (evidence archived under `~/.local/share/hyprvx/evidence/{claude,codex}/`).
-- Drafted, not ticked: patches 0001–0005 (T025, T035–T038).
-- Next: T014 stock build (blocked at glaze FetchContent while Git discovery is disabled for truthful provenance),
-  then T009, T015–T023, T024–T026, US2/US4 tests, GATE-A, GATE-N, T039–T053 in `tasks.md` order.
+- Done (ticked, evidence archived): T001–T024 except T023 (written, needs patched), T009, T014 (stock build),
+  T015–T018 (harness, nested.sh, refusal tests, testclient), T019–T022 (analyzer, lib/config, lint, GATE-A PASS),
+  T039 (lint on series).
+- Written, not run: T023 t_id, T027–T032 US2 scripts, T033 v2_capture, T034 gate_n, T041–T042 US4 scripts.
+- In progress: patched build (0001–0005, patchset 5005d4c52ac7); then T025/T026 (T-ID), v2 build + T033/T034
+  (GATE-N needs H by Claude), T040 debug loop, T043, T044–T053.
+- Harness facts: tests render on headless output HVX-1 (WAYLAND-1 disabled); startup notices dismissed after an
+  exec-once marker; captures `grim -o HVX-1`; session root /tmp/hyprvx-nested-<uid>-claude.
 
 ## Sprint 1 goal
 
