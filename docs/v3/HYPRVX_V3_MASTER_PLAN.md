@@ -454,7 +454,7 @@ Effort là khoảng thô theo đơn vị *focused engineering-weeks*, độ tin 
 
 ---
 
-## I. First Implementation Sprint (chuẩn bị + `tasks.md` đã duyệt; implementation chờ duyệt `tasks.md`)
+## I. First Implementation Sprint (`tasks.md` đã duyệt tại `966e6b6`; đang thực thi, Claude-only theo DV3-15)
 **Mục tiêu:** chốt rủi ro cao nhất, tức chứng minh có thể render surface thật bị scale/pan đúng pixel mà Normal vẫn pixel-identical.
 
 **Điều chỉnh theo replan (P7, 2026-10-10):**
@@ -503,7 +503,7 @@ Effort là khoảng thô theo đơn vị *focused engineering-weeks*, độ tin 
    - **T-OFF:** về identity ⇒ ảnh bằng ảnh T-ID.
    - Input chưa nằm trong sprint 1; chỉ ghi chú observation.
 7. **Kết quả kỳ vọng:** cửa sổ foot/testclient co đúng 25%, không cắt, không stale; layer-shell (testclient layer tùy chọn) không đổi.
-8. **Success criteria:** GATE-A và GATE-N PASS; T-ID, T-Z*, T-PAN, T-STALE, T-STALE-STATIC, T-OFF đều PASS kèm artifact; L2 invariants PASS (gồm tương đương V1); clean build tái lập 2 lần cho cùng sha256 đầu vào patch (mức input + test-result); Codex chạy lại độc lập (R1) cho cùng kết quả.
+8. **Success criteria:** GATE-A và GATE-N PASS; T-ID, T-Z*, T-PAN, T-STALE, T-STALE-STATIC, T-OFF đều PASS kèm artifact; L2 invariants PASS (gồm tương đương V1); clean build tái lập 2 lần cho cùng sha256 đầu vào patch (mức input + test-result); R1 (T044) là rebuild clean-room do Claude chạy lại, kèm báo cáo kiểm từ source, cho cùng kết quả (DV3-15).
 9. **Stop conditions:**
    - T-ID không pixel-identical.
    - Build đòi đổi package hệ thống.
@@ -570,7 +570,7 @@ Spec Kit CLI 1.1.3 được khởi tạo trong worktree V3 bằng lệnh `specif
 
 | Feature dir | Phase | Trạng thái |
 |---|---|---|
-| `specs/001-native-spatial-camera/` | 0 + 1 + 2 (Sprint 1 nằm trong này) | spec + plan + research + contracts (replan P1–P5 đã áp); `tasks.md` sinh trên branch `v3/001-native-spatial-camera`, chờ duyệt |
+| `specs/001-native-spatial-camera/` | 0 + 1 + 2 (Sprint 1 nằm trong này) | spec + plan + research + contracts (replan P1–P5 đã áp); `tasks.md` trên branch `v3/001-native-spatial-camera`, đã duyệt (`966e6b6`), Sprint 1 đang thực thi |
 | `specs/002-multi-window-drift-mvp/` | 3 (gồm move bằng drag sửa `O(w)`, DV3-11) | tạo khi 001 qua cổng |
 | `specs/003-trackpad-native-ux/` | 4 | — |
 | `specs/004-drift-window-behavior/` | 5 | — |

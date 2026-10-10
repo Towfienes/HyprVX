@@ -10,7 +10,7 @@ directly.
 cd /home/towfienes/Projects/HyprVX-v3
 
 # Each agent uses its own cache root (contracts/test-tooling.md): ~/.cache/hyprvx/<agent>/{src,build,prefix,ccache,tools}
-set -x HYPRVX_AGENT claude                # or: codex
+set -x HYPRVX_AGENT claude
 
 # 1. Pin upstream and apply the patch series (outside the repo)
 bash scripts/fetch-hyprland.sh            # clones + verifies HEAD == efb50993…
@@ -42,6 +42,6 @@ bash scripts/nested.sh stop               # refuses unless PID/start-time/signat
   compositor.
 - Never use `ydotool`/uinput. Pointer tests use `tools/vpointer` connected to the nested `WAYLAND_DISPLAY` only.
 - Raw evidence (images, JSONL, logs, `build-info.json`) is written under `~/.cache/hyprvx/<agent>/evidence/<run-id>/`;
-  only `summary.json` and `SHA256SUMS` are committed under `evidence/<run-id>/`. Claude imports and verifies each run
+  only `summary.json` and `SHA256SUMS` are committed under `evidence/<run-id>/`. Each run is archived and verified
   into `~/.local/share/hyprvx/evidence/<agent>/<run-id>/` (inspect with `sha256sum -c SHA256SUMS`). Runs are referenced from
   `checklists/verification.md`.

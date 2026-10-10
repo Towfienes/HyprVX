@@ -1,6 +1,6 @@
 # Contract: Test Tooling, Evidence and Resource Locks (Feature 001)
 
-**Contract version**: 1.1 (2026-10-11; T014: `build-info.json` records the pinned FetchContent dependency `deps.glaze`. 1.0 frozen at `966e6b6`)
+**Contract version**: 1.2 (2026-10-11; editorial only, DV3-15: single agent, no interface change. 1.1 added `deps.glaze`; 1.0 frozen at `966e6b6`)
 GATE-N decision rules §6.1). Owner: Claude (contract). Implementers: see `tasks.md`.
 Changes require a version bump and an entry in `../integration-log.md`. Consumers code against this contract,
 never against another agent's unfinished branch.
@@ -20,8 +20,8 @@ PASS unconditionally, and a dispatcher reply is never a pass condition.
 | `~/.local/share/hyprvx/evidence/<agent>/<run-id>/` | **Retained archive**, imported and checksum-verified by Claude (§8); files read-only; never deleted by any tool | Claude only |
 | `evidence/<run-id>/` (in each repo checkout) | **Committed index**: `summary.json` and `SHA256SUMS` only | the running agent |
 
-`<agent>` ∈ {`claude`, `codex`} from `HYPRVX_AGENT` (scripts refuse to run when it is unset). Agents never share a
-source tree, build tree, prefix or ccache, so neither can alter the other's binaries. `run-id` is
+`<agent>` comes from `HYPRVX_AGENT` (scripts refuse to run when it is unset). Since DV3-15 all new work uses
+`claude`; `codex` caches and archives from the retired Codex lane are kept as history and never reused. `run-id` is
 `YYYYMMDD-HHMMSS-<variant>-<git-short-sha>` (local time, e.g. `20261012-141500-patched-1a2b3c4`).
 
 ## 2. Resource lock and memory checks
@@ -181,22 +181,22 @@ Exit codes: 0 ok, 1 command failed, 2 usage, 3 identity verification failed. Log
 never deleted by tools.
 
 **Commit trailer.** `Evidence:` names the run-id and the raw directory, for example
-`Evidence: 20261012-141500-stock-1a2b3c4 ~/.cache/hyprvx/codex/evidence/20261012-141500-stock-1a2b3c4/`.
+`Evidence: 20261012-141500-stock-1a2b3c4 ~/.cache/hyprvx/claude/evidence/20261012-141500-stock-1a2b3c4/`.
 A trailer may only reference a run whose raw directory exists on this machine and whose committed `SHA256SUMS`
 verifies. Results without such evidence are reported as NOT RUN, never PASS.
 
-**Import (Claude, at every integration).** Before ticking a task:
-1. Confirm `evidence/<run-id>/SHA256SUMS` in the reviewed commit is byte-identical to the one in the raw directory.
+**Archive (before ticking a task).**
+1. Confirm `evidence/<run-id>/SHA256SUMS` in the commit is byte-identical to the one in the raw directory.
 2. Copy the raw directory to `~/.local/share/hyprvx/evidence/<agent>/<run-id>/` (`cp -a`), make the copy read-only
    (`chmod -R a-w`), and run `sha256sum -c SHA256SUMS` inside the copy.
 3. Record run-id, archive path and the `sha256sum -c` result in `../integration-log.md`.
-Any missing file or checksum mismatch rejects the handoff: the task is not ticked and its result is NOT RUN until a
-new run is handed off. Claude's own runs are archived the same way.
+Any missing file or checksum mismatch means the task is not ticked and its result is NOT RUN until a new run is
+archived.
 
 **Inspect (user).** `cd ~/.local/share/hyprvx/evidence/<agent>/<run-id>/ && sha256sum -c SHA256SUMS`, then open
 the PNGs and read `summary.json`. `checklists/verification.md` cites the archive path and run-id for every PASS.
 
-**Retain.** The archive is outside both repos and outside the agent caches, so deleting the Codex clone or a cache
+**Retain.** The archive is outside both repos and outside the agent caches, so deleting a clone or a cache
 does not lose evidence. Nothing deletes it automatically; pruning is the user's decision.
 
 `summary.json`:
