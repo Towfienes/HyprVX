@@ -138,6 +138,18 @@ class AnalyzerTest(unittest.TestCase):
         code, out = self.run_analyzer("diff", c, "--reference", b, "--max-pixels", "1")
         self.assertEqual(code, 0)
 
+    def test_region_excludes_a_second_client_with_the_same_markers(self):
+        # A second testclient (e.g. a layer surface) uses the same marker colors; --region isolates the window.
+        image = frame(self.client, 140, 100)
+        image.paste(testclient(240, 140), (980, 620))
+        path = self.save(image, "two.png")
+        code, out = self.run_analyzer("bbox", path, "--expect-box", "140,100,800,600", "--tolerance", "0")
+        self.assertEqual(code, 1)
+        code, out = self.run_analyzer("bbox", path, "--expect-box", "140,100,800,600", "--tolerance", "0",
+                                      "--region", "0,0,970,800")
+        self.assertEqual(code, 0, out)
+        self.assertEqual(out["bbox"], {"x": 140, "y": 100, "w": 800, "h": 600})
+
     def test_blocked_on_unreadable_input_bad_arguments_or_size_mismatch(self):
         bad = self.dir / "bad.png"
         bad.write_bytes(b"not an image")

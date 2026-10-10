@@ -5,6 +5,7 @@
 set -uo pipefail
 here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$here/lib.sh"
+set +e  # lib.sh enables errexit; a failing test must be recorded, not end the suite
 TESTS=(t_id t_zoom t_pan t_stale t_stale_static t_layer t_off t_invalid)
 SCALES=(${HVX_SCALES:-1 1.25})
 

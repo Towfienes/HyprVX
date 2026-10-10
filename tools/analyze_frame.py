@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """HyprVX frame analyzer (contracts/test-tooling.md section 6).
 
-  python3 -I tools/analyze_frame.py bbox IMAGE --expect-box X,Y,W,H --tolerance PX [--allow-clip X,Y,W,H] --out JSON
+  python3 -I tools/analyze_frame.py bbox IMAGE --expect-box X,Y,W,H --tolerance PX [--allow-clip X,Y,W,H] [--region X,Y,W,H] --out JSON
   python3 -I tools/analyze_frame.py diff IMAGE --reference IMG [--max-pixels N] --out JSON
 
 Exit codes: 0 PASS, 1 FAIL, 2 BLOCKED (unreadable input or bad arguments).
@@ -84,13 +84,15 @@ def parse_box(text):
     return {"x": x, "y": y, "w": w, "h": h}
 
 
-def find_markers(width, height, pixels):
-    """Bounding box (x0, y0, x1, y1) of each marker color, or None when absent."""
+def find_markers(width, height, pixels, region=None):
+    """Bounding box (x0, y0, x1, y1) of each marker color, or None when absent; only pixels inside region count."""
     found = {name: None for name in MARKERS}
     tol = MARKER_CHANNEL_TOLERANCE
-    for y in range(height):
+    x_range = range(width) if region is None else range(max(0, region["x"]), min(width, region["x"] + region["w"]))
+    y_range = range(height) if region is None else range(max(0, region["y"]), min(height, region["y"] + region["h"]))
+    for y in y_range:
         row = y * width * 3
-        for x in range(width):
+        for x in x_range:
             i = row + x * 3
             r, g, b = pixels[i], pixels[i + 1], pixels[i + 2]
             for name, (mr, mg, mb) in MARKERS.items():
@@ -112,9 +114,9 @@ def inside(point, region):
     return region["x"] <= x < region["x"] + region["w"] and region["y"] <= y < region["y"] + region["h"]
 
 
-def analyze_bbox(image, expect, tolerance, allow_clip):
+def analyze_bbox(image, expect, tolerance, allow_clip, region=None):
     width, height, pixels = load_rgb(image)
-    found = find_markers(width, height, pixels)
+    found = find_markers(width, height, pixels, region)
     reasons = []
 
     # Expected marker corners derived from the expected box.
@@ -188,6 +190,7 @@ def main(argv):
     parser.add_argument("--expect-box")
     parser.add_argument("--tolerance", type=int, default=2)
     parser.add_argument("--allow-clip")
+    parser.add_argument("--region", help="only pixels inside X,Y,W,H are searched for markers (e.g. to exclude another client)")
     parser.add_argument("--reference")
     parser.add_argument("--max-pixels", type=int, default=0)
     parser.add_argument("--out", required=True)
@@ -204,7 +207,8 @@ def main(argv):
             if not args.expect_box:
                 raise Blocked("bbox needs --expect-box")
             allow = parse_box(args.allow_clip) if args.allow_clip else None
-            result.update(analyze_bbox(args.image, parse_box(args.expect_box), args.tolerance, allow))
+            region = parse_box(args.region) if args.region else None
+            result.update(analyze_bbox(args.image, parse_box(args.expect_box), args.tolerance, allow, region))
         else:
             if not args.reference:
                 raise Blocked("diff needs --reference")

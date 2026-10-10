@@ -25,7 +25,8 @@ hvx_init_run() {
     local sha
     sha=$(git -C "$HVX_REPO" rev-parse --short=7 HEAD)
     HVX_TEST="$2"
-    HVX_RUN_ID="$(date +%Y%m%d-%H%M%S)-$1-$sha"
+    # The test name keeps run-ids unique when tests start within the same second (e.g. run_sprint1).
+    HVX_RUN_ID="$(date +%Y%m%d-%H%M%S)-$1-$sha-$2"
     HVX_EVID="$HOME/.cache/hyprvx/$HYPRVX_AGENT/evidence/$HVX_RUN_ID"
     mkdir -p "$HVX_EVID"
     { date -Is; git -C "$HVX_REPO" rev-parse HEAD; grep MemAvailable /proc/meminfo; cat /proc/pressure/memory; } \

@@ -16,7 +16,8 @@ hvx_nested start --variant patched --size "$SIZE" --scale "$SCALE" > "$HVX_EVID/
 hvx_client_start window 800x600
 hvx_client_start layer 240x140 --layer TOP --position 980,620 --app-id hyprvx-layer
 hvx_capture identity window
-hvx_analyze identity bbox "$HVX_EVID/identity.png" --expect-box 140,100,800,600 --tolerance 2 \
+# The layer client draws the same markers; measure the window outside the layer box.
+hvx_analyze identity bbox "$HVX_EVID/identity.png" --expect-box 140,100,800,600 --tolerance 2 --region 0,0,970,800 \
     || hvx_die_blocked "identity window box not found (setup invalid)"
 result=PASS
 for cam in "0 0 0.5" "100 50 1.5" "-400 -300 0.25"; do
