@@ -7,14 +7,16 @@
 are retired, the Codex clone is a read-only historical reference. Phase 2 (T054–T071) and U0 stay blocked until
 T053 and user approval.
 
-- Done (ticked, evidence archived): T001–T024 except T023 (written, needs patched), T009, T014 (stock build),
-  T015–T018 (harness, nested.sh, refusal tests, testclient), T019–T022 (analyzer, lib/config, lint, GATE-A PASS),
-  T039 (lint on series).
-- Written, not run: T023 t_id, T027–T032 US2 scripts, T033 v2_capture, T034 gate_n, T041–T042 US4 scripts.
-- In progress: patched build (0001–0005, patchset 5005d4c52ac7); then T025/T026 (T-ID), v2 build + T033/T034
-  (GATE-N needs H by Claude), T040 debug loop, T043, T044–T053.
-- Harness facts: tests render on headless output HVX-1 (WAYLAND-1 disabled); startup notices dismissed after an
-  exec-once marker; captures `grim -o HVX-1`; session root /tmp/hyprvx-nested-<uid>-claude.
+- Done (ticked, evidence archived): T001–T026, T033–T039 except none; GATE-A PASS (V-23), GATE-N PASS with H
+  (V-24; RC1 detected, RC2 not reproduced), T-ID PASS on patchset 5005d4c52ac7 (re-run needed on the current series).
+- T040 debug loop (2026-10-11): patch 0002 gained two fixes found by native runs: border interior under the camera,
+  and round-out of fractional clip/damage/border regions (scale 1.25). Current series patchset 47b6baa12904
+  (repo fbd98a9); patched rebuild was started in the background (evidence dir in scratchpad/patched-rid).
+- Suite status before the rounding fix (run 20261011-044316-…-sprint1): 15/16 PASS, only t_layer at scale 1.25 FAIL.
+- Next: archive the 47b6baa12904 build, re-run tests/native/run_sprint1.sh (T040; T-ID included), then T043 tick,
+  T044 clean-room (fresh worktree via apply-patches --reset, CCACHE_DISABLE=1 build, run_sprint1; source report
+  already written in specs/001-native-spatial-camera/r1-source-verification.md), T045 m_cost, T046 two clean
+  rebuilds, T047–T053 (G1 = stop for user approval).
 
 ## Sprint 1 goal
 
