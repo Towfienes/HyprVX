@@ -205,6 +205,13 @@ if(HYPRVX_WITH_WAYLAND_PLATFORM)
     add_executable(hyprvx_native_dev platform/src/native_dev_main.cpp)
     set_target_properties(hyprvx_native_dev PROPERTIES OUTPUT_NAME hyprvx-native-dev)
     target_link_libraries(hyprvx_native_dev PRIVATE hyprvx_wayland_platform)
+
+    # Deterministic client for native tests (contracts/test-tooling.md section 4).
+    add_executable(hyprvx_testclient tools/testclient/main.cpp ${HYPRVX_GENERATED_PROTOCOLS})
+    set_target_properties(hyprvx_testclient PROPERTIES OUTPUT_NAME hyprvx-testclient)
+    target_include_directories(hyprvx_testclient PRIVATE ${HYPRVX_PROTOCOL_DIR})
+    target_link_libraries(hyprvx_testclient PRIVATE PkgConfig::WAYLAND_CLIENT)
+    target_compile_features(hyprvx_testclient PRIVATE cxx_std_20)
 endif()
 
 if(HYPRVX_WITH_HYPRLAND_PLUGIN)
