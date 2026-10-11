@@ -163,8 +163,11 @@ if [[ ${HVX_X11_POLICY:-1} == 1 ]]; then
         run_states policy- 0
         # Fallback: a second X11 client whose menu has no WM_TRANSIENT_FOR; it is focused (mapped last) and gets
         # O = (300,100) the same way; its menu must take the focused window's offset.
+        # y is mapped with Drift OFF, so spawn placement (R6) leaves it at L; x keeps its stored offset across off/on.
         set_camera policy-fb-cam 0 0 1
+        hvx_dispatch hyprvx:off > /dev/null 2>&1 || true
         hvx_x11client_start y 400x300 --menu 100,80,160,120 --menu-parent no --class hyprvx-x11client-y
+        hvx_dispatch hyprvx:on > /dev/null 2>&1 || true
         hvx_x11_ready y w
         clients fb
         read -r ADDR_Y YX YY YW YH < <(python3 -I "$GEOM" client "$HVX_EVID/fb.clients.json" hyprvx-x11client-y) || hvx_die_blocked "no second X11 client"

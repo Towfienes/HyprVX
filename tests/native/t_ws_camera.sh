@@ -6,6 +6,8 @@
 #  3. Back to 1: capture = ws1 (0 px); back to 2: capture = ws2 (0 px).
 #  4. Recreated id: workspace 3 with client e, zoom 0.5: capture ws3; e quits, workspace 1 (workspace 3 is destroyed,
 #     checked in `hyprctl workspaces`), workspace 3 again with a new e: capture = ws3 (stored camera restored).
+# Clients are mapped while Drift is OFF (d at setup; e with Drift switched off around its map), so spawn placement (R6)
+# does not move them and their drawn boxes depend on the camera alone; stored cameras survive Drift off/on.
 set -euo pipefail
 source "$(dirname -- "${BASH_SOURCE[0]}")/lib.sh"
 SIZE="${HVX_OUTPUT_SIZE:-1280x800}"
@@ -30,6 +32,9 @@ ws() { hvx_dispatch workspace "$1" > "$HVX_EVID/ws$1-$2.reply" 2>&1 || true; }
 hvx_start_form --policy --size "$SIZE" --scale "$SCALE" > "$HVX_EVID/session.log" 2>&1 \
     || { cat "$HVX_EVID/session.log" >&2; hvx_die_blocked "form $HVX_FORM session did not start"; }
 hvx_client_start a 300x200
+ws 2 setup
+hvx_client_start d 300x200 --app-id hyprvx-testclient-b
+ws 1 setup
 hvx_vpointer_start vp
 printf 'move 0 0\n' > "$HVX_EVID/home.cmds"
 hvx_pointer_run home.steps vp "$HVX_EVID/home.cmds" a
@@ -43,7 +48,6 @@ box_at ws1 a 170,100,150,100 || hvx_die_blocked "workspace 1 camera not applied 
 
 # 2
 ws 2 first
-hvx_client_start d 300x200 --app-id hyprvx-testclient-b
 hvx_capture ws2-first d
 box_at ws2-first d 960,560,300,200 || fail "workspace 2 does not start at identity (workspace 1's camera leaked)"
 hvx_dispatch hyprvx:zoom 0.8 > /dev/null 2>&1 || true
@@ -59,8 +63,10 @@ hvx_capture ws2-back d
 same ws2-back ws2-back ws2
 
 # 4
+hvx_dispatch hyprvx:off > /dev/null 2>&1 || true
 ws 3 first
 hvx_client_start e 300x200 --app-id hyprvx-testclient-c
+hvx_dispatch hyprvx:on > /dev/null 2>&1 || true
 hvx_dispatch hyprvx:zoom 0.5 > /dev/null 2>&1 || true
 hvx_capture ws3 e
 hvx_client_cmd e quit
@@ -73,8 +79,10 @@ python3 -I -c "
 import json, sys
 sys.exit(1 if any(w['id'] == 3 for w in json.load(open(sys.argv[1]))) else 0)" "$HVX_EVID/workspaces.json" \
     || hvx_die_blocked "workspace 3 was not destroyed (setup invalid)"
+hvx_dispatch hyprvx:off > /dev/null 2>&1 || true
 ws 3 recreated
 hvx_client_start e 300x200 --app-id hyprvx-testclient-c
+hvx_dispatch hyprvx:on > /dev/null 2>&1 || true
 hvx_capture ws3-recreated e
 same ws3-recreated ws3-recreated ws3
 
