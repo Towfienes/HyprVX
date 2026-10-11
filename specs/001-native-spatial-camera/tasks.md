@@ -225,8 +225,8 @@ Note: "Phase N" headings in this file are Spec Kit task phases; "master-plan Pha
 ## Phase 9: Feature 001 gate
 
 - [x] T069 R1 for Phase 2: clean-room rebuild and full-suite re-run (Sprint 1 + US3 + spike) on the final commit, with a source-verification report on 0006–0009 as in T044 (owner: claude)
-- [ ] T070 Update `checklists/verification.md` (all V-xx), `integration-log.md`, `.ai/CURRENT_STATE.md`, `.ai/NEXT_TASK.md`; human review V-20 for the Phase 2 image set (owner: claude)
-- [ ] T071 **Feature 001 gate**: present L4 + L5 + L5b evidence and the delivery decision; STOP for user approval before merging into `v3/spec-foundation`, Feature 002 or the U0 spike (owner: claude)
+- [x] T070 Update `checklists/verification.md` (all V-xx), `integration-log.md`, `.ai/CURRENT_STATE.md`, `.ai/NEXT_TASK.md`; human review V-20 for the Phase 2 image set (owner: claude)
+- [x] T071 **Feature 001 gate**: present L4 + L5 + L5b evidence and the delivery decision; STOP for user approval before merging into `v3/spec-foundation`, Feature 002 or the U0 spike (owner: claude)
 
 ---
 

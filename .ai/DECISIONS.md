@@ -308,3 +308,20 @@ work, integrated Codex commits, evidence and approved technical corrections (P1â
 GATE-A, GATE-N, U0) remain. Open tasks keep their IDs, dependencies and gates and are owned by Claude. Technical
 difference: R1 (T044, T069) and T068 lose author/verifier independence; they become clean-room rebuilds with a
 source-verification report written before reading new results. The Codex clone is left untouched as a reference.
+
+### DV3-16 - Production delivery: plugin on stock Hyprland (DV3-01 outcome)
+
+Status: accepted (user, 2026-10-11, at the Feature 001 gate T071).
+
+Applying the DV3-01 rule: the plugin-hook spike (T066â€“T068) passed the same visual + input suites as the patch series
+with byte-identical captures, so production delivery is a plugin on stock Hyprland. The spike is **not
+production-ready**; these risks stay recorded and open (`specs/001-native-spatial-camera/delivery-decision.md`):
+24 hooks, 17 of them whole copies of patched Hyprland functions (about 1700 lines, generated from the patch series,
+which therefore stays maintained); private-member access through `#define private public`; ABI compatibility
+(same compiler and exact headers of the running binary, x86_64 trampolines, signature mismatches found only at load
+time); two seams a hook cannot reach (file-static `updateRelativeCursorCoords`, the special-workspace camera hint);
+regeneration and re-verification on every Hyprland update. Not verified: loading into the distribution binary,
+special workspaces, warp-on-focus, pointer constraints under a camera, physical hardware. The plugin is not installed
+into the host and the host Hyprland binary is not replaced. Roadmap, architecture C (patch the mechanism, plugin the
+policy) and all gates are unchanged.
+

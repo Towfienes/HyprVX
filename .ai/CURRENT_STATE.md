@@ -400,3 +400,13 @@ Production safety: host Hyprland and Caelestia untouched; no plugin loaded; no p
   created by Claude.
 - Production safety: V-22 Phase 2 audit `20261011-141225-audit-c836666-v22p2` PASS; `dev` still at `15f75b0`;
   nothing pushed.
+
+## Feature 001 closed at T071 (2026-10-11)
+
+- The user approved the Feature 001 gate (T071) and the Phase 2 V-20 image set (T070); `tasks.md` T001–T071 are all
+  ticked with archived evidence.
+- Delivery decision DV3-16: plugin on stock Hyprland per DV3-01. The spike is not production-ready; risks recorded
+  in `delivery-decision.md` and `.ai/DECISIONS.md`. Nothing installed into the host.
+- Kept: V-08 PARTIAL, frames presented NOT MEASURED, NOT RUN items listed in the T071 integration-log row.
+- Not done (needs user approval): merging `v3/001-native-spatial-camera` into `v3/spec-foundation`, the U0 spike,
+  Feature 002 specification.

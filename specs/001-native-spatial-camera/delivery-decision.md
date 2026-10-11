@@ -1,6 +1,8 @@
 # Delivery decision: patch series vs plugin function hooks (T067, V-21)
 
-**Status**: evidence complete for the spike; the decision is presented at the Feature 001 gate (T071) for user approval.
+**Status**: **decided by the user on 2026-10-11 at the Feature 001 gate (T071): plugin on stock Hyprland, per DV3-01
+(DV3-16).** The spike is not production-ready: every cost and risk below stays open. The plugin is not installed into
+the host, and the host Hyprland binary is not replaced.
 **Rule being applied** (master plan §A item 4, DV3-01): if the plugin-hook port passes the **same visual + input
 suite**, ship the plugin on stock Hyprland; otherwise ship the patched Hyprland side by side (own prefix, own session,
 stock Hyprland stays the fallback).

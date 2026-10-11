@@ -537,6 +537,9 @@ Effort là khoảng thô theo đơn vị *focused engineering-weeks*, độ tin 
   compositor/GPU/socket host vẫn duyệt tay; không Full Access/Bypass), áp dụng từ WO-04.
 - **DV3-15** Dừng cộng tác Claude + Codex (user, 2026-10-11): Claude Code là agent implementation duy nhất; mục O hết
   hiệu lực trừ O5; DV3-09 (hybrid) và DV3-14 bị thay thế; công việc và evidence đã có được giữ nguyên.
+- **DV3-16** Phân phối production theo DV3-01 (user, 2026-10-11, cổng Feature 001): plugin chạy trên Hyprland gốc,
+  vì spike plugin-hook PASS cùng bộ test visual + input. Spike chưa phải production-ready; rủi ro trong
+  `specs/001-native-spatial-camera/delivery-decision.md`. Roadmap, kiến trúc C và các gate không đổi.
 
 **Còn mở:**
 - License toàn dự án (D010 của V1). `CameraMath.hpp` đã chốt BSD-3-Clause (DV3-10).

@@ -12,9 +12,13 @@
   V-04 two clean rebuilds with byte-identical captures. T045 cost measured (informational).
 - **G1 approved by the user on 2026-10-11 (T053 ticked).** Phase 2 T054–T069 are done (patches 0006–0009, US3
   8/8, delivery spike, Phase 2 R1); see `.ai/CURRENT_STATE.md` "Phase 2 status at the Feature 001 gate".
-- **Next: T071 Feature 001 gate — STOP for user approval.** Pending user actions: V-20 review of the Phase 2 image
-  set (`checklists/verification.md`, closes T070) and the delivery decision (`delivery-decision.md`). U0 and
-  Feature 002 stay blocked until then. Native runs need the host GPU profile Integrated (AMD only).
+- **Feature 001 gate T071 approved by the user on 2026-10-11** (T070 V-20 Phase 2 PASS; delivery DV3-16: plugin on
+  stock Hyprland, spike not production-ready). All of T001–T071 are ticked.
+- **Next (each needs the user's go-ahead):** merge `v3/001-native-spatial-camera` into `v3/spec-foundation` (no
+  merge or push without approval, DV3-13); then, per the master plan roadmap, the time-boxed U0 unified-world spike
+  (DV3-12, evidence only, no merge of its code) and Spec Kit for Feature 002 / Phase 3 Multi-Window MVP
+  (`/speckit-specify` → plan → tasks, tasks approval before implementation). Native runs need the host GPU profile
+  Integrated (AMD only).
 - V-20 / SC-005: PASS, signed by the user (Towfienes) on 2026-10-11 in `checklists/verification.md`.
 
 ## Sprint 1 goal
