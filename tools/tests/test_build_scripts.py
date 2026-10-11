@@ -36,7 +36,7 @@ class BuildScriptTest(unittest.TestCase):
                 stub = root / tool
                 stub.write_text(f"#!/bin/sh\nprintf called >> '{marker}'\nexit 97\n")
                 stub.chmod(0o700)
-            variants = ("stock", "v2", "patched") if SCRIPT.name == "build-hyprland.sh" else (None,)
+            variants = ("stock", "v2", "patched", "patched-nodev") if SCRIPT.name == "build-hyprland.sh" else (None,)
             for variant in variants:
                 with self.subTest(variant=variant):
                     args = ["--variant", variant] if variant else DRY_RUN_ARGS
@@ -53,6 +53,8 @@ class BuildScriptTest(unittest.TestCase):
                             self.assertIn("-DHYPRVX_DEV=ON", result.stdout)
                         else:
                             self.assertNotIn("HYPRVX_DEV", result.stdout)
+                        if variant == "patched-nodev":
+                            self.assertIn("-nodev/build-info.json", result.stdout)
                         self.assertNotIn("-DCMAKE_CXX_FLAGS=", result.stdout)
                     if SCRIPT.name == "apply-patches.sh":
                         self.assertIn("patchset_id=bc05d46c42b0", result.stdout)
@@ -286,7 +288,7 @@ class GlazePinTest(unittest.TestCase):
                 build.check_glaze_source(link, self.fake_git())
 
     def test_dry_run_configures_offline_glaze_and_keeps_git_disabled(self):
-        for variant in ("stock", "v2", "patched"):
+        for variant in ("stock", "v2", "patched", "patched-nodev"):
             result = subprocess.run(["bash", str(SCRIPT), "--variant", variant, "--dry-run"],
                                     env=os.environ | {"HYPRVX_AGENT": "claude"}, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
