@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # FR-016 check (Feature 002 T057): the dev control exists only in test builds.
-#  Static: the literal "hyprvx-dev" (the hyprctl command and dispatcher prefix) is absent from the delivered plugin
-#  form S (plugin/S) and from the patched build without the dev control (prefix <patchset>-nodev, build variant
-#  patched-nodev); present in plugin/S-dev and the dev patched build (positive controls, so the check is not vacuous).
+#  Static: the dev command table's keywords ("camera-mon", "full-damage", exact strings) are absent from the delivered
+#  plugin form S (plugin/S) and from the patched build without the dev control (prefix <patchset>-nodev, build variant
+#  patched-nodev), and form S has no HyprVXSpike::registerDevControl symbol; all present in plugin/S-dev and the dev
+#  patched build (positive controls, so the check is not vacuous). The name "hyprvx-dev" itself is not searched: the
+#  compiler builds that 10-byte std::string from immediates (no literal in .rodata), as the first T057 run found.
 #  Runtime: `hyprctl hyprvx-dev state` is rejected in a stock session with plugin/S loaded and in a patched-nodev
 #  session with plugin/P loaded, while the policy answers (`hyprctl hyprvx state`) and Drift enters (Super+Escape is
 #  consumed afterwards, the Drift-is-on probe); the dev patched session answers `hyprvx-dev state` (control).
@@ -27,12 +29,15 @@ cp "$NODEV/build-info.json" "$HVX_EVID/build-info-patched-nodev.json"
 hvx_copy_build_info patched
 sha256sum "$PLUG/S/hyprvx-drift-S.so" "$PLUG/S-dev/hyprvx-drift-S.so" "$PLUG/P/hyprvx-drift-P.so" "$NODEV/bin/Hyprland" "$DEVBIN" > "$HVX_EVID/binaries.sha256"
 
-# Static
-has() { strings -a "$2" | grep -c 'hyprvx-dev' > "$HVX_EVID/strings-$1.txt" || true; cat "$HVX_EVID/strings-$1.txt"; }
-[[ $(has plugin-S "$PLUG/S/hyprvx-drift-S.so") == 0 ]] && ok "plugin S: no hyprvx-dev" || fail "plugin S contains hyprvx-dev"
-[[ $(has patched-nodev "$NODEV/bin/Hyprland") == 0 ]] && ok "patched-nodev: no hyprvx-dev" || fail "patched-nodev contains hyprvx-dev"
-[[ $(has plugin-S-dev "$PLUG/S-dev/hyprvx-drift-S.so") -gt 0 ]] && ok "control: plugin S-dev has hyprvx-dev" || hvx_die_blocked "control: S-dev lacks hyprvx-dev (check vacuous)"
-[[ $(has patched-dev "$DEVBIN") -gt 0 ]] && ok "control: dev patched build has hyprvx-dev" || hvx_die_blocked "control: dev build lacks hyprvx-dev (check vacuous)"
+# Static: number of dev command keywords (0..2) and of registerDevControl definitions in each binary
+has() { strings -a "$2" | grep -cxE 'camera-mon|full-damage' > "$HVX_EVID/keywords-$1.txt" || true; cat "$HVX_EVID/keywords-$1.txt"; }
+sym() { nm -C --defined-only "$2" | grep -c 'HyprVXSpike::registerDevControl()$' > "$HVX_EVID/symbol-$1.txt" || true; cat "$HVX_EVID/symbol-$1.txt"; }
+[[ $(has plugin-S "$PLUG/S/hyprvx-drift-S.so") == 0 ]] && ok "plugin S: no dev command keywords" || fail "plugin S contains dev command keywords"
+[[ $(sym plugin-S "$PLUG/S/hyprvx-drift-S.so") == 0 ]] && ok "plugin S: no registerDevControl" || fail "plugin S defines registerDevControl"
+[[ $(has patched-nodev "$NODEV/bin/Hyprland") == 0 ]] && ok "patched-nodev: no dev command keywords" || fail "patched-nodev contains dev command keywords"
+[[ $(has plugin-S-dev "$PLUG/S-dev/hyprvx-drift-S.so") == 2 ]] && ok "control: plugin S-dev has both keywords" || hvx_die_blocked "control: S-dev lacks the dev keywords (check vacuous)"
+[[ $(sym plugin-S-dev "$PLUG/S-dev/hyprvx-drift-S.so") -gt 0 ]] && ok "control: plugin S-dev defines registerDevControl" || hvx_die_blocked "control: S-dev lacks registerDevControl (check vacuous)"
+[[ $(has patched-dev "$DEVBIN") == 2 ]] && ok "control: dev patched build has both keywords" || hvx_die_blocked "control: dev build lacks the dev keywords (check vacuous)"
 
 # Runtime: stock + plugin S
 hvx_nested start --variant stock --size "$SIZE" --scale "$SCALE" > "$HVX_EVID/s.session.log" 2>&1 || hvx_die_blocked "stock session did not start"

@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """Form P / form S capture parity for Feature 002 (V-23, T054).
 
-  python3 -I tests/native/compare_forms.py --suite-p DIR --suite-s DIR --out JSON
+  python3 -I tests/native/compare_forms.py --suite-p DIR --suite-s DIR --out JSON [--form-p F] [--form-s F]
+
+Only the per-test runs of form --form-p (default P) are taken from --suite-p and of form --form-s (default S) from
+--suite-s, so a suite holding both forms (run_feature002.sh default) can be used. With the same form on both sides it
+compares two suites of one form (V-27 reproducibility, T057).
 
 Each suite archive (run_feature002.sh) lists its per-test runs in results.txt ("TEST form=F scale=S RESULT run=ID").
 For every (test, scale) present in both suites, every capture (*.png) that both runs wrote under the same name must be
@@ -24,7 +28,7 @@ EXCLUDED = {("t_ws_anim", "control-early.png"): "mid-animation frame with Drift 
 EVIDENCE = Path.home() / ".local/share/hyprvx/evidence/claude"
 
 
-def runs(suite):
+def runs(suite, form):
     out = {}
     results = Path(suite) / "results.txt"
     if not results.is_file():
@@ -35,6 +39,8 @@ def runs(suite):
         if len(words) < 5:
             continue
         fields = dict(w.split("=", 1) for w in words[1:] if "=" in w)
+        if fields.get("form") != form:
+            continue
         out[(words[0], fields.get("scale"))] = {"result": words[3], "run": fields.get("run")}
     return out
 
@@ -48,9 +54,11 @@ def main():
     parser.add_argument("--suite-p", required=True)
     parser.add_argument("--suite-s", required=True)
     parser.add_argument("--out", required=True)
+    parser.add_argument("--form-p", default="P", choices=["P", "S"])
+    parser.add_argument("--form-s", default="S", choices=["P", "S"])
     args = parser.parse_args()
-    p, s = runs(args.suite_p), runs(args.suite_s)
-    report = {"suite_p": args.suite_p, "suite_s": args.suite_s, "compared": 0, "identical": 0, "differ": [], "gaps": [],
+    p, s = runs(args.suite_p, args.form_p), runs(args.suite_s, args.form_s)
+    report = {"suite_p": args.suite_p, "suite_s": args.suite_s, "form_p": args.form_p, "form_s": args.form_s, "compared": 0, "identical": 0, "differ": [], "gaps": [],
               "excluded": [], "pairs": []}
     for key in sorted(set(p) | set(s)):
         test, scale = key
