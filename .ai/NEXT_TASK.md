@@ -15,9 +15,12 @@
 - **Feature 001 gate T071 approved by the user on 2026-10-11** (T070 V-20 Phase 2 PASS; delivery DV3-16: plugin on
   stock Hyprland, spike not production-ready). All of T001–T071 are ticked.
 - Merge into `v3/spec-foundation` done (`6931c04`); U0 spike done (`docs/v3/U0_FEASIBILITY_REPORT.md`).
-- **Next: STOP for the user's approval to start Feature 002 / Phase 3 Multi-Window MVP (Option A)** via Spec Kit
-  (`/speckit-specify` → plan → tasks, tasks approval before implementation). No push. Native runs need the host GPU
-  profile Integrated (AMD only).
+- Feature 002 started (user approval 2026-10-11) on branch `v3/002-multi-window-drift-mvp`: spec, plan, research,
+  data model, contracts (drift-control 1.0, mechanism-api 1.0, transform 1.2, test-tooling 1.4), quickstart,
+  checklists and `tasks.md` (T001–T062) are written; `/speckit-analyze` found 1 CRITICAL (license record of copied
+  functions) and 3 MEDIUM gaps, all fixed in `tasks.md` (`8f1ac97`).
+- **Next: STOP for the user's approval of `specs/002-multi-window-drift-mvp/tasks.md`** (Spec Kit: implementation only
+  after tasks approval). Then `/speckit-implement` from T001. No push. Native runs need the host GPU profile Integrated.
 - V-20 / SC-005: PASS, signed by the user (Towfienes) on 2026-10-11 in `checklists/verification.md`.
 
 ## Sprint 1 goal
