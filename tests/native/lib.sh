@@ -167,13 +167,30 @@ s = float(sys.argv[2]); x, y, w, h = map(float, sys.argv[1].split(','))
 print('%d,%d,%d,%d' % (round(x * s), round(y * s), round(w * s), round(h * s)))" "$1" "${HVX_OUTPUT_SCALE:-1}"
 }
 
-hvx_copy_build_info() {
-    local variant=$1 id
-    id=$(python3 -I -c "
+# hvx_prefix_id VARIANT: the prefix id (patchset id or stock id) of the variant built from this checkout.
+hvx_prefix_id() {
+    python3 -I -c "
 import importlib.util, sys; from pathlib import Path
 spec = importlib.util.spec_from_file_location('b', '$HVX_REPO/tools/hyprvx_build.py'); b = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(b); print(b.variant_identity(Path('$HVX_REPO'), '$variant')[0])")
-    cp "$HOME/.cache/hyprvx/$HYPRVX_AGENT/prefix/$id/build-info.json" "$HVX_EVID/build-info-$variant.json"
+spec.loader.exec_module(b); print(b.variant_identity(Path('$HVX_REPO'), '$1')[0])"
+}
+
+hvx_copy_build_info() {
+    local variant=$1
+    cp "$HOME/.cache/hyprvx/$HYPRVX_AGENT/prefix/$(hvx_prefix_id "$variant")/build-info.json" "$HVX_EVID/build-info-$variant.json"
+}
+
+# hvx_hyprctl VARIANT ARGS...: read-only queries (e.g. -j clients, -j activewindow) with the nested prefix's hyprctl,
+# through `nested.sh run`, which re-verifies the session and points HYPRLAND_INSTANCE_SIGNATURE at it. Never the host.
+hvx_hyprctl() {
+    local variant=$1
+    shift
+    hvx_nested run -- "$HOME/.cache/hyprvx/$HYPRVX_AGENT/prefix/$(hvx_prefix_id "$variant")/bin/hyprctl" "$@"
+}
+
+# hvx_session_dir: the verified session's directory (nested.sh status); `stop` copies the compositor log there.
+hvx_session_dir() {
+    hvx_nested status | sed -n 's/.*; session=\(.*\)$/\1/p'
 }
 
 # hvx_finish RESULT TEST [NOTE]: summary.json, SHA256SUMS, repo index and read-only archive.

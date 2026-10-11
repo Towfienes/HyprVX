@@ -1,7 +1,7 @@
 // hyprvx-testclient: deterministic Wayland client for HyprVX native tests (contracts/test-tooling.md section 4).
 //
 //   hyprvx-testclient --size WxH --title T --log PATH [--control FIFO] [--layer TOP|OVERLAY] [--position X,Y]
-//                     [--app-id ID] [--scale-aware] [--popup X,Y,W,H] [--subsurface X,Y,W,H]
+//                     [--app-id ID] [--scale-aware] [--popup X,Y,W,H] [--subsurface X,Y,W,H] [--resizable]
 //
 // Content: background RGB(32,32,32), 1 px grid every 50 px RGB(64,64,64) from surface (0,0), 16x16 corner markers
 // TL red, TR green, BL blue, BR magenta. SHM XRGB8888 (opaque). The control FIFO accepts
@@ -64,6 +64,7 @@ struct Options {
     int posX = 0;
     int posY = 0;
     bool scaleAware = false;
+    bool resizable = false; // no min/max size, so a compositor resize can change the window size
     Rect popup;
     Rect subsurface;
 };
@@ -548,6 +549,8 @@ Options parseArgs(int argc, char** argv) {
                 die("--position must be X,Y");
         } else if (a == "--scale-aware") {
             o.scaleAware = true;
+        } else if (a == "--resizable") {
+            o.resizable = true;
         } else if (a == "--popup" || a == "--subsurface") {
             Rect& r = a == "--popup" ? o.popup : o.subsurface;
             if (std::sscanf(next(), "%d,%d,%d,%d", &r.x, &r.y, &r.w, &r.h) != 4 || r.w < 2 * kMarker || r.h < 2 * kMarker)
@@ -598,8 +601,10 @@ int main(int argc, char** argv) {
         xdg_toplevel_add_listener(c.toplevel, &kToplevelListener, &c);
         xdg_toplevel_set_title(c.toplevel, c.opts.title.c_str());
         xdg_toplevel_set_app_id(c.toplevel, c.opts.appId.c_str());
-        xdg_toplevel_set_min_size(c.toplevel, c.opts.width, c.opts.height);
-        xdg_toplevel_set_max_size(c.toplevel, c.opts.width, c.opts.height);
+        if (!c.opts.resizable) {
+            xdg_toplevel_set_min_size(c.toplevel, c.opts.width, c.opts.height);
+            xdg_toplevel_set_max_size(c.toplevel, c.opts.width, c.opts.height);
+        }
     } else {
         if (!c.layerShell)
             die("compositor lacks zwlr_layer_shell_v1");

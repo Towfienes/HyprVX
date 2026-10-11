@@ -74,7 +74,7 @@ C++ `xdg_toplevel` client using SHM `XRGB8888` (opaque). Deterministic content:
 - Scale 1 buffers. With `--scale-aware`, it honours the preferred buffer scale (used for scale 1.25 runs).
 
 CLI: `hyprvx-testclient --size WxH --title T --log PATH [--control PATH] [--layer TOP|OVERLAY] [--scale-aware]
-[--popup X,Y,W,H] [--subsurface X,Y,W,H] [--position X,Y] [--app-id ID]`
+[--popup X,Y,W,H] [--subsurface X,Y,W,H] [--position X,Y] [--app-id ID] [--resizable]`
 - `--control PATH` reads newline commands from a FIFO:
   - `fill X Y W H RRGGBB`: paint a surface-local rectangle and commit with damage limited to that rectangle.
   - `redraw`: repaint everything and commit with full damage.
@@ -87,6 +87,8 @@ CLI: `hyprvx-testclient --size WxH --title T --log PATH [--control PATH] [--laye
   repositioned by the client; an offset outside every monitor is allowed (V-19).
 - `--subsurface X,Y,W,H` (1.3, toplevel only): one desynchronized `wl_subsurface` of size W×H at parent-local (X, Y),
   placed above the parent, with the subsurface palette below.
+- `--resizable` (1.3): the toplevel sets no min/max size (by default min = max = `--size`), so a compositor resize
+  can change its size; the content stays `--size` (used only as the identity control of `t_drag_scope.sh`).
 - Palettes (background, grid, then markers TL, TR, BL, BR; grid and markers as for the main surface):
   main RGB(32,32,32) / (64,64,64) / red (255,0,0), green (0,255,0), blue (0,0,255), magenta (255,0,255);
   popup RGB(40,40,80) / (64,64,64) / yellow (255,255,0), cyan (0,255,255), orange (255,128,0), violet (128,0,255);
