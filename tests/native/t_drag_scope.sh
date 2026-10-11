@@ -74,7 +74,8 @@ PY
 before=$(geometry before)
 printf 'move 270 200\ndown 275\nmove 370 260\nmove 470 320\nup 275\n' | steps move_drag
 after_move=$(geometry after_move)
-printf 'move 474 300\ndown\nmove 520 340\nmove 560 380\nup\n' | steps resize_drag
+# Resize drags pace their moves by > 1 frame (pointer_driver.py "pause"): Hyprland skips faster resize updates.
+printf 'move 474 300\ndown\npause 40\nmove 520 340\npause 40\nmove 560 380\nup\n' | steps resize_drag
 after_resize=$(geometry after_resize)
 printf '%s\n%s\n%s\n' "$before" "$after_move" "$after_resize" > "$HVX_EVID/geometry.txt"
 [[ $before != missing && $before == "$after_move" ]] || { echo "move drag changed the geometry while non-identity" >&2; result=FAIL; }
@@ -103,7 +104,7 @@ if [[ $result == PASS ]]; then
         || hvx_die_blocked "identity control: the side-button move drag did not move the window (setup invalid)"
     BORDER_X=$(python3 -I -c "import json,sys; g=json.loads(sys.argv[1]); print(g['at'][0] + g['size'][0] + 8)" "$id_after_move")
     BORDER_Y=$(python3 -I -c "import json,sys; g=json.loads(sys.argv[1]); print(g['at'][1] + g['size'][1] // 2)" "$id_after_move")
-    printf 'move %s %s\ndown\nmove %s %s\nmove %s %s\nup\n' "$BORDER_X" "$BORDER_Y" $((BORDER_X + 30)) "$BORDER_Y" \
+    printf 'move %s %s\ndown\npause 40\nmove %s %s\npause 40\nmove %s %s\nup\n' "$BORDER_X" "$BORDER_Y" $((BORDER_X + 30)) "$BORDER_Y" \
         $((BORDER_X + 60)) "$BORDER_Y" | steps id_resize_drag
     id_after_resize=$(geometry id_after_resize)
     echo "$id_after_resize" >> "$HVX_EVID/identity-geometry.txt"

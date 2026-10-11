@@ -38,10 +38,13 @@ print(c[-1]['w'], c[-1]['h']) if c else print('0 0')" "$HVX_EVID/$1.jsonl"
 hvx_hyprctl_form -j clients > "$HVX_EVID/clients0.json"
 read -r ADDR_A AX AY AW AH < <(python3 -I "$GEOM" client "$HVX_EVID/clients0.json" hyprvx-testclient) || hvx_die_blocked "no client A"
 
+# Every compositor resize drag paces its moves with "pause 40" (> 2 frames at 60 Hz): Hyprland skips a resize update
+# that arrives within one monitor frame of the previous one and applies nothing at release (pointer_driver.py), which
+# made a fast final step a timing-dependent FAIL (T057 round B, 20261012-021950-formS-2deb797-t_resize).
 # Setup validity: identity, offset 0; border drag from just outside the bottom-right corner by (40, 30).
 hvx_nested dev panic > /dev/null || hvx_die_blocked "dev panic failed"
 read -r w0 h0 <<< "$(last_configure a)"
-printf 'move %s %s\ndown\nmove %s %s\nmove %s %s\nup\n' "$((AX + AW + 3))" "$((AY + AH + 3))" "$((AX + AW + 23))" "$((AY + AH + 18))" \
+printf 'move %s %s\ndown\npause 40\nmove %s %s\npause 40\nmove %s %s\nup\n' "$((AX + AW + 3))" "$((AY + AH + 3))" "$((AX + AW + 23))" "$((AY + AH + 18))" \
     "$((AX + AW + 43))" "$((AY + AH + 33))" | steps setup a
 read -r w1 h1 <<< "$(last_configure a)"
 echo "setup: ${w0}x${h0} -> ${w1}x${h1}" > "$HVX_EVID/setup.txt"
@@ -69,13 +72,13 @@ PY
 # 1. Border drag under the camera: A's drawn box is ((AX + 100) / 2, (AY + 50) / 2, AW / 2, AH / 2); press 2 px outside
 #    its drawn bottom-right corner (4 world units, inside the border grab area) and move by d = (40, 30).
 read -r bx by < <(python3 -I -c "import sys; x,y,w,h = map(float, sys.argv[1:5]); print(int((x + 100 + w) / 2 + 2), int((y + 50 + h) / 2 + 2))" "$AX" "$AY" "$AW" "$AH")
-printf 'move %s %s\ndown\nmove %s %s\nmove %s %s\nup\n' "$bx" "$by" "$((bx + 20))" "$((by + 15))" "$((bx + 40))" "$((by + 30))" | steps border a
+printf 'move %s %s\ndown\npause 40\nmove %s %s\npause 40\nmove %s %s\nup\n' "$bx" "$by" "$((bx + 20))" "$((by + 15))" "$((bx + 40))" "$((by + 30))" | steps border a
 check_size border "$((AW + 80))" "$((AH + 60))" || result=FAIL
 read -r w2 h2 <<< "$(last_configure a)"
 hvx_capture after-border a
 # 2. The resize bind (BTN_EXTRA = 276) in A's drawn bottom-right quadrant, d' = (20, 10).
 read -r qx qy < <(python3 -I -c "import sys; x,y,w,h = map(float, sys.argv[1:5]); print(int((x + 100 + 0.8 * w) / 2), int((y + 50 + 0.8 * h) / 2))" "$AX" "$AY" "$w2" "$h2")
-printf 'move %s %s\ndown 276\nmove %s %s\nmove %s %s\nup 276\n' "$qx" "$qy" "$((qx + 10))" "$((qy + 5))" "$((qx + 20))" "$((qy + 10))" | steps bind a
+printf 'move %s %s\ndown 276\npause 40\nmove %s %s\npause 40\nmove %s %s\nup 276\n' "$qx" "$qy" "$((qx + 10))" "$((qy + 5))" "$((qx + 20))" "$((qy + 10))" | steps bind a
 check_size bind "$((w2 + 40))" "$((h2 + 20))" || result=FAIL
 hvx_capture after-bind a
 
@@ -86,7 +89,7 @@ read -r _ TX TY TW TH < <(python3 -I "$GEOM" client "$HVX_EVID/clients-tiled-bef
 tiled_cfg_before=$(grep -c '"ev": "configure"' "$HVX_EVID/t.jsonl" || true)
 # A point on drawn T that is not on drawn A: T's drawn box is (TX/2, TY/2, TW/2, TH/2); A's drawn box is in its top-left.
 read -r tx ty < <(python3 -I -c "import sys; x,y,w,h = map(float, sys.argv[1:5]); print(int((x + 0.9 * w) / 2), int((y + 0.9 * h) / 2))" "$TX" "$TY" "$TW" "$TH")
-printf 'move %s %s\ndown 276\nmove %s %s\nmove %s %s\nup 276\n' "$tx" "$ty" "$((tx - 20))" "$((ty - 10))" "$((tx - 40))" "$((ty - 20))" | steps tiled a t
+printf 'move %s %s\ndown 276\npause 40\nmove %s %s\npause 40\nmove %s %s\nup 276\n' "$tx" "$ty" "$((tx - 20))" "$((ty - 10))" "$((tx - 40))" "$((ty - 20))" | steps tiled a t
 hvx_hyprctl_form -j clients > "$HVX_EVID/clients-tiled-after.json"
 tiled_cfg_after=$(grep -c '"ev": "configure"' "$HVX_EVID/t.jsonl" || true)
 python3 -I - "$HVX_EVID/clients-tiled-before.json" "$HVX_EVID/clients-tiled-after.json" "$tiled_cfg_before" "$tiled_cfg_after" \

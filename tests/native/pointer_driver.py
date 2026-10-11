@@ -8,6 +8,11 @@ For every command line in FILE ("move X Y", "down", "up", "click"): send it to t
 "done" line (the compositor has processed it and sent any pointer events), then send "sync" to every client and wait
 for that commit's frame_done. Pointer lines a client logged before that frame_done and after the previous barrier
 belong to the command. Output JSON: {"steps": [{"cmd": ..., "events": {NAME: [event, ...]}}, ...]}.
+"pause MS" sends nothing and waits MS milliseconds (recorded as a step without events). It exists only for Hyprland's
+compositor resize drags: CDragStateController::mouseMove skips a resize update that arrives less than one monitor
+frame after the previous one (DragController.cpp, TIMERDELTA < MSMONITOR) and applies nothing at release, so a test
+that needs every step of a resize drag applied paces its moves by more than a frame. That decision is time-based; no
+event signals it.
 Exit codes: 0 done, 2 BLOCKED (a ready signal timed out or vpointer rejected a command; the partial result is
 still written).
 """
@@ -115,6 +120,10 @@ def main(argv):
     steps, status = [], 0
     try:
         for cmd in commands:
+            if cmd.startswith("pause "):
+                time.sleep(int(cmd.split()[1]) / 1000.0)
+                steps.append({"cmd": cmd, "events": {}})
+                continue
             run_vpointer(vp_fifo, vp_log, cmd, args.timeout)
             step = {"cmd": cmd, "events": {}}
             for name, fifo, log in clients:
