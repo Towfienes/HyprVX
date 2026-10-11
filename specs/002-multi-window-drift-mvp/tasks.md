@@ -225,7 +225,7 @@ description: "Task list for Feature 002 — Multi-Window Drift MVP (Option A), C
   - step 10 skipped with a note (Phase 5);
   - steps 11 and 12 by Super+Escape and a stock comparison.
   It captures every step and runs in forms P and S.
-- [ ] T056 Write `tests/native/run_feature002.sh` (all §9 tests, both forms, both scales); run it, plus `run_sprint1.sh` and `run_phase2.sh` in both forms with the plugin loaded and Drift OFF (V-24)
+- [x] T056 Write `tests/native/run_feature002.sh` (all §9 tests, both forms, both scales); run it, plus `run_sprint1.sh` and `run_phase2.sh` in both forms with the plugin loaded and Drift OFF (V-24)
 - [ ] T057 R1 clean-room: rebuild `patched` and both plugin forms from fresh worktrees and build directories without ccache, re-run `run_feature002.sh`, and write `specs/002-multi-window-drift-mvp/r1-source-verification.md` before reading the new results. The report covers, with file:line:
   - FR-003: no pass element and no cancelled event while OFF;
   - Constitution IV: no inline camera arithmetic in 0010–0013 or the policy;
