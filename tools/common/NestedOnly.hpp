@@ -84,10 +84,13 @@ inline void checkWaylandPeer(const char* tool, int fd) {
         refuse(tool, 3, "refusing: the compositor is not an agent-prefix nested build (" + path + ")");
 }
 
-// The X11 connection's peer must be the XWayland server of an agent-prefix Hyprland (its direct child), as resolved by
-// `nested.sh xdisplay` (test-tooling 1.4 §7).
+// The X11 connection's peer must be an agent-prefix Hyprland or its direct child, as resolved by `nested.sh xdisplay`
+// (test-tooling 1.4 §7). Hyprland creates and listens on the X sockets itself and hands them to Xwayland, so
+// SO_PEERCRED (taken at listen time) names the compositor; a server started otherwise would be its child.
 inline void checkX11Peer(const char* tool, int fd) {
     const pid_t server = peerPid(tool, fd);
+    if (isAgentPrefixHyprland(exeOf(server)))
+        return;
     const pid_t parent = parentOf(server);
     if (parent <= 1 || !isAgentPrefixHyprland(exeOf(parent)))
         refuse(tool, 3, "refusing: the X server is not the XWayland of an agent-prefix nested build");

@@ -2,7 +2,8 @@
 # T-STALE-MW (Feature 002 US2.5, SC-007, V-06, T018). Three floating test clients; 50 seeded random states, each a
 # camera (P, z) plus a world offset per window, all set through the dev control (no policy). Each ready frame (partial
 # damage) must equal the frame rendered after `hyprvx-dev full-damage` (diff, 0 pixels). Offsets change between
-# states, so stale regions at the old offsets would show. The seed is recorded; HVX_STALE_SEED overrides it.
+# states, so stale regions at the old offsets would show. The seed is recorded; HVX_STALE_SEED overrides it. A TOP
+# layer client (never transformed) is the ready-rule reference: a window moved off the output gets no frame callbacks.
 set -euo pipefail
 source "$(dirname -- "${BASH_SOURCE[0]}")/lib.sh"
 SIZE="${HVX_OUTPUT_SIZE:-1280x800}"
@@ -25,6 +26,7 @@ hvx_start_form --size "$SIZE" --scale "$SCALE" > "$HVX_EVID/session.log" 2>&1 \
 hvx_client_start a 300x200
 hvx_client_start b 300x200 --app-id hyprvx-testclient-b
 hvx_client_start c 300x200 --app-id hyprvx-testclient-c
+hvx_client_start ref 100x60 --layer TOP --position 1170,730 --app-id hyprvx-layer
 hvx_hyprctl_form -j clients > "$HVX_EVID/clients.json"
 ADDR=()
 for cls in hyprvx-testclient hyprvx-testclient-b hyprvx-testclient-c; do
@@ -39,9 +41,9 @@ while read -r px py z oax oay obx oby ocx ocy; do
     hvx_nested dev offset "${ADDR[1]}" "$obx" "$oby" > /dev/null || hvx_die_blocked "state $i: dev offset rejected"
     hvx_nested dev offset "${ADDR[2]}" "$ocx" "$ocy" > /dev/null || hvx_die_blocked "state $i: dev offset rejected"
     hvx_nested dev camera "$px" "$py" "$z" > /dev/null || hvx_die_blocked "state $i: dev camera rejected ($px $py $z)"
-    hvx_capture "state$i" a
+    hvx_capture "state$i" ref
     hvx_nested dev full-damage > /dev/null || hvx_die_blocked "state $i: full-damage failed"
-    hvx_capture "state$i-full" a
+    hvx_capture "state$i-full" ref
     hvx_analyze "state$i-diff" diff "$HVX_EVID/state$i.png" --reference "$HVX_EVID/state$i-full.png" --max-pixels 0 || result=FAIL
 done < "$HVX_EVID/states.txt"
 hvx_nested dev panic > /dev/null || true

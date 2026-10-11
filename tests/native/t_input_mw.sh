@@ -6,7 +6,8 @@
 #    subsurface and B: every enter/motion is for the right surface at surfaceLocal(S) - O = inverse(S) - (L + O) +-1;
 #  - a point on the empty canvas (no drawn window) reaches no client;
 #  - a click on drawn B focuses B (button and keyboard enter at B, nothing at A), a click on drawn A focuses A.
-# Setup validity first: identity camera, offsets 0, a move to A's centre reaches A at (400,300) +-1, else BLOCKED.
+# Setup validity first: identity camera, offsets 0, a move to A-local (100,100) (clear of its popup) reaches A there +-1,
+# else BLOCKED.
 # Pointer constraints: hyprvx-testclient cannot hold a pointer constraint, so the constraint case is recorded NOT RUN.
 set -euo pipefail
 source "$(dirname -- "${BASH_SOURCE[0]}")/lib.sh"
@@ -42,12 +43,12 @@ add() { # X,Y,W,H OX,OY -> world box X+OX,Y+OY,W,H
 
 # Setup validity (identity, offsets 0, stock path).
 hvx_nested dev panic > /dev/null || hvx_die_blocked "dev panic failed"
-printf 'move %s %s\n' "$((AX + 400))" "$((AY + 300))" | steps setup a b
-python3 -I - "$HVX_EVID/setup.steps.json" "$TOL" << 'PY' || hvx_die_blocked "identity setup: a move to A's centre did not reach A at (400,300)"
+printf 'move %s %s\n' "$((AX + 100))" "$((AY + 100))" | steps setup a b
+python3 -I - "$HVX_EVID/setup.steps.json" "$TOL" << 'PY' || hvx_die_blocked "identity setup: a move to A-local (100,100) did not reach A there"
 import json, sys
 ev = [e for e in json.load(open(sys.argv[1]))["steps"][0]["events"]["a"] if e["ev"] in ("enter", "motion")]
 tol = float(sys.argv[2])
-sys.exit(0 if ev and abs(ev[-1]["x"] - 400) <= tol and abs(ev[-1]["y"] - 300) <= tol else 1)
+sys.exit(0 if ev and ev[-1].get("surface") == "main" and abs(ev[-1]["x"] - 100) <= tol and abs(ev[-1]["y"] - 100) <= tol else 1)
 PY
 
 read -r oax oay <<< "${OA//,/ }"

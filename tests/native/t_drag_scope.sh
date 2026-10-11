@@ -4,9 +4,11 @@
 #  1. A held-button drag inside the client: every motion while BTN_LEFT is held arrives at surfaceLocal(S) +-1 and the
 #     press/release reach the client.
 #  2. A compositor move drag (the nested config's no-modifier side-button movewindow bind, standing in for Super+LMB)
-#     and 3. a border resize drag (resize_on_border, pressed in the drawn border grab area) leave the window's logical
-#     geometry unchanged (`hyprctl -j clients` of the nested instance before/after), and the nested log records both
-#     as blocked.
+#     leaves the window's logical geometry unchanged (`hyprctl -j clients` of the nested instance before/after) and
+#     the nested log records it as blocked.
+#  3. A border resize drag (resize_on_border, pressed in the drawn border grab area) of this floating window resizes
+#     it through the camera: width + d/z +-1, position unchanged, no "blocked resize" log line. Feature 002 FR-009
+#     (patch 0012) replaced Feature 001's "resize blocked" here; tiled resize stays blocked (t_resize.sh).
 # Setup validity (identity control, run last): the same move and border-resize drags at identity must change the
 # geometry, else the non-identity "unchanged" results are vacuous and the run is BLOCKED.
 set -euo pipefail
@@ -74,7 +76,15 @@ after_move=$(geometry after_move)
 printf 'move 474 200\ndown\nmove 520 240\nmove 560 280\nup\n' | steps resize_drag
 after_resize=$(geometry after_resize)
 printf '%s\n%s\n%s\n' "$before" "$after_move" "$after_resize" > "$HVX_EVID/geometry.txt"
-[[ $before != missing && $before == "$after_move" && $before == "$after_resize" ]] || { echo "geometry changed while non-identity" >&2; result=FAIL; }
+[[ $before != missing && $before == "$after_move" ]] || { echo "move drag changed the geometry while non-identity" >&2; result=FAIL; }
+# Resize by d = (560 - 474) screen px = 172 world units at z = 0.5 (worldDelta), right edge only.
+python3 -I - "$after_move" "$after_resize" "$TOL" > "$HVX_EVID/resize.check" << 'PY' || { echo "border resize did not follow the camera" >&2; result=FAIL; }
+import json, sys
+a, b, tol = json.loads(sys.argv[1]), json.loads(sys.argv[2]), float(sys.argv[3])
+ok = a["at"] == b["at"] and abs(b["size"][0] - (a["size"][0] + 172)) <= tol and b["size"][1] == a["size"][1]
+print(json.dumps({"before": a, "after": b, "expect_width": a["size"][0] + 172, "ok": ok}))
+sys.exit(0 if ok else 1)
+PY
 
 # Identity control: the same drags must act on the stock path. Pressing inside the window centre (540,400) / on the
 # right border grab area and dragging. It validates the "unchanged" results above, so it runs only if they passed: a
@@ -103,7 +113,7 @@ cp "$SESSION_DIR/hyprland.log" "$HVX_EVID/nested-hyprland.log" 2> /dev/null || h
 blocked_move=$(grep -c "HyprVX: blocked a compositor move drag" "$HVX_EVID/nested-hyprland.log" || true)
 blocked_resize=$(grep -c "HyprVX: blocked a compositor resize drag" "$HVX_EVID/nested-hyprland.log" || true)
 echo "blocked move drags: $blocked_move; blocked resize drags: $blocked_resize" | tee "$HVX_EVID/blocked.txt"
-[[ $blocked_move -ge 1 && $blocked_resize -ge 1 ]] || result=FAIL
-hvx_finish "$result" "T-DRAG-SCOPE held-button drag local coordinates; compositor drags blocked while non-identity (FR-012)" \
+[[ $blocked_move -ge 1 && $blocked_resize == 0 ]] || result=FAIL
+hvx_finish "$result" "T-DRAG-SCOPE held-button drag local coordinates; move blocked, floating resize through the camera (FR-012, F002 FR-009)" \
     "camera P=(0,0) z=0.5; side-button movewindow bind for Super+LMB; output $SIZE scale $SCALE"
 [[ $result == PASS ]]

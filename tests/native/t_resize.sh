@@ -44,8 +44,8 @@ read -r w0 h0 <<< "$(last_configure a)"
 printf 'move %s %s\ndown\nmove %s %s\nmove %s %s\nup\n' "$((AX + AW + 3))" "$((AY + AH + 3))" "$((AX + AW + 23))" "$((AY + AH + 18))" \
     "$((AX + AW + 43))" "$((AY + AH + 33))" | steps setup a
 read -r w1 h1 <<< "$(last_configure a)"
-echo "setup: $w0x$h0 -> $w1x$h1" > "$HVX_EVID/setup.txt"
-(( w1 == w0 + 40 && h1 == h0 + 30 )) || hvx_die_blocked "identity border drag did not resize by (40,30): $w0x$h0 -> $w1x$h1 (setup invalid)"
+echo "setup: ${w0}x${h0} -> ${w1}x${h1}" > "$HVX_EVID/setup.txt"
+(( w1 == w0 + 40 && h1 == h0 + 30 )) || hvx_die_blocked "identity border drag did not resize by (40,30): ${w0}x${h0} -> ${w1}x${h1} (setup invalid)"
 hvx_hyprctl_form -j clients > "$HVX_EVID/clients1.json"
 read -r _ AX AY AW AH < <(python3 -I "$GEOM" client "$HVX_EVID/clients1.json" hyprvx-testclient)
 

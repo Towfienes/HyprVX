@@ -47,65 +47,92 @@ bbox() { # NAME PX PY Z BOX OFFSET SET
         --region "$(python3 -I "$GEOM" pad --box "$phys" --by 4)"
 }
 
-# Setup validity (identity, offset 0).
-hvx_nested dev panic > /dev/null || hvx_die_blocked "dev panic failed"
-hvx_client_cmd x menu
-hvx_wait_for "$HVX_EVID/x.jsonl" '"ev": "menu_map"' || hvx_die_blocked "menu never mapped"
-capture setup
-bbox setup-main 0 0 1 "$MAIN_L" 0,0 main || hvx_die_blocked "X11 main window not at its logical box (setup invalid)"
-bbox setup-menu 0 0 1 "$MENU_L" 0,0 popup || hvx_die_blocked "X11 menu not at main + (100,80) (setup invalid)"
-clients menu
-ADDR_MENU=$(python3 -I - "$HVX_EVID/menu.clients.json" "$ADDR_X" << 'PY'
+menu_address() { # LABEL: the override-redirect menu window (xwayland, 160x120, not the main window)
+    clients "$1"
+    python3 -I - "$HVX_EVID/$1.clients.json" "$ADDR_X" << 'PY'
 import json, sys
 c = [c for c in json.load(open(sys.argv[1])) if c.get("xwayland") and c["address"] != sys.argv[2] and c["size"] == [160, 120]]
 print(c[0]["address"] if c else "")
 PY
-)
+}
+map_menu() { # LABEL: maps the menu (a new window each time) and prints its address
+    local before
+    before=$(grep -c '"ev": "menu_map"' "$HVX_EVID/x.jsonl" || true)
+    hvx_client_cmd x menu
+    local deadline=$(($(date +%s%N) + HVX_READY_TIMEOUT * 1000000000))
+    while (($(grep -c '"ev": "menu_map"' "$HVX_EVID/x.jsonl" || true) <= before)); do
+        (($(date +%s%N) < deadline)) || hvx_die_blocked "menu never mapped ($1)"
+        sleep 0.02
+    done
+    hvx_x11_ready x w
+    menu_address "$1"
+}
+unmap_menu() {
+    hvx_client_cmd x unmenu
+    hvx_x11_ready x w
+}
+world() { # BOX OFFSET -> BOX + OFFSET
+    python3 -I -c "import sys; x,y,w,h = map(float, sys.argv[1].split(',')); ox,oy = map(float, sys.argv[2].split(',')); print('%r,%r,%r,%r' % (x+ox, y+oy, w, h))" "$1" "$2"
+}
+pointer_check() { # TAG KIND PX PY Z BOX [SAMPLE]
+    local tag=$1 kind=$2 px=$3 py=$4 z=$5 box=$6 smp=()
+    [[ -n ${7:-} ]] && smp=(--sample "$7")
+    python3 -I "$POINTS" points --camera "$px" "$py" "$z" --surface "$box" "${smp[@]}" --n 20 --margin 3 \
+        --commands "$HVX_EVID/$tag-$kind.cmds" --meta "$HVX_EVID/$tag-$kind.points.json" \
+        || hvx_die_blocked "$tag: cannot sample the drawn X11 $kind"
+    hvx_pointer_run "$tag-$kind.steps" vp "$HVX_EVID/$tag-$kind.cmds" x w
+    python3 -I "$POINTS" check --meta "$HVX_EVID/$tag-$kind.points.json" --steps "$HVX_EVID/$tag-$kind.steps.json" \
+        --client x --surface-name "$kind" --tol "$PTOL" --out "$HVX_EVID/$tag-$kind.input.json"
+}
+
+# Setup validity (identity, offset 0, menu mapped).
+hvx_nested dev panic > /dev/null || hvx_die_blocked "dev panic failed"
+ADDR_MENU=$(map_menu setup)
 [[ -n $ADDR_MENU ]] || hvx_die_blocked "override-redirect menu window not listed"
+capture setup
+bbox setup-main 0 0 1 "$MAIN_L" 0,0 main || hvx_die_blocked "X11 main window not at its logical box (setup invalid)"
+bbox setup-menu 0 0 1 "$MENU_L" 0,0 popup || hvx_die_blocked "X11 menu not at main + (100,80) (setup invalid)"
+unmap_menu
 
 result=PASS
-run_states() { # TAG-PREFIX
-    local pre=$1 st tag px py z
+read -r ox oy <<< "${O//,/ }"
+MAIN_W=$(world "$MAIN_L" "$O")
+MENU_W=$(world "$MENU_L" "$O")
+SAMPLE_W=$(python3 -I -c "import sys; x,y,w,h = map(float, sys.argv[1].split(',')); print('%r,%r,90,70' % (x, y))" "$MAIN_W")
+# run_states PREFIX DEV_MENU_OFFSET(1|0): per camera state, the main window's input with the menu closed, then the menu
+# mapped (a new window): captured, both boxes judged, and the menu's input (it holds the pointer grab).
+run_states() {
+    local pre=$1 dev_menu=$2 st tag px py z menu
     for st in "${STATES[@]}"; do
         read -r tag px py z <<< "$st"
         tag="$pre$tag"
         hvx_nested dev camera "$px" "$py" "$z" > /dev/null || hvx_die_blocked "$tag: dev camera rejected"
+        hvx_x11_ready x w
+        pointer_check "$tag" main "$px" "$py" "$z" "$MAIN_W" "$SAMPLE_W" || result=FAIL
+        menu=$(map_menu "$tag")
+        [[ -n $menu ]] || hvx_die_blocked "$tag: menu window not listed"
+        echo "$tag menu $menu" >> "$HVX_EVID/menus.txt"
+        if [[ $dev_menu == 1 ]]; then
+            hvx_nested dev offset "$menu" "$ox" "$oy" > /dev/null || hvx_die_blocked "$tag: dev offset rejected for the menu"
+        fi
         capture "$tag"
         bbox "$tag-main" "$px" "$py" "$z" "$MAIN_L" "$O" main || result=FAIL
         bbox "$tag-menu" "$px" "$py" "$z" "$MENU_L" "$O" popup || result=FAIL
-        local main_w menu_w sample_w
-        main_w=$(python3 -I -c "import sys; x,y,w,h = map(float, sys.argv[1].split(',')); ox,oy = map(float, sys.argv[2].split(',')); print('%r,%r,%r,%r' % (x+ox, y+oy, w, h))" "$MAIN_L" "$O")
-        menu_w=$(python3 -I -c "import sys; x,y,w,h = map(float, sys.argv[1].split(',')); ox,oy = map(float, sys.argv[2].split(',')); print('%r,%r,%r,%r' % (x+ox, y+oy, w, h))" "$MENU_L" "$O")
-        sample_w=$(python3 -I -c "import sys; x,y,w,h = map(float, sys.argv[1].split(',')); print('%r,%r,90,70' % (x, y))" "$main_w")
-        for kind in main menu; do
-            local box smp=()
-            box=$([[ $kind == main ]] && echo "$main_w" || echo "$menu_w")
-            [[ $kind == main ]] && smp=(--sample "$sample_w")
-            python3 -I "$POINTS" points --camera "$px" "$py" "$z" --surface "$box" "${smp[@]}" --n 20 --margin 3 \
-                --commands "$HVX_EVID/$tag-$kind.cmds" --meta "$HVX_EVID/$tag-$kind.points.json" \
-                || hvx_die_blocked "$tag: cannot sample the drawn X11 $kind"
-            hvx_pointer_run "$tag-$kind.steps" vp "$HVX_EVID/$tag-$kind.cmds" x w
-            python3 -I "$POINTS" check --meta "$HVX_EVID/$tag-$kind.points.json" --steps "$HVX_EVID/$tag-$kind.steps.json" \
-                --client x --surface-name "$kind" --tol "$PTOL" --out "$HVX_EVID/$tag-$kind.input.json" || result=FAIL
-        done
+        pointer_check "$tag" menu "$px" "$py" "$z" "$MENU_W" || result=FAIL
+        unmap_menu
     done
 }
 
-read -r ox oy <<< "${O//,/ }"
 hvx_nested dev offset "$ADDR_X" "$ox" "$oy" > /dev/null || hvx_die_blocked "dev offset rejected for the X11 window"
-hvx_nested dev offset "$ADDR_MENU" "$ox" "$oy" > /dev/null || hvx_die_blocked "dev offset rejected for the menu window"
-run_states ""
+run_states "" 1
 
 if [[ ${HVX_X11_POLICY:-0} == 1 ]]; then
-    # Policy case (T042): Drift on; the menu is re-mapped and must take the parent's world offset by inheritance.
+    # Policy case (T042): Drift on; each new menu must take its parent's world offset by itself (research R9).
     hvx_nested dev panic > /dev/null || true
-    hvx_client_cmd x unmenu
-    hvx_plugin_load "$(hvx_plugin_path)" 2> /dev/null || [[ $HVX_FORM == S ]] || hvx_die_blocked "policy plugin did not load"
+    [[ $HVX_FORM == S ]] || hvx_plugin_load || hvx_die_blocked "policy plugin did not load"
     hvx_dispatch hyprvx:on > "$HVX_EVID/policy-on.reply" || true
     hvx_nested dev offset "$ADDR_X" "$ox" "$oy" > /dev/null || hvx_die_blocked "dev offset rejected (policy case)"
-    hvx_client_cmd x menu
-    hvx_wait_for "$HVX_EVID/x.jsonl" '"ev": "menu_map"' || hvx_die_blocked "menu never re-mapped"
-    run_states policy-
+    run_states policy- 0
     hvx_dispatch hyprvx:off > /dev/null || true
 fi
 

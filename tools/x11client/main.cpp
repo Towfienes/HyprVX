@@ -5,7 +5,10 @@
 // Content as the Wayland test client (section 4): background RGB(32,32,32), 1 px grid every 50 px RGB(64,64,64),
 // 16x16 corner markers TL red, TR green, BL blue, BR magenta. --menu prepares an override-redirect window with the popup
 // palette (test-tooling 1.3), WM_TRANSIENT_FOR = the main window, mapped at main-window-relative X,Y by the control
-// command "menu" and unmapped by "unmenu". Control: "redraw", "menu", "unmenu", "quit". Logs (JSON lines): enter,
+// command "menu" and unmapped by "unmenu". Like a real X11 menu, the mapped menu grabs the pointer (owner_events off),
+// so the X server reports pointer events relative to it: Hyprland routes the pointer of an override-redirect popup
+// menu to the focused window's surface (XWayland surface wantsFocus() is false), and XWayland turns that surface's
+// local coordinates into root coordinates. Control: "redraw", "menu", "unmenu", "quit". Logs (JSON lines): enter,
 // leave, motion, button and key events per window ("surface": "main"|"menu", X window-local coordinates), kb_enter on
 // focus, and {"ev":"drawn","seq":N} after each redraw has been flushed and a round trip completed.
 // Launch it only through `scripts/nested.sh run --x11`; it refuses any X server that is not the XWayland of an
@@ -157,7 +160,14 @@ void mapMenu(State& s) {
     xcb_map_window(s.conn, s.menu.id);
     s.menu.mapped = true;
     xcb_flush(s.conn);
-    logLine(s, "\"ev\": \"menu_map\", \"root_x\": %d, \"root_y\": %d, \"w\": %d, \"h\": %d", rootX, rootY, s.menu.w, s.menu.h);
+    sync(s);
+    const uint16_t pointerEvents = XCB_EVENT_MASK_POINTER_MOTION | XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE |
+        XCB_EVENT_MASK_ENTER_WINDOW | XCB_EVENT_MASK_LEAVE_WINDOW;
+    auto* grab = xcb_grab_pointer_reply(s.conn, xcb_grab_pointer(s.conn, 0, s.menu.id, pointerEvents, XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC,
+                                                                 XCB_NONE, XCB_NONE, XCB_CURRENT_TIME), nullptr);
+    const int grabStatus = grab ? grab->status : -1;
+    std::free(grab);
+    logLine(s, "\"ev\": \"menu_map\", \"root_x\": %d, \"root_y\": %d, \"w\": %d, \"h\": %d, \"grab\": %d", rootX, rootY, s.menu.w, s.menu.h, grabStatus);
 }
 
 void handleCommand(State& s, const std::string& line) {
@@ -170,6 +180,7 @@ void handleCommand(State& s, const std::string& line) {
         redraw(s);
     } else if (line == "unmenu") {
         if (s.menu.mapped) {
+            xcb_ungrab_pointer(s.conn, XCB_CURRENT_TIME);
             xcb_unmap_window(s.conn, s.menu.id);
             s.menu.mapped = false;
         }

@@ -50,7 +50,8 @@ def cmd_crop_equal(a):
     x, y, w, h = (int(v) for v in box(a.region))
     one = Image.open(a.a).convert("RGB").crop((x, y, x + w, y + h))
     two = Image.open(a.b).convert("RGB").crop((x, y, x + w, y + h))
-    diff = sum(1 for p, q in zip(one.getdata(), two.getdata()) if p != q)
+    ra, rb = one.tobytes(), two.tobytes()
+    diff = sum(1 for i in range(0, len(ra), 3) if ra[i:i + 3] != rb[i:i + 3])
     print(json.dumps({"region": [x, y, w, h], "differing_pixels": diff}))
     return 0 if diff == 0 else 1
 
