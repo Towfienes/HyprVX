@@ -5,7 +5,7 @@
 #  patched-nodev), and form S has no HyprVXSpike::registerDevControl symbol; all present in plugin/S-dev and the dev
 #  patched build (positive controls, so the check is not vacuous). The name "hyprvx-dev" itself is not searched: the
 #  compiler builds that 10-byte std::string from immediates (no literal in .rodata), as the first T057 run found.
-#  Runtime: `hyprctl hyprvx-dev state` is rejected in a stock session with plugin/S loaded and in a patched-nodev
+#  Runtime: `hyprctl hyprvx-dev state` is rejected ("unknown request", Hyprland's answer) in a stock session with plugin/S loaded and in a patched-nodev
 #  session with plugin/P loaded, while the policy answers (`hyprctl hyprvx state`) and Drift enters (Super+Escape is
 #  consumed afterwards, the Drift-is-on probe); the dev patched session answers `hyprvx-dev state` (control).
 set -euo pipefail
@@ -45,7 +45,8 @@ HVX_OWN_SESSION=1
 hvx_plugin_load "$PLUG/S/hyprvx-drift-S.so" || hvx_die_blocked "plugin S did not load"
 hvx_hyprctl stock hyprvx-dev state > "$HVX_EVID/s.dev.reply" 2>&1 || true
 hvx_hyprctl stock hyprvx state > "$HVX_EVID/s.policy.reply" 2>&1 || true
-grep -q '"monitors"' "$HVX_EVID/s.dev.reply" && fail "stock + plugin S answers hyprvx-dev state" || ok "stock + plugin S rejects hyprvx-dev: $(head -c 80 "$HVX_EVID/s.dev.reply")"
+[[ $(cat "$HVX_EVID/s.dev.reply") == "unknown request" ]] && ok "stock + plugin S rejects hyprvx-dev (unknown request)" \
+    || fail "stock + plugin S does not reject hyprvx-dev: $(head -c 120 "$HVX_EVID/s.dev.reply")"
 grep -q '"monitors"' "$HVX_EVID/s.policy.reply" && ok "stock + plugin S: policy answers" || fail "stock + plugin S: policy does not answer"
 hvx_stop >> "$HVX_EVID/s.session.log" 2>&1 || hvx_die_blocked "session did not stop"
 
@@ -57,7 +58,8 @@ hvx_plugin_load "$PLUG/P/hyprvx-drift-P.so" || fail "plugin P did not load into 
 nodevctl() { hvx_nested run -- "$NODEV/bin/hyprctl" "$@"; }
 nodevctl hyprvx-dev state > "$HVX_EVID/p.dev.reply" 2>&1 || true
 nodevctl hyprvx state > "$HVX_EVID/p.policy.reply" 2>&1 || true
-grep -q '"monitors"' "$HVX_EVID/p.dev.reply" && fail "patched-nodev answers hyprvx-dev state" || ok "patched-nodev rejects hyprvx-dev: $(head -c 80 "$HVX_EVID/p.dev.reply")"
+[[ $(cat "$HVX_EVID/p.dev.reply") == "unknown request" ]] && ok "patched-nodev + plugin P rejects hyprvx-dev (unknown request)" \
+    || fail "patched-nodev + plugin P does not reject hyprvx-dev: $(head -c 120 "$HVX_EVID/p.dev.reply")"
 grep -q '"monitors"' "$HVX_EVID/p.policy.reply" && ok "patched-nodev + plugin P: policy answers" || fail "patched-nodev + plugin P: policy does not answer"
 hvx_client_start client 300x200
 hvx_vkeyboard_start kb

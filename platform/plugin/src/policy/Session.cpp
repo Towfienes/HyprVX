@@ -29,6 +29,7 @@
 #include <src/state/WorkspaceState.hpp>
 
 #include <format>
+#include <string_view>
 #include <vector>
 
 using namespace hyprvx;
@@ -213,8 +214,15 @@ namespace {
         return std::format(R"({{"monitors":[{}],"windows":[{}],"build":{}}})", monitors, windows, HyprVXPolicy::buildJSON(HyprVXPolicy::PHANDLE));
     }
 
+    // Registered non-exact, so Hyprland hands over every request that starts with "hyprvx" (the first matching non-exact
+    // command wins, HyprCtl.cpp), "hyprvx-dev ..." included. Only the command word "hyprvx" is ours: for any other an
+    // empty result makes Hyprland answer "unknown request", so a build without the dev control rejects hyprvx-dev
+    // (FR-016). In test builds the dev control registers before the policy and is matched first.
     std::string hyprctlCommand(eHyprCtlOutputFormat, std::string in) {
-        if (in.find("state") == std::string::npos)
+        const std::string_view REQUEST = in;
+        if (REQUEST != "hyprvx" && !REQUEST.starts_with("hyprvx "))
+            return "";
+        if (REQUEST != "hyprvx state")
             return "err:invalid";
         return stateJSON();
     }
