@@ -10,6 +10,7 @@ workspace region offset; drift-visible windows can get frame callbacks and stay 
 ---
  src/desktop/state/GlobalWindowController.cpp |   4 +-
  src/desktop/state/ViewHitTester.cpp          |  13 +-
+ src/desktop/view/Window.cpp                  |   4 +-
  src/hyprvx/CameraMath.hpp                    |   5 +
  src/hyprvx/DevControl.cpp                    |  32 +++-
  src/hyprvx/DriftSpike.cpp                    | 162 +++++++++++++++++++
@@ -17,7 +18,7 @@ workspace region offset; drift-visible windows can get frame callbacks and stay 
  src/hyprvx/MonitorCamera.cpp                 |  13 +-
  src/hyprvx/SceneCamera.cpp                   |   9 +-
  src/render/Renderer.cpp                      |  23 +++
- 9 files changed, 300 insertions(+), 11 deletions(-)
+ 10 files changed, 303 insertions(+), 12 deletions(-)
  create mode 100644 src/hyprvx/DriftSpike.cpp
  create mode 100644 src/hyprvx/DriftSpike.hpp
 
@@ -87,6 +88,28 @@ index adaf8b1a..4e896998 100644
  
      if (window->m_isX11)
          return pos - window->position(Desktop::View::IGeometric::GEOMETRIC_GOAL);
+diff --git a/src/desktop/view/Window.cpp b/src/desktop/view/Window.cpp
+index 12b023dd..3ba432b4 100644
+--- a/src/desktop/view/Window.cpp
++++ b/src/desktop/view/Window.cpp
+@@ -67,6 +67,7 @@
+ #include "../../event/EventBus.hpp"
+ #include "../../hyprvx/SceneCamera.hpp"
+ #include "../../hyprvx/InputCamera.hpp"
++#include "../../hyprvx/DriftSpike.hpp"
+ 
+ #include <hyprutils/string/String.hpp>
+ #include <hyprutils/string/VarList.hpp>
+@@ -2761,7 +2762,8 @@ void CWindow::commitWindow() {
+             g_pHyprRenderer->damageWindow(m_self.lock());
+     }
+ 
+-    if (!m_workspace->m_visible)
++    // HyprVX U0 spike: commits of drift-visible windows of hidden workspaces damage too (else no frame is scheduled)
++    if (!m_workspace->m_visible && !HyprVX::Drift::visible(m_self.lock(), m_workspace->m_monitor.lock()))
+         return;
+ 
+     const auto PMONITOR = m_monitor.lock();
 diff --git a/src/hyprvx/CameraMath.hpp b/src/hyprvx/CameraMath.hpp
 index 27d20aed..d5bcd4e9 100644
 --- a/src/hyprvx/CameraMath.hpp
