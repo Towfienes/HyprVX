@@ -7,10 +7,15 @@
 //   Hyprland's pressed-key list, so it is dropped too).
 // - Super + vertical wheel: zoom by zoom_step per detent at the pointer; steps = -value120 / 120 (wheel up zooms in).
 // - Super + left button on empty canvas (no window, no top/overlay layer surface under the pointer, FR-007): pan drag,
-//   content follows the pointer. Press, motion and release are cancelled while the drag lasts.
-// The move drag (Super + left button on a window) is added in T048.
+//   content follows the pointer.
+// - Super + left button on a window (FR-008): move drag, O(w) = startOffset + worldDelta(C, S - startScreen); only the
+//   offset changes, Hyprland's window model is never written. The user's own Super + left bind never sees the press.
+// Press, motion and release are cancelled while a drag lasts. The model ends a drag on every data-model end condition
+// (release, leaving DRIFT, panic, the window closing or leaving the scene, a workspace change); motion is then no
+// longer taken, and only the release of the cancelled press stays cancelled.
 
 #include "policy/Plugin.hpp"
+#include "policy/Mechanism.hpp"
 
 #include <src/desktop/state/ViewHitTester.hpp>
 #include <src/desktop/state/ViewState.hpp>
@@ -31,6 +36,8 @@ namespace {
     std::vector<CHyprSignalListener> g_listeners;
     // The left button press that started a Drift drag was cancelled; its release is cancelled too.
     bool g_dragButton = false;
+    // The window of a move drag.
+    PHLWINDOWREF g_dragWindow;
 
     bool superHeld() {
         return g_pInputManager->getModsFromAllKBs() & HL_MODIFIER_META;
@@ -41,19 +48,21 @@ namespace {
         return {POS.x, POS.y};
     }
 
-    // FR-007: empty canvas = no window content (through the camera and offsets, patch 0011) and no top or overlay
-    // layer surface (or layer popup) under the pointer.
-    bool emptyCanvas(const PHLMONITOR& monitor, const Vector2D& pos) {
+    // What a Super + left press hits: a top/overlay layer surface or layer popup (neither drag), a window (move, hit
+    // through the camera and offsets, patch 0011) or empty canvas (pan, FR-007).
+    struct SPressTarget {
+        bool      layer = false;
+        PHLWINDOW window;
+    };
+    SPressTarget pressTarget(const PHLMONITOR& monitor, const Vector2D& pos) {
         const auto& hit = Desktop::viewState()->hitTest();
-        Vector2D local;
-        PHLLS    layer;
-        if (hit.layerPopupSurfaceAt(pos, monitor, &local, &layer))
-            return false;
-        if (hit.layerSurfaceAt(pos, &monitor->m_layerSurfaceLayers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY], &local, &layer))
-            return false;
-        if (hit.layerSurfaceAt(pos, &monitor->m_layerSurfaceLayers[ZWLR_LAYER_SHELL_V1_LAYER_TOP], &local, &layer))
-            return false;
-        return !hit.windowAt(pos, Desktop::View::RESERVED_EXTENTS | Desktop::View::INPUT_EXTENTS | Desktop::View::ALLOW_FLOATING);
+        Vector2D    local;
+        PHLLS       layer;
+        if (hit.layerPopupSurfaceAt(pos, monitor, &local, &layer) ||
+            hit.layerSurfaceAt(pos, &monitor->m_layerSurfaceLayers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY], &local, &layer) ||
+            hit.layerSurfaceAt(pos, &monitor->m_layerSurfaceLayers[ZWLR_LAYER_SHELL_V1_LAYER_TOP], &local, &layer))
+            return {.layer = true};
+        return {.window = hit.windowAt(pos, Desktop::View::RESERVED_EXTENTS | Desktop::View::INPUT_EXTENTS | Desktop::View::ALLOW_FLOATING)};
     }
 
     void onKey(const IKeyboard::SKeyEvent& event, Event::SCallbackInfo& info) {
@@ -89,6 +98,7 @@ namespace {
             if (!g_dragButton)
                 return;
             g_dragButton = false;
+            g_dragWindow.reset();
             HyprVXPolicy::model().dragEnd();
             info.cancelled = true;
             return;
@@ -96,21 +106,40 @@ namespace {
         if (!HyprVXPolicy::anyDrift() || !superHeld())
             return;
         const auto MONITOR = HyprVXPolicy::driftMonitorUnderPointer();
-        if (!MONITOR || !emptyCanvas(MONITOR, g_pInputManager->getMouseCoordsInternal()))
+        if (!MONITOR)
             return;
-        if (!HyprVXPolicy::model().beginPan(MONITOR->m_id, pointer()))
+        const auto TARGET = pressTarget(MONITOR, g_pInputManager->getMouseCoordsInternal());
+        if (TARGET.layer)
+            return;
+        bool started = false;
+        if (TARGET.window) {
+            started      = HyprVXPolicy::model().beginMove(MONITOR->m_id, rc<uintptr_t>(TARGET.window.get()), pointer());
+            g_dragWindow = TARGET.window;
+        } else
+            started = HyprVXPolicy::model().beginPan(MONITOR->m_id, pointer());
+        if (!started)
             return;
         g_dragButton   = true;
         info.cancelled = true;
     }
 
     void onMove(Event::SCallbackInfo& info) {
-        // A drag ended by Drift leaving DRIFT (or panic) stops taking motion; only the release stays cancelled.
-        if (!g_dragButton || !HyprVXPolicy::model().drag())
+        // A drag the model ended stops taking motion; only the release stays cancelled.
+        const auto& DRAG = HyprVXPolicy::model().drag();
+        if (!g_dragButton || !DRAG)
             return;
         info.cancelled = true;
-        if (HyprVXPolicy::model().dragMotion(pointer()))
+        if (!HyprVXPolicy::model().dragMotion(pointer()))
+            return;
+        if (DRAG->kind == hyprvx::drift::DragKind::Pan) {
             HyprVXPolicy::sync(true);
+            return;
+        }
+        // Move: only the dragged window's offset changes (it is a scene window while the drag lasts).
+        if (const auto WINDOW = g_dragWindow.lock()) {
+            const auto OFFSET = HyprVXPolicy::model().offset(DRAG->window);
+            HyprVX::setWindowOffset(WINDOW, Vector2D{OFFSET.x, OFFSET.y});
+        }
     }
 }
 
@@ -125,4 +154,5 @@ void HyprVXPolicy::initInput() {
 void HyprVXPolicy::shutdownInput() {
     g_listeners.clear();
     g_dragButton = false;
+    g_dragWindow.reset();
 }
