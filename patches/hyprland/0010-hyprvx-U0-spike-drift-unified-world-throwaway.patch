@@ -1,0 +1,536 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Towfienes <ngolamtien1706@gmail.com>
+Date: Sun, 11 Oct 2026 14:46:06 +0700
+Subject: [PATCH] hyprvx U0 spike: drift unified world (throwaway, evidence
+ only, not merged)
+
+isDriftVisible in shouldRenderWindow and windowAt; per-window camera hints carry the
+workspace region offset; drift-visible windows can get frame callbacks and stay unsuspended
+(dev control flags). Never writes workspace membership or layout (master plan C5).
+---
+ src/desktop/state/GlobalWindowController.cpp |   4 +-
+ src/desktop/state/ViewHitTester.cpp          |  13 +-
+ src/hyprvx/CameraMath.hpp                    |   5 +
+ src/hyprvx/DevControl.cpp                    |  32 +++-
+ src/hyprvx/DriftSpike.cpp                    | 162 +++++++++++++++++++
+ src/hyprvx/DriftSpike.hpp                    |  50 ++++++
+ src/hyprvx/MonitorCamera.cpp                 |  13 +-
+ src/hyprvx/SceneCamera.cpp                   |   9 +-
+ src/render/Renderer.cpp                      |  23 +++
+ 9 files changed, 300 insertions(+), 11 deletions(-)
+ create mode 100644 src/hyprvx/DriftSpike.cpp
+ create mode 100644 src/hyprvx/DriftSpike.hpp
+
+diff --git a/src/desktop/state/GlobalWindowController.cpp b/src/desktop/state/GlobalWindowController.cpp
+index daf5969c..0f408099 100644
+--- a/src/desktop/state/GlobalWindowController.cpp
++++ b/src/desktop/state/GlobalWindowController.cpp
+@@ -6,6 +6,7 @@
+ #include "../../output/Monitor.hpp"
+ #include "../../layout/LayoutManager.hpp"
+ #include "../../managers/fullscreen/FullscreenController.hpp"
++#include "../../hyprvx/DriftSpike.hpp"
+ 
+ using namespace Desktop;
+ 
+@@ -28,7 +29,8 @@ void CGlobalWindowController::updateSuspendedStates() const {
+         if (!w->m_isMapped)
+             continue;
+ 
+-        w->setSuspended(w->isHidden() || !w->m_workspace || !w->m_workspace->isVisible());
++        // U0 spike: drift-visible windows can be kept out of the suspended state (dev control "drift on ... awake")
++        w->setSuspended((w->isHidden() || !w->m_workspace || !w->m_workspace->isVisible()) && !HyprVX::Drift::keepAwake(w));
+     }
+ }
+ 
+diff --git a/src/desktop/state/ViewHitTester.cpp b/src/desktop/state/ViewHitTester.cpp
+index adaf8b1a..4e896998 100644
+--- a/src/desktop/state/ViewHitTester.cpp
++++ b/src/desktop/state/ViewHitTester.cpp
+@@ -15,6 +15,7 @@
+ #include "../../xwayland/XWayland.hpp"
+ #include "../../managers/fullscreen/FullscreenController.hpp"
+ #include "../../hyprvx/InputCamera.hpp"
++#include "../../hyprvx/DriftSpike.hpp"
+ 
+ #include <cmath>
+ #include <ranges>
+@@ -255,14 +256,19 @@ PHLWINDOW CViewHitTester::windowAt(const Vector2D& screenPos, uint16_t propertie
+             return PWINDOW;
+     }
+ 
+-    return windowForWorkspace(false);
++    if (const auto PWINDOW = windowForWorkspace(false))
++        return PWINDOW;
++
++    // HyprVX U0 spike: windows of other workspaces that drift shows
++    return HyprVX::Drift::windowAt(*PMONITOR, screenPos, properties, ignoreWindow);
+ }
+ 
+ SP<CWLSurfaceResource> CViewHitTester::windowSurfaceAt(const Vector2D& screenPos, PHLWINDOW window, Vector2D& surfaceLocal) const {
+     if (!validMapped(window))
+         return nullptr;
+ 
+-    const auto pos = HyprVX::screenToWorld(screenPos); // HyprVX: surface-local through the camera (FR-007)
++    // HyprVX: surface-local through the camera (FR-007); U0 spike: minus the drift offset of the window
++    const auto pos = HyprVX::screenToWorld(screenPos) - HyprVX::Drift::offset(window);
+ 
+     RASSERT(!window->m_isX11, "Cannot call windowSurfaceAt on an X11 window!");
+ 
+@@ -288,7 +294,8 @@ Vector2D CViewHitTester::surfaceLocalAt(const Vector2D& screenPos, PHLWINDOW win
+     if (!validMapped(window))
+         return {};
+ 
+-    const auto pos = HyprVX::screenToWorld(screenPos); // HyprVX: surface-local through the camera (FR-007)
++    // HyprVX: surface-local through the camera (FR-007); U0 spike: minus the drift offset of the window
++    const auto pos = HyprVX::screenToWorld(screenPos) - HyprVX::Drift::offset(window);
+ 
+     if (window->m_isX11)
+         return pos - window->position(Desktop::View::IGeometric::GEOMETRIC_GOAL);
+diff --git a/src/hyprvx/CameraMath.hpp b/src/hyprvx/CameraMath.hpp
+index 27d20aed..d5bcd4e9 100644
+--- a/src/hyprvx/CameraMath.hpp
++++ b/src/hyprvx/CameraMath.hpp
+@@ -118,6 +118,11 @@ enum class Error {
+     return {{c.origin.x - d.x / c.zoom, c.origin.y - d.y / c.zoom}, c.zoom};
+ }
+ 
++// U0 spike only (not in transform-contract v1.1): P' = P - d, a world-space shift of the origin.
++[[nodiscard]] constexpr CameraState panByWorld(const CameraState& c, Vec d) noexcept {
++    return {{c.origin.x - d.x, c.origin.y - d.y}, c.zoom};
++}
++
+ [[nodiscard]] constexpr CameraState identityFor(Vec M) noexcept {
+     return {M, 1.0};
+ }
+diff --git a/src/hyprvx/DevControl.cpp b/src/hyprvx/DevControl.cpp
+index ac973a36..faff65dc 100644
+--- a/src/hyprvx/DevControl.cpp
++++ b/src/hyprvx/DevControl.cpp
+@@ -3,6 +3,7 @@
+ #ifdef HYPRVX_DEV
+ 
+ #include "MonitorCamera.hpp"
++#include "DriftSpike.hpp"
+ 
+ #include "../output/Monitor.hpp"
+ #include "../state/MonitorState.hpp"
+@@ -88,12 +89,34 @@ namespace {
+ 
+     // Never fails: every camera returns to exact identity (the scene has no other state in Feature 001).
+     SDispatchResult panic(std::string) {
+-        for (auto const& m : State::monitorState()->monitors())
++        for (auto const& m : State::monitorState()->monitors()) {
++            if (HyprVX::Drift::on(*m))
++                HyprVX::Drift::set(*m, false, {});
+             HyprVX::resetCamera(*m);
++        }
+         Log::logger->log(Log::WARN, "[hyprvx] panic: all cameras reset to identity");
+         return {};
+     }
+ 
++    // U0 spike: `drift on [frames] [awake]` | `drift off` on the focused monitor.
++    SDispatchResult drift(std::string args) {
++        const auto MONITOR = Desktop::focusState()->monitor();
++        const auto WORDS   = splitWords(args);
++        if (!MONITOR || WORDS.empty() || (WORDS[0] != "on" && WORDS[0] != "off"))
++            return error("err:invalid");
++
++        HyprVX::Drift::SFlags flags;
++        for (size_t i = 1; i < WORDS.size(); ++i) {
++            if (WORDS[i] == "frames")
++                flags.frames = true;
++            else if (WORDS[i] == "awake")
++                flags.awake = true;
++            else
++                return error("err:invalid");
++        }
++        return HyprVX::Drift::set(*MONITOR, WORDS[0] == "on", flags) ? SDispatchResult{} : error("err:invalid");
++    }
++
+     SDispatchResult fullDamage(std::string) {
+         for (auto const& m : State::monitorState()->monitors())
+             g_pHyprRenderer->damageMonitor(m);
+@@ -107,8 +130,9 @@ namespace {
+             const auto CAMERA = HyprVX::cameraOf(*m);
+             if (out.size() > 1)
+                 out += ",";
+-            out += std::format(R"({{"monitor":"{}","P":[{:.17g},{:.17g}],"z":{:.17g},"identity":{},"revision":{},"passElementsAdded":{}}})", escapeJSONStrings(m->m_name),
+-                               CAMERA.origin.x, CAMERA.origin.y, CAMERA.zoom, HyprVX::cameraIsIdentity(*m), m->m_hyprvxCamera.revision, m->m_hyprvxCamera.passElementsAdded);
++            out += std::format(R"({{"monitor":"{}","P":[{:.17g},{:.17g}],"z":{:.17g},"identity":{},"revision":{},"passElementsAdded":{},{}}})", escapeJSONStrings(m->m_name),
++                               CAMERA.origin.x, CAMERA.origin.y, CAMERA.zoom, HyprVX::cameraIsIdentity(*m), m->m_hyprvxCamera.revision, m->m_hyprvxCamera.passElementsAdded,
++                               HyprVX::Drift::stateJSON(*m));
+         }
+         return out + "]";
+     }
+@@ -125,7 +149,7 @@ namespace {
+ 
+     const std::vector<SCommand>& commands() {
+         static const std::vector<SCommand> COMMANDS = {
+-            {"camera", camera}, {"camera-mon", cameraMon}, {"panic", panic}, {"state", state}, {"full-damage", fullDamage},
++            {"camera", camera}, {"camera-mon", cameraMon}, {"panic", panic}, {"state", state}, {"full-damage", fullDamage}, {"drift", drift},
+         };
+         return COMMANDS;
+     }
+diff --git a/src/hyprvx/DriftSpike.cpp b/src/hyprvx/DriftSpike.cpp
+new file mode 100644
+index 00000000..dbd6a1f3
+--- /dev/null
++++ b/src/hyprvx/DriftSpike.cpp
+@@ -0,0 +1,162 @@
++#include "DriftSpike.hpp"
++#include "SceneCamera.hpp"
++
++#include "../output/Monitor.hpp"
++#include "../desktop/Workspace.hpp"
++#include "../desktop/view/Window.hpp"
++#include "../desktop/view/WLSurface.hpp"
++#include "../desktop/state/WindowState.hpp"
++#include "../desktop/state/GlobalWindowController.hpp"
++#include "../protocols/core/Compositor.hpp"
++#include "../render/Renderer.hpp"
++#include "../state/MonitorState.hpp"
++#include "../debug/log/Logger.hpp"
++
++#include <format>
++#include <ranges>
++#include <unordered_map>
++
++using namespace hyprvx;
++using namespace Render;
++
++namespace {
++    struct SState {
++        WORKSPACEID           anchor = WORKSPACE_INVALID;
++        HyprVX::Drift::SFlags flags;
++        SRenderModifData      outer, base;
++    };
++
++    std::unordered_map<MONITORID, SState>& states() {
++        static std::unordered_map<MONITORID, SState> s;
++        return s;
++    }
++
++    const SState* stateOf(const Monitor::CMonitor& monitor) {
++        const auto IT = states().find(monitor.m_id);
++        return IT == states().end() ? nullptr : &IT->second;
++    }
++
++    bool regular(const PHLWORKSPACE& ws) {
++        return ws && !ws->m_isSpecialWorkspace && ws->m_id > 0;
++    }
++
++    Vector2D region(const Monitor::CMonitor& monitor, WORKSPACEID id) {
++        return {sc<double>(id - 1) * monitor.m_size.x, 0.0};
++    }
++
++    // The window's monitor for drift purposes: the monitor of its regular workspace, if drift is on there.
++    PHLMONITOR driftMonitorOf(const PHLWINDOW& window) {
++        if (!window || !regular(window->m_workspace))
++            return nullptr;
++        const auto MONITOR = window->m_workspace->m_monitor.lock();
++        return MONITOR && stateOf(*MONITOR) ? MONITOR : nullptr;
++    }
++}
++
++bool HyprVX::Drift::on(const Monitor::CMonitor& monitor) {
++    return stateOf(monitor) != nullptr;
++}
++
++bool HyprVX::Drift::set(Monitor::CMonitor& monitor, bool enable, SFlags flags) {
++    if (enable) {
++        if (!regular(monitor.m_activeWorkspace))
++            return false;
++        auto& state = states()[monitor.m_id];
++        if (state.anchor == WORKSPACE_INVALID)
++            state.anchor = monitor.m_activeWorkspace->m_id;
++        state.flags = flags;
++    } else
++        states().erase(monitor.m_id);
++
++    Log::logger->log(Log::WARN, "[hyprvx] U0 drift {} on {} (frames {}, awake {})", enable ? "on" : "off", monitor.m_name, flags.frames, flags.awake);
++    Desktop::globalWindowController()->updateSuspendedStates();
++    if (g_pHyprRenderer)
++        g_pHyprRenderer->damageMonitor(monitor.m_self.lock());
++    return true;
++}
++
++Vector2D HyprVX::Drift::shift(const Monitor::CMonitor& monitor) {
++    const auto STATE = stateOf(monitor);
++    if (!STATE || !regular(monitor.m_activeWorkspace))
++        return {};
++    return region(monitor, monitor.m_activeWorkspace->m_id) - region(monitor, STATE->anchor);
++}
++
++Vector2D HyprVX::Drift::offset(const PHLWINDOW& window) {
++    const auto MONITOR = driftMonitorOf(window);
++    if (!MONITOR || !regular(MONITOR->m_activeWorkspace))
++        return {};
++    return region(*MONITOR, window->m_workspace->m_id) - region(*MONITOR, MONITOR->m_activeWorkspace->m_id);
++}
++
++bool HyprVX::Drift::visible(const PHLWINDOW& window, const PHLMONITOR& monitor) {
++    if (!monitor || !window || !window->m_isMapped || window->isHidden())
++        return false;
++    if (driftMonitorOf(window) != monitor || window->m_workspace == monitor->m_activeWorkspace)
++        return false;
++
++    const auto VIEW = cammath::visibleWorldRect(cameraOf(*monitor), {monitor->m_size.x, monitor->m_size.y});
++    return window->getFullWindowBoundingBox().translate(offset(window)).overlaps({VIEW.pos.x, VIEW.pos.y, VIEW.size.x, VIEW.size.y});
++}
++
++bool HyprVX::Drift::keepAwake(const PHLWINDOW& window) {
++    const auto MONITOR = driftMonitorOf(window);
++    return MONITOR && stateOf(*MONITOR)->flags.awake && visible(window, MONITOR);
++}
++
++void HyprVX::Drift::setPass(const Monitor::CMonitor& monitor, const SRenderModifData& outer, const SRenderModifData& base) {
++    const auto IT = states().find(monitor.m_id);
++    if (IT == states().end())
++        return;
++    IT->second.outer = outer;
++    IT->second.base  = base;
++}
++
++SRenderModifData HyprVX::Drift::windowModif(const Monitor::CMonitor& monitor, const PHLWINDOW& window) {
++    // The window is drawn at L(w) + its workspace's render offset; it belongs at L(w) + O(w). Shifting the camera
++    // origin by the difference keeps the single camera transform (Constitution IV): P' = P - O(w) + renderOffset.
++    const auto DELTA = offset(window) - (window->m_pinned ? Vector2D{} : window->m_workspace->m_renderOffset->value());
++    const auto STATE = stateOf(monitor);
++    return cameraRenderModif(monitor, cammath::panByWorld(cameraOf(monitor), {DELTA.x, DELTA.y}), STATE ? STATE->outer : SRenderModifData{});
++}
++
++SRenderModifData HyprVX::Drift::passBase(const Monitor::CMonitor& monitor) {
++    const auto STATE = stateOf(monitor);
++    return STATE ? STATE->base : SRenderModifData{};
++}
++
++PHLWINDOW HyprVX::Drift::windowAt(const Monitor::CMonitor& monitor, const Vector2D& screen, uint64_t properties, const PHLWINDOW& ignore) {
++    if (!on(monitor))
++        return nullptr;
++
++    const auto WORLD   = cammath::inverse(cameraOf(monitor), monitorOrigin(monitor), {screen.x, screen.y});
++    const auto MONITOR = monitor.m_self.lock();
++    for (auto const& w : Desktop::windowState()->windows() | std::views::reverse) {
++        if (w == ignore || !w->acceptsInput() || w->m_ruleApplicator->noFocus().valueOrDefault() || !visible(w, MONITOR))
++            continue;
++        if (w->getWindowBoxUnified(properties).containsPoint(Vector2D{WORLD.x, WORLD.y} - offset(w)))
++            return w;
++    }
++    return nullptr;
++}
++
++void HyprVX::Drift::sendFrames(const PHLMONITOR& monitor, const Time::steady_tp& now) {
++    for (auto const& w : Desktop::windowState()->windows()) {
++        if (visible(w, monitor) && w->wlSurface() && w->wlSurface()->resource())
++            w->wlSurface()->resource()->breadthfirst([now](SP<CWLSurfaceResource> s, const Vector2D&, void*) { s->frame(now); }, nullptr);
++    }
++}
++
++bool HyprVX::Drift::sendsFrames(const Monitor::CMonitor& monitor) {
++    const auto STATE = stateOf(monitor);
++    return STATE && STATE->flags.frames;
++}
++
++std::string HyprVX::Drift::stateJSON(const Monitor::CMonitor& monitor) {
++    const auto STATE = stateOf(monitor);
++    if (!STATE)
++        return R"("drift":false)";
++    const auto SHIFT = shift(monitor);
++    return std::format(R"("drift":true,"anchor":{},"active":{},"shift":[{:.17g},{:.17g}],"frames":{},"awake":{})", STATE->anchor,
++                       monitor.m_activeWorkspace ? monitor.m_activeWorkspace->m_id : WORKSPACE_INVALID, SHIFT.x, SHIFT.y, STATE->flags.frames, STATE->flags.awake);
++}
+diff --git a/src/hyprvx/DriftSpike.hpp b/src/hyprvx/DriftSpike.hpp
+new file mode 100644
+index 00000000..3f0ebf74
+--- /dev/null
++++ b/src/hyprvx/DriftSpike.hpp
+@@ -0,0 +1,50 @@
++#pragma once
++
++// HyprVX U0 unified-world feasibility spike (DV3-12): throwaway, evidence only, never merged.
++//
++// While drift is on for a monitor, every regular workspace on it is placed in one world: workspace k has the region
++// offset R(k) = ((k - 1) * monitor width, 0). The world frame is anchored at the workspace that was active when drift
++// was turned on; the stored camera is in that frame. Rendering and input keep working in the active workspace's frame
++// (window offset 0), so the effective camera is the stored one shifted by R(active) - R(anchor) and a window of
++// another workspace has the offset O(w) = R(ws(w)) - R(active). Focusing a window of workspace k makes k active:
++// both change by the same amount, so nothing moves on screen. Workspace membership, layout positions, floating and
++// fullscreen state are never written (master plan C5).
++
++#include "../helpers/math/Math.hpp"
++#include "../helpers/time/Time.hpp"
++#include "../render/types.hpp"
++#include "../desktop/DesktopTypes.hpp"
++
++#include <cstdint>
++#include <string>
++
++namespace Monitor {
++    class CMonitor;
++}
++
++namespace HyprVX::Drift {
++    struct SFlags {
++        bool frames = false; // also send frame callbacks to drift-visible windows on frames without damage
++        bool awake  = false; // keep drift-visible windows out of the xdg_toplevel suspended state
++    };
++
++    bool                     on(const Monitor::CMonitor& monitor);
++    bool                     set(Monitor::CMonitor& monitor, bool enable, SFlags flags);
++    Vector2D                 shift(const Monitor::CMonitor& monitor);
++    Vector2D                 offset(const PHLWINDOW& window);
++
++    // isDriftVisible(w, m): a mapped window of a non-active regular workspace on m whose world box the camera shows.
++    bool                     visible(const PHLWINDOW& window, const PHLMONITOR& monitor);
++    bool                     keepAwake(const PHLWINDOW& window);
++
++    // The window pass of a drift monitor draws each window through its own camera hint, then restores the pass base.
++    void                     setPass(const Monitor::CMonitor& monitor, const Render::SRenderModifData& outer, const Render::SRenderModifData& base);
++    Render::SRenderModifData windowModif(const Monitor::CMonitor& monitor, const PHLWINDOW& window);
++    Render::SRenderModifData passBase(const Monitor::CMonitor& monitor);
++
++    PHLWINDOW                windowAt(const Monitor::CMonitor& monitor, const Vector2D& screen, uint64_t properties, const PHLWINDOW& ignore);
++    void                     sendFrames(const PHLMONITOR& monitor, const Time::steady_tp& now);
++    bool                     sendsFrames(const Monitor::CMonitor& monitor);
++
++    std::string              stateJSON(const Monitor::CMonitor& monitor);
++}
+diff --git a/src/hyprvx/MonitorCamera.cpp b/src/hyprvx/MonitorCamera.cpp
+index c8061d3b..8e09a3f4 100644
+--- a/src/hyprvx/MonitorCamera.cpp
++++ b/src/hyprvx/MonitorCamera.cpp
+@@ -1,4 +1,5 @@
+ #include "MonitorCamera.hpp"
++#include "DriftSpike.hpp"
+ 
+ #include "../output/Monitor.hpp"
+ #include "../debug/log/Logger.hpp"
+@@ -32,8 +33,16 @@ cammath::Vec HyprVX::monitorOrigin(const Monitor::CMonitor& monitor) {
+     return {monitor.m_position.x, monitor.m_position.y};
+ }
+ 
++namespace {
++    cammath::CameraState storedCamera(const Monitor::CMonitor& monitor) {
++        return monitor.m_hyprvxCamera.active ? monitor.m_hyprvxCamera.state : cammath::identityFor(HyprVX::monitorOrigin(monitor));
++    }
++}
++
++// U0 spike: in drift the stored camera is in the anchor workspace's frame; rendering and input use the active one's.
+ cammath::CameraState HyprVX::cameraOf(const Monitor::CMonitor& monitor) {
+-    return monitor.m_hyprvxCamera.active ? monitor.m_hyprvxCamera.state : cammath::identityFor(monitorOrigin(monitor));
++    const auto SHIFT = Drift::shift(monitor);
++    return cammath::panByWorld(storedCamera(monitor), {SHIFT.x, SHIFT.y});
+ }
+ 
+ bool HyprVX::cameraIsIdentity(const Monitor::CMonitor& monitor) {
+@@ -46,7 +55,7 @@ bool HyprVX::setCamera(Monitor::CMonitor& monitor, const cammath::CameraState& c
+         return false;
+     }
+ 
+-    if (sameState(cameraOf(monitor), camera))
++    if (sameState(storedCamera(monitor), camera))
+         return true;
+ 
+     auto& stored  = monitor.m_hyprvxCamera;
+diff --git a/src/hyprvx/SceneCamera.cpp b/src/hyprvx/SceneCamera.cpp
+index 58ea0773..173c31ae 100644
+--- a/src/hyprvx/SceneCamera.cpp
++++ b/src/hyprvx/SceneCamera.cpp
+@@ -1,4 +1,5 @@
+ #include "SceneCamera.hpp"
++#include "DriftSpike.hpp"
+ 
+ #include "../output/Monitor.hpp"
+ #include "../desktop/Workspace.hpp"
+@@ -56,6 +57,12 @@ bool HyprVX::cameraShows(const Monitor::CMonitor& monitor, const CBox& globalLog
+ }
+ 
+ void HyprVX::addCameraDamage(Monitor::CMonitor& monitor, const CBox& globalLogical) {
++    // U0 spike: drift windows are not at their layout position; any damage redraws the whole output.
++    if (Drift::on(monitor)) {
++        monitor.addDamage(CBox{0, 0, monitor.m_transformedSize.x, monitor.m_transformedSize.y});
++        return;
++    }
++
+     const auto CAMERA = activeCamera(monitor);
+     if (!CAMERA || globalLogical.empty())
+         return;
+@@ -66,7 +73,7 @@ void HyprVX::addCameraDamage(Monitor::CMonitor& monitor, const CBox& globalLogic
+ }
+ 
+ void HyprVX::addCameraDamage(Monitor::CMonitor& monitor, const CRegion& globalLogical) {
+-    if (!activeCamera(monitor))
++    if (!activeCamera(monitor) && !Drift::on(monitor))
+         return;
+ 
+     globalLogical.forEachRect([&monitor](const auto& RECT) { addCameraDamage(monitor, CBox(RECT.x1, RECT.y1, RECT.x2 - RECT.x1, RECT.y2 - RECT.y1)); });
+diff --git a/src/render/Renderer.cpp b/src/render/Renderer.cpp
+index 5b23d81b..31c18405 100644
+--- a/src/render/Renderer.cpp
++++ b/src/render/Renderer.cpp
+@@ -45,6 +45,7 @@
+ #include "pass/RectPassElement.hpp"
+ #include "pass/RendererHintsPassElement.hpp"
+ #include "../hyprvx/SceneCamera.hpp"
++#include "../hyprvx/DriftSpike.hpp"
+ #include "pass/SurfacePassElement.hpp"
+ #include "../debug/log/Logger.hpp"
+ #include "../protocols/ColorManagement.hpp"
+@@ -229,6 +230,10 @@ WP<Render::GL::CHyprOpenGLImpl> IHyprRenderer::glBackend() {
+ }
+ 
+ bool IHyprRenderer::shouldRenderWindow(PHLWINDOW pWindow, PHLMONITOR pMonitor) {
++    // HyprVX U0 spike: isDriftVisible replaces the workspace-visibility checks for windows of other workspaces
++    if UNLIKELY (HyprVX::Drift::visible(pWindow, pMonitor))
++        return true;
++
+     if (!pWindow->visibleOnMonitor(pMonitor))
+         return false;
+ 
+@@ -308,6 +313,10 @@ bool IHyprRenderer::shouldRenderWindow(PHLWINDOW pWindow) {
+     if (PWORKSPACE && PWORKSPACE->isVisible())
+         return true;
+ 
++    // HyprVX U0 spike (popups and subsurfaces of drift-visible windows)
++    if UNLIKELY (HyprVX::Drift::visible(pWindow, PWORKSPACE->m_monitor.lock()))
++        return true;
++
+     for (auto const& m : State::monitorState()->monitors()) {
+         if (PWORKSPACE && PWORKSPACE->m_monitor == m && (PWORKSPACE->m_renderOffset->isBeingAnimated() || PWORKSPACE->m_alpha->isBeingAnimated()))
+             return true;
+@@ -436,6 +445,16 @@ void IHyprRenderer::renderWorkspaceWindowsFullscreen(PHLMONITOR pMonitor, PHLWOR
+ void IHyprRenderer::renderWorkspaceWindows(PHLMONITOR pMonitor, PHLWORKSPACE pWorkspace, const Time::steady_tp& time) {
+     PHLWINDOW lastWindow;
+ 
++    // HyprVX U0 spike: in drift every window is drawn through its own camera hint (world offset, workspace slide undone)
++    const bool HYPRVXDRIFT  = HyprVX::Drift::on(*pMonitor) && pWorkspace == pMonitor->m_activeWorkspace;
++    const auto renderWindow = [&](PHLWINDOW w, PHLMONITOR m, const Time::steady_tp& t, bool decorate, eRenderPassMode mode) {
++        if UNLIKELY (HYPRVXDRIFT)
++            addPassElement(makeUnique<CRendererHintsPassElement>(CRendererHintsPassElement::SData{HyprVX::Drift::windowModif(*m, w)}));
++        this->renderWindow(w, m, t, decorate, mode);
++        if UNLIKELY (HYPRVXDRIFT)
++            addPassElement(makeUnique<CRendererHintsPassElement>(CRendererHintsPassElement::SData{HyprVX::Drift::passBase(*m)}));
++    };
++
+     Event::bus()->m_events.render.stage.emit(RENDER_PRE_WINDOWS);
+ 
+     std::vector<PHLWINDOWREF> windows;
+@@ -1189,6 +1208,8 @@ void IHyprRenderer::renderAllClientsForWorkspace(PHLMONITOR pMonitor, PHLWORKSPA
+         }
+     };
+     pushHyprvxCamera(true);
++    if UNLIKELY (HyprVX::Drift::on(*pMonitor) && pWorkspace == pMonitor->m_activeWorkspace)
++        HyprVX::Drift::setPass(*pMonitor, RENDERMODIFDATA, HYPRVXCAMERA ? HyprVX::cameraRenderModif(*pMonitor, *HYPRVXCAMERA, RENDERMODIFDATA) : RENDERMODIFDATA);
+ 
+     if UNLIKELY /* subjective? */ (Fullscreen::controller()->hasFullscreen(pWorkspace))
+         renderWorkspaceWindowsFullscreen(pMonitor, pWorkspace, time);
+@@ -2236,6 +2257,8 @@ void IHyprRenderer::renderMonitor(PHLMONITOR pMonitor, bool commit) {
+             sendFrameEventsToWorkspace(pMonitor, pMonitor->m_activeWorkspace, NOW);
+         if (pMonitor->m_activeSpecialWorkspace)
+             sendFrameEventsToWorkspace(pMonitor, pMonitor->m_activeSpecialWorkspace, NOW);
++        if UNLIKELY (HyprVX::Drift::sendsFrames(*pMonitor))
++            HyprVX::Drift::sendFrames(pMonitor, NOW);
+     }
+ 
+     renderCursor = renderCursor && shouldRenderCursor();

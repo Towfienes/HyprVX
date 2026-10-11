@@ -359,8 +359,12 @@ void xdgSurfaceConfigure(void* data, xdg_surface* surface, uint32_t serial) {
 }
 const xdg_surface_listener kXdgSurfaceListener = {.configure = xdgSurfaceConfigure};
 
-void toplevelConfigure(void* data, xdg_toplevel*, int32_t w, int32_t h, wl_array*) {
-    logLine(*static_cast<Client*>(data), "\"ev\": \"configure\", \"w\": %d, \"h\": %d", w, h);
+// U0 spike: the configure states (xdg_wm_base v6: SUSPENDED = 9; ACTIVATED = 4) are logged.
+void toplevelConfigure(void* data, xdg_toplevel*, int32_t w, int32_t h, wl_array* states) {
+    std::string list;
+    for (const auto* st = static_cast<const uint32_t*>(states->data); reinterpret_cast<const char*>(st) < static_cast<const char*>(states->data) + states->size; ++st)
+        list += (list.empty() ? "" : ", ") + std::to_string(*st);
+    logLine(*static_cast<Client*>(data), "\"ev\": \"configure\", \"w\": %d, \"h\": %d, \"states\": [%s]", w, h, list.c_str());
 }
 void toplevelClose(void* data, xdg_toplevel*) {
     static_cast<Client*>(data)->running = false;
@@ -386,8 +390,13 @@ void layerClosed(void* data, zwlr_layer_surface_v1*) {
 }
 const zwlr_layer_surface_v1_listener kLayerListener = {.configure = layerConfigure, .closed = layerClosed};
 
-void surfaceEnter(void*, wl_surface*, wl_output*) {}
-void surfaceLeave(void*, wl_surface*, wl_output*) {}
+// U0 spike: wl_surface.enter/leave of the main surface are logged.
+void surfaceEnter(void* data, wl_surface*, wl_output*) {
+    logLine(*static_cast<Client*>(data), "\"ev\": \"output_enter\"");
+}
+void surfaceLeave(void* data, wl_surface*, wl_output*) {
+    logLine(*static_cast<Client*>(data), "\"ev\": \"output_leave\"");
+}
 void surfacePreferredScale(void* data, wl_surface*, int32_t factor) {
     auto& c = *static_cast<Client*>(data);
     logLine(c, "\"ev\": \"preferred_buffer_scale\", \"scale\": %d", factor);
@@ -485,10 +494,12 @@ void registryGlobal(void* data, wl_registry* registry, uint32_t name, const char
         c.compositor = static_cast<wl_compositor*>(wl_registry_bind(registry, name, &wl_compositor_interface, c.compositorVersion));
     } else if (std::strcmp(interface, wl_subcompositor_interface.name) == 0) {
         c.subcompositor = static_cast<wl_subcompositor*>(wl_registry_bind(registry, name, &wl_subcompositor_interface, 1));
+    } else if (std::strcmp(interface, wl_output_interface.name) == 0) {
+        wl_registry_bind(registry, name, &wl_output_interface, 1); // U0 spike: so that wl_surface.enter/leave are sent
     } else if (std::strcmp(interface, wl_shm_interface.name) == 0) {
         c.shm = static_cast<wl_shm*>(wl_registry_bind(registry, name, &wl_shm_interface, 1));
     } else if (std::strcmp(interface, xdg_wm_base_interface.name) == 0) {
-        c.wmBase = static_cast<xdg_wm_base*>(wl_registry_bind(registry, name, &xdg_wm_base_interface, std::min<uint32_t>(version, 5)));
+        c.wmBase = static_cast<xdg_wm_base*>(wl_registry_bind(registry, name, &xdg_wm_base_interface, std::min<uint32_t>(version, 6)));
         xdg_wm_base_add_listener(c.wmBase, &kWmBaseListener, &c);
     } else if (std::strcmp(interface, zwlr_layer_shell_v1_interface.name) == 0) {
         c.layerShell = static_cast<zwlr_layer_shell_v1*>(
