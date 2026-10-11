@@ -36,6 +36,19 @@ Do not copy source code based only on assumptions about its license.
 - Compatibility: permissive with the project's eventual license provided the
   attribution and permission text remain with distributed copies.
 
+## wlr-virtual-pointer protocol definition (Feature 001 Phase 2, T054/T055)
+
+- Source: Hyprland upstream `efb50993780079460b0cbed1363e2166a2de1d9f`,
+  `protocols/wlr-virtual-pointer-unstable-v1.xml` (a copy of the wlr-protocols definition).
+- File sha256: `3ff6d540be0bc5228195bf072bde42117ea17945a5c2061add5d3cf97d6bb524` (vendored byte-identical).
+- License: X/MIT style permission notice embedded in the XML; copyright © 2019 Josef Gajdusek. It permits use,
+  copying, modification, merging, publishing, distribution, sublicensing and sale, provided the copyright and
+  permission notice are kept in all copies or substantial portions.
+- Use: vendored protocol XML only, at `tools/vpointer/protocols/wlr-virtual-pointer-unstable-v1.xml`;
+  `wayland-scanner` generates the client stubs at build time for the test-only `hyprvx-vpointer` tool, which connects
+  only to the verified nested compositor. The complete original notice stays in the vendored XML.
+- Compatibility: permissive with the project's eventual license provided the notice stays with distributed copies.
+
 ## HyprVX files under an explicit license
 
 The project-wide license is still open (V1 D010). The files below carry their own license so that they can be

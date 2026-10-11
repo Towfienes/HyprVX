@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """HyprVX frame analyzer (contracts/test-tooling.md section 6).
 
-  python3 -I tools/analyze_frame.py bbox IMAGE --expect-box X,Y,W,H --tolerance PX [--allow-clip X,Y,W,H] [--region X,Y,W,H] --out JSON
+  python3 -I tools/analyze_frame.py bbox IMAGE --expect-box X,Y,W,H --tolerance PX [--allow-clip X,Y,W,H] [--region X,Y,W,H]
+                                    [--marker-set main|popup|sub] --out JSON
   python3 -I tools/analyze_frame.py diff IMAGE --reference IMG [--max-pixels N] --out JSON
 
 Exit codes: 0 PASS, 1 FAIL, 2 BLOCKED (unreadable input or bad arguments).
@@ -13,15 +14,16 @@ import json
 from pathlib import Path
 import sys
 
-TOOL_VERSION = "1.0"
+TOOL_VERSION = "1.1"
 
-# hyprvx-testclient corner markers (test-tooling section 4). No other client pixel uses these colors.
-MARKERS = {
-    "tl": (255, 0, 0),
-    "tr": (0, 255, 0),
-    "bl": (0, 0, 255),
-    "br": (255, 0, 255),
+# hyprvx-testclient corner markers (test-tooling section 4; popup and subsurface palettes since 1.3). No other
+# client pixel uses these colors.
+MARKER_SETS = {
+    "main": {"tl": (255, 0, 0), "tr": (0, 255, 0), "bl": (0, 0, 255), "br": (255, 0, 255)},
+    "popup": {"tl": (255, 255, 0), "tr": (0, 255, 255), "bl": (255, 128, 0), "br": (128, 0, 255)},
+    "sub": {"tl": (255, 0, 128), "tr": (128, 255, 0), "bl": (0, 128, 255), "br": (0, 255, 128)},
 }
+MARKERS = MARKER_SETS["main"]
 # Per-channel distance accepted as a marker pixel. Filtered marker edges blend toward the RGB(32,32,32) background
 # by at least half a channel range, so they stay outside this distance.
 MARKER_CHANNEL_TOLERANCE = 24
@@ -84,9 +86,9 @@ def parse_box(text):
     return {"x": x, "y": y, "w": w, "h": h}
 
 
-def find_markers(width, height, pixels, region=None):
+def find_markers(width, height, pixels, region=None, markers=MARKERS):
     """Bounding box (x0, y0, x1, y1) of each marker color, or None when absent; only pixels inside region count."""
-    found = {name: None for name in MARKERS}
+    found = {name: None for name in markers}
     tol = MARKER_CHANNEL_TOLERANCE
     x_range = range(width) if region is None else range(max(0, region["x"]), min(width, region["x"] + region["w"]))
     y_range = range(height) if region is None else range(max(0, region["y"]), min(height, region["y"] + region["h"]))
@@ -95,7 +97,7 @@ def find_markers(width, height, pixels, region=None):
         for x in x_range:
             i = row + x * 3
             r, g, b = pixels[i], pixels[i + 1], pixels[i + 2]
-            for name, (mr, mg, mb) in MARKERS.items():
+            for name, (mr, mg, mb) in markers.items():
                 if abs(r - mr) <= tol and abs(g - mg) <= tol and abs(b - mb) <= tol:
                     box = found[name]
                     if box is None:
@@ -114,9 +116,9 @@ def inside(point, region):
     return region["x"] <= x < region["x"] + region["w"] and region["y"] <= y < region["y"] + region["h"]
 
 
-def analyze_bbox(image, expect, tolerance, allow_clip, region=None):
+def analyze_bbox(image, expect, tolerance, allow_clip, region=None, marker_set="main"):
     width, height, pixels = load_rgb(image)
-    found = find_markers(width, height, pixels, region)
+    found = find_markers(width, height, pixels, region, MARKER_SETS[marker_set])
     reasons = []
 
     # Expected marker corners derived from the expected box.
@@ -193,6 +195,8 @@ def main(argv):
     parser.add_argument("--region", help="only pixels inside X,Y,W,H are searched for markers (e.g. to exclude another client)")
     parser.add_argument("--reference")
     parser.add_argument("--max-pixels", type=int, default=0)
+    parser.add_argument("--marker-set", choices=sorted(MARKER_SETS), default="main",
+                        help="testclient palette whose corner markers define the box (main, popup or sub)")
     parser.add_argument("--out", required=True)
     try:
         args = parser.parse_args(argv)
@@ -208,7 +212,7 @@ def main(argv):
                 raise Blocked("bbox needs --expect-box")
             allow = parse_box(args.allow_clip) if args.allow_clip else None
             region = parse_box(args.region) if args.region else None
-            result.update(analyze_bbox(args.image, parse_box(args.expect_box), args.tolerance, allow, region))
+            result.update(analyze_bbox(args.image, parse_box(args.expect_box), args.tolerance, allow, region, args.marker_set))
         else:
             if not args.reference:
                 raise Blocked("diff needs --reference")

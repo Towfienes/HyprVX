@@ -53,14 +53,18 @@ hvx_cleanup() {
 }
 trap hvx_cleanup EXIT
 
-# Builds hyprvx-testclient in the agent cache when missing and prints its path.
-hvx_testclient() {
+# Builds (incrementally, so a source change is never tested with a stale binary) hyprvx-testclient and
+# hyprvx-vpointer in the agent cache; prints the build directory.
+hvx_tools_build() {
     local build="$HOME/.cache/hyprvx/$HYPRVX_AGENT/build/testclient"
-    if [[ ! -x $build/hyprvx-testclient ]]; then
+    if [[ ! -f $build/build.ninja ]]; then
         cmake -S "$HVX_REPO" -B "$build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DHYPRVX_WITH_WAYLAND_PLATFORM=ON > "$build.configure.log" 2>&1
-        cmake --build "$build" --target hyprvx_testclient -j2 > "$build.build.log" 2>&1
     fi
-    echo "$build/hyprvx-testclient"
+    cmake --build "$build" --target hyprvx_testclient hyprvx_vpointer -j2 > "$build.build.log" 2>&1
+    echo "$build"
+}
+hvx_testclient() {
+    echo "$(hvx_tools_build)/hyprvx-testclient"
 }
 
 # hvx_client_start NAME SIZE [testclient args...]: starts a nested client with a control FIFO and a JSONL log.
@@ -75,6 +79,32 @@ hvx_client_start() {
     hvx_nested run --background -- "$client" --size "$size" --title "$name" --log "$log" --control "$fifo" "$@" \
         > /dev/null
     hvx_wait_for "$log" '"ev": "frame_done"' || hvx_die_blocked "client $name never presented a frame"
+}
+
+# hvx_vpointer_start NAME: starts hyprvx-vpointer on the nested display (logical layout from HVX_LAYOUT, default
+# 1280x800) with control FIFO NAME.fifo and log NAME.jsonl; waits for its ready line.
+hvx_vpointer_start() {
+    local name=$1 fifo="$HVX_EVID/$1.fifo" log="$HVX_EVID/$1.jsonl" vp
+    vp="$(hvx_tools_build)/hyprvx-vpointer"
+    rm -f "$fifo"
+    mkfifo -m 600 "$fifo"
+    : > "$log"
+    hvx_nested run --background -- "$vp" --layout "${HVX_LAYOUT:-1280x800}" --log "$log" --control "$fifo" > /dev/null
+    hvx_wait_for "$log" '"ev": "ready"' || hvx_die_blocked "vpointer $name never became ready"
+}
+
+# hvx_pointer_run OUT VPOINTER COMMANDS_FILE CLIENT...: runs the commands through pointer_driver.py and writes
+# OUT.json in the evidence dir; a timeout is BLOCKED.
+hvx_pointer_run() {
+    local out=$1 vp=$2 commands=$3 client
+    shift 3
+    local args=()
+    for client in "$@"; do
+        args+=(--client "$client:$HVX_EVID/$client.fifo:$HVX_EVID/$client.jsonl")
+    done
+    python3 -I "$HVX_REPO/tests/native/pointer_driver.py" --vpointer "$HVX_EVID/$vp.fifo:$HVX_EVID/$vp.jsonl" \
+        "${args[@]}" --commands "$commands" --out "$HVX_EVID/$out.json" \
+        || hvx_die_blocked "pointer driver $out did not complete"
 }
 
 hvx_client_cmd() {

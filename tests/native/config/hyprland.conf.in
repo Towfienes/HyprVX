@@ -16,6 +16,8 @@ general {
     border_size = 2
     col.active_border = rgb(888888)
     col.inactive_border = rgb(888888)
+    # Border resize drags exist so that t_drag_scope.sh can prove they are blocked while the camera is non-identity.
+    resize_on_border = true
 }
 
 decoration {
@@ -68,3 +70,9 @@ exec-once = touch "$XDG_RUNTIME_DIR/hyprvx-exec-once"
 
 # The test client floats at a fixed logical position with its own fixed size (min = max size).
 windowrule = match:class ^(hyprvx-testclient)$, float on, move 140 100
+# Second client for the focus test (t_focus.sh, app-id hyprvx-testclient-b); no other test starts it.
+windowrule = match:class ^(hyprvx-testclient-b)$, float on, move 960 560
+
+# Compositor move drag without a modifier: hyprvx-vpointer has no keyboard, so the side button (BTN_SIDE, 275) stands
+# in for Super+LMB (same movewindow mouse bind and drag controller). Only t_drag_scope.sh presses it.
+bindm = , mouse:275, movewindow

@@ -18,16 +18,24 @@ CANVAS = (1280, 800)
 CANVAS_COLOR = (17, 17, 17)
 
 
-def testclient(w, h):
+# Palettes from test-tooling section 4 (1.3): background, then markers TL, TR, BL, BR.
+PALETTES = {
+    "main": ((32, 32, 32), ((255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 0, 255))),
+    "popup": ((40, 40, 80), ((255, 255, 0), (0, 255, 255), (255, 128, 0), (128, 0, 255))),
+    "sub": ((48, 40, 32), ((255, 0, 128), (128, 255, 0), (0, 128, 255), (0, 255, 128))),
+}
+
+
+def testclient(w, h, palette="main"):
     """hyprvx-testclient content: background, 50 px grid, 16x16 corner markers."""
-    image = Image.new("RGB", (w, h), (32, 32, 32))
+    background, markers = PALETTES[palette]
+    image = Image.new("RGB", (w, h), background)
     px = image.load()
     for y in range(h):
         for x in range(w):
             if x % 50 == 0 or y % 50 == 0:
                 px[x, y] = (64, 64, 64)
-    for (x0, y0), color in (((0, 0), (255, 0, 0)), ((w - 16, 0), (0, 255, 0)),
-                            ((0, h - 16), (0, 0, 255)), ((w - 16, h - 16), (255, 0, 255))):
+    for (x0, y0), color in zip(((0, 0), (w - 16, 0), (0, h - 16), (w - 16, h - 16)), markers):
         for y in range(y0, y0 + 16):
             for x in range(x0, x0 + 16):
                 px[x, y] = color
@@ -149,6 +157,33 @@ class AnalyzerTest(unittest.TestCase):
                                       "--region", "0,0,970,800")
         self.assertEqual(code, 0, out)
         self.assertEqual(out["bbox"], {"x": 140, "y": 100, "w": 800, "h": 600})
+
+    def test_marker_sets_select_popup_and_subsurface(self):
+        # Main window with a popup at window-local (300, 200) and a subsurface at (40, 380), both at z = 0.5.
+        image = frame(self.client, 140, 100)
+        image.paste(testclient(200, 120, "popup"), (440, 300))
+        image.paste(testclient(160, 100, "sub"), (180, 480))
+        path = self.save(image, "popup.png")
+        code, out = self.run_analyzer("bbox", path, "--expect-box", "440,300,200,120", "--tolerance", "0",
+                                      "--marker-set", "popup")
+        self.assertEqual(code, 0, out)
+        self.assertEqual(out["bbox"], {"x": 440, "y": 300, "w": 200, "h": 120})
+        code, out = self.run_analyzer("bbox", path, "--expect-box", "180,480,160,100", "--tolerance", "0",
+                                      "--marker-set", "sub")
+        self.assertEqual(code, 0, out)
+        # The main set still finds the main window and ignores the other palettes.
+        code, out = self.run_analyzer("bbox", path, "--expect-box", "140,100,800,600", "--tolerance", "0")
+        self.assertEqual(code, 0, out)
+        # A popup drawn at the wrong place is a displacement, not a pass.
+        code, out = self.run_analyzer("bbox", path, "--expect-box", "300,200,200,120", "--tolerance", "2",
+                                      "--marker-set", "popup")
+        self.assertEqual(code, 1)
+        # Without a popup in the frame, every popup marker is missing.
+        plain = self.save(frame(self.client, 140, 100), "plain.png")
+        code, out = self.run_analyzer("bbox", plain, "--expect-box", "440,300,200,120", "--marker-set", "popup")
+        self.assertEqual(code, 1)
+        self.assertTrue({"marker_missing:tl", "marker_missing:tr", "marker_missing:bl",
+                         "marker_missing:br"} <= set(out["reasons"]), out["reasons"])
 
     def test_blocked_on_unreadable_input_bad_arguments_or_size_mismatch(self):
         bad = self.dir / "bad.png"

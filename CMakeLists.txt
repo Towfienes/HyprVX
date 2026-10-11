@@ -212,6 +212,15 @@ if(HYPRVX_WITH_WAYLAND_PLATFORM)
     target_include_directories(hyprvx_testclient PRIVATE ${HYPRVX_PROTOCOL_DIR})
     target_link_libraries(hyprvx_testclient PRIVATE PkgConfig::WAYLAND_CLIENT)
     target_compile_features(hyprvx_testclient PRIVATE cxx_std_20)
+
+    # Test-only virtual pointer for the nested compositor (contracts/test-tooling.md section 4a).
+    hyprvx_client_protocol(wlr-virtual-pointer ${CMAKE_CURRENT_SOURCE_DIR}/tools/vpointer/protocols/wlr-virtual-pointer-unstable-v1.xml)
+    add_executable(hyprvx_vpointer tools/vpointer/main.cpp
+        ${HYPRVX_PROTOCOL_DIR}/wlr-virtual-pointer-protocol.c ${HYPRVX_PROTOCOL_DIR}/wlr-virtual-pointer-client-protocol.h)
+    set_target_properties(hyprvx_vpointer PROPERTIES OUTPUT_NAME hyprvx-vpointer)
+    target_include_directories(hyprvx_vpointer PRIVATE ${HYPRVX_PROTOCOL_DIR})
+    target_link_libraries(hyprvx_vpointer PRIVATE PkgConfig::WAYLAND_CLIENT)
+    target_compile_features(hyprvx_vpointer PRIVATE cxx_std_20)
 endif()
 
 if(HYPRVX_WITH_HYPRLAND_PLUGIN)

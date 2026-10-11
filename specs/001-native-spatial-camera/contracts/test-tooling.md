@@ -1,6 +1,7 @@
 # Contract: Test Tooling, Evidence and Resource Locks (Feature 001)
 
-**Contract version**: 1.2 (2026-10-11; editorial only, DV3-15: single agent, no interface change. 1.1 added `deps.glaze`; 1.0 frozen at `966e6b6`)
+**Contract version**: 1.3 (2026-10-11, T055: testclient `--popup`/`--subsurface` and per-surface pointer events, the
+`hyprvx-vpointer` CLI (§4a), analyzer `--marker-set`. 1.2 editorial (DV3-15); 1.1 added `deps.glaze`; 1.0 frozen at `966e6b6`)
 GATE-N decision rules §6.1). Owner: Claude (contract). Implementers: see `tasks.md`.
 Changes require a version bump and an entry in `../integration-log.md`. Consumers code against this contract,
 never against another agent's unfinished branch.
@@ -72,13 +73,25 @@ C++ `xdg_toplevel` client using SHM `XRGB8888` (opaque). Deterministic content:
   bottom-right RGB(255,0,255). No other pixel uses these colors.
 - Scale 1 buffers. With `--scale-aware`, it honours the preferred buffer scale (used for scale 1.25 runs).
 
-CLI: `hyprvx-testclient --size WxH --title T --log PATH [--control PATH] [--layer TOP|OVERLAY] [--scale-aware]`
+CLI: `hyprvx-testclient --size WxH --title T --log PATH [--control PATH] [--layer TOP|OVERLAY] [--scale-aware]
+[--popup X,Y,W,H] [--subsurface X,Y,W,H] [--position X,Y] [--app-id ID]`
 - `--control PATH` reads newline commands from a FIFO:
   - `fill X Y W H RRGGBB`: paint a surface-local rectangle and commit with damage limited to that rectangle.
   - `redraw`: repaint everything and commit with full damage.
   - `sync`: commit with no content change and request a frame callback.
   - `quit`.
 - `--layer` maps a `wlr-layer-shell` surface with the same content instead of a toplevel (V-14).
+- `--popup X,Y,W,H` (1.3, toplevel only): after the first configure, maps one `xdg_popup` of size W×H whose top-left is
+  at parent-surface-local (X, Y) (positioner anchor rect (X, Y, 1, 1) with anchor `top_left`, so the anchor point is
+  (X, Y), and gravity `bottom_right`; `constraint_adjustment` none; no grab). Content uses the popup palette below. The popup is never
+  repositioned by the client; an offset outside every monitor is allowed (V-19).
+- `--subsurface X,Y,W,H` (1.3, toplevel only): one desynchronized `wl_subsurface` of size W×H at parent-local (X, Y),
+  placed above the parent, with the subsurface palette below.
+- Palettes (background, grid, then markers TL, TR, BL, BR; grid and markers as for the main surface):
+  main RGB(32,32,32) / (64,64,64) / red (255,0,0), green (0,255,0), blue (0,0,255), magenta (255,0,255);
+  popup RGB(40,40,80) / (64,64,64) / yellow (255,255,0), cyan (0,255,255), orange (255,128,0), violet (128,0,255);
+  subsurface RGB(48,40,32) / (64,64,64) / pink (255,0,128), lime (128,255,0), azure (0,128,255), spring (0,255,128).
+  No other client pixel uses a marker color. Popup and subsurface buffers follow `--scale-aware` like the main one.
 
 Log (`--log`), one JSON object per line:
 ```json
@@ -90,7 +103,36 @@ Log (`--log`), one JSON object per line:
 {"t_ns": 125200000, "ev": "button", "button": 272, "state": "pressed"}
 ```
 `seq` increments per commit; `frame_done` carries the `seq` of the commit whose callback fired. Pointer
-coordinates are surface-local `wl_fixed` converted to double.
+coordinates are surface-local `wl_fixed` converted to double. Since 1.3, `enter`, `leave`, `motion` and `button`
+carry `"surface": "main" | "popup" | "sub"` (the surface the event is for; `motion` and `button` name the surface of
+the last `enter`), e.g. `{"t_ns": 125000000, "ev": "enter", "surface": "popup", "x": 10.0, "y": 20.0}`. Popup
+lifecycle lines: `{"ev": "popup_configure", "x": X, "y": Y, "w": W, "h": H}` (the position the compositor chose,
+parent-relative) and `{"ev": "popup_done"}` when the compositor dismisses it.
+
+## 4a. `hyprvx-vpointer` (`tools/vpointer/`, 1.3)
+
+C++ client of `zwlr_virtual_pointer_v1` (vendored XML, `docs/THIRD_PARTY.md`). Test-only; it moves the pointer of the
+nested compositor and nothing else.
+
+CLI: `hyprvx-vpointer --layout WxH --log PATH (--control FIFO | --script FILE)`
+- `--layout WxH`: the logical size of the nested output layout (one output at (0, 0)). Absolute motion is sent with
+  extents (W·256, H·256), so positions resolve to 1/256 logical px.
+- Commands, one per line, each followed by `frame` and a `wl_display_roundtrip`, then a log line:
+  - `move X Y`: absolute motion to logical (X, Y) (doubles, 0 ≤ X ≤ W, 0 ≤ Y ≤ H).
+  - `down [BUTTON]`, `up [BUTTON]`, `click [BUTTON]`: Linux button code, default 272 (`BTN_LEFT`).
+  - `quit`.
+- Log, one JSON object per line: `{"t_ns": …, "seq": N, "ev": "done", "cmd": "move", "x": X, "y": Y}` after the
+  roundtrip, i.e. after the compositor has processed the request and sent any resulting pointer events;
+  `{"ev": "error", "message": …}` for a rejected command.
+- Safety (defense in depth, in addition to `scripts/nested.sh run`, the only supported launcher): it refuses to
+  connect (exit 3, nothing sent) unless `XDG_RUNTIME_DIR` is a private `/tmp/hvx-*` directory owned by the user with
+  mode 0700 and `WAYLAND_DISPLAY` is a bare socket name; after connecting it reads the server PID with `SO_PEERCRED`
+  and disconnects (exit 3) unless `/proc/<pid>/exe` lies under `~/.cache/hyprvx/<agent>/prefix/`. No uinput,
+  `ydotool` or host display is ever used (master plan §F).
+
+Attribution rule for tests: after each `done` line, the test sends `sync` to the testclient and waits for that
+commit's `frame_done`. Pointer events for the command are logged before that `frame_done`, because the compositor
+sent them before it received the commit. Events between two such barriers belong to the command between them.
 
 ## 5. Deterministic capture rules
 
@@ -111,7 +153,7 @@ or PPM (`grim -t ppm`).
 
 | Mode | Options | Checks |
 |---|---|---|
-| `bbox` | `--expect-box X,Y,W,H --tolerance PX` | Window bounding box from marker colors; all four markers present unless `--allow-clip` is given with an expected visible region |
+| `bbox` | `--expect-box X,Y,W,H --tolerance PX [--marker-set main\|popup\|sub] [--region X,Y,W,H]` | Bounding box from the marker colors of the chosen palette (default `main`, 1.3); all four markers present unless `--allow-clip` is given with an expected visible region |
 | `diff` | `--reference IMG [--max-pixels N]` | Pixel-exact comparison (`N` defaults to 0) |
 
 Output JSON:

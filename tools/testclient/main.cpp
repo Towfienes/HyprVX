@@ -1,11 +1,13 @@
 // hyprvx-testclient: deterministic Wayland client for HyprVX native tests (contracts/test-tooling.md section 4).
 //
 //   hyprvx-testclient --size WxH --title T --log PATH [--control FIFO] [--layer TOP|OVERLAY] [--position X,Y]
-//                     [--app-id ID] [--scale-aware]
+//                     [--app-id ID] [--scale-aware] [--popup X,Y,W,H] [--subsurface X,Y,W,H]
 //
 // Content: background RGB(32,32,32), 1 px grid every 50 px RGB(64,64,64) from surface (0,0), 16x16 corner markers
 // TL red, TR green, BL blue, BR magenta. SHM XRGB8888 (opaque). The control FIFO accepts
 // "fill X Y W H RRGGBB", "redraw", "sync" and "quit". Every commit gets a frame callback; the log is JSON lines.
+// --popup maps one xdg_popup and --subsurface one wl_subsurface at a fixed parent-local offset, each with its own
+// palette (test-tooling 1.3); pointer events name the surface they are for.
 
 #include <algorithm>
 #include <cerrno>
@@ -34,11 +36,22 @@
 
 namespace {
 
-constexpr uint32_t kBackground = 0x202020;
-constexpr uint32_t kGrid = 0x404040;
-constexpr uint32_t kMarkers[4] = {0xFF0000, 0x00FF00, 0x0000FF, 0xFF00FF}; // TL, TR, BL, BR
+struct Palette {
+    uint32_t background;
+    uint32_t grid;
+    uint32_t markers[4]; // TL, TR, BL, BR
+};
+constexpr Palette kMainPalette = {0x202020, 0x404040, {0xFF0000, 0x00FF00, 0x0000FF, 0xFF00FF}};
+constexpr Palette kPopupPalette = {0x282850, 0x404040, {0xFFFF00, 0x00FFFF, 0xFF8000, 0x8000FF}};
+constexpr Palette kSubPalette = {0x302820, 0x404040, {0xFF0080, 0x80FF00, 0x0080FF, 0x00FF80}};
+constexpr uint32_t kBackground = kMainPalette.background;
 constexpr int kMarker = 16;
 constexpr int kGridStep = 50;
+
+struct Rect {
+    int  x = 0, y = 0, w = 0, h = 0;
+    bool set = false;
+};
 
 struct Options {
     int width = 800;
@@ -51,12 +64,25 @@ struct Options {
     int posX = 0;
     int posY = 0;
     bool scaleAware = false;
+    Rect popup;
+    Rect subsurface;
 };
 
 struct Buffer {
     wl_buffer* buffer = nullptr;
     uint32_t*  pixels = nullptr;
     bool       busy = false;
+};
+
+// A popup or subsurface: static content in one buffer, repainted only when the buffer scale changes.
+struct Extra {
+    const char*   name = "";
+    Rect          rect;
+    const Palette* palette = nullptr;
+    wl_surface*   surface = nullptr;
+    wl_buffer*    buffer = nullptr;
+    uint32_t*     pixels = nullptr;
+    size_t        size = 0;
 };
 
 struct Client {
@@ -69,12 +95,19 @@ struct Client {
     wl_shm*                shm = nullptr;
     xdg_wm_base*           wmBase = nullptr;
     zwlr_layer_shell_v1*   layerShell = nullptr;
+    wl_subcompositor*      subcompositor = nullptr;
     wl_seat*               seat = nullptr;
     wl_pointer*            pointer = nullptr;
+    const char*            pointerSurface = "none"; // surface of the last pointer enter
     wl_surface*            surface = nullptr;
     xdg_surface*           xdgSurface = nullptr;
     xdg_toplevel*          toplevel = nullptr;
     zwlr_layer_surface_v1* layerSurface = nullptr;
+    Extra                  popup;
+    Extra                  sub;
+    xdg_surface*           popupXdgSurface = nullptr;
+    xdg_popup*             xdgPopup = nullptr;
+    wl_subsurface*         subsurface = nullptr;
 
     int                   scale = 1;
     int                   bufferWidth = 0;
@@ -125,19 +158,25 @@ void paintRect(Client& c, int x, int y, int w, int h, uint32_t color) {
             c.canvas[static_cast<size_t>(py) * c.bufferWidth + px] = color;
 }
 
-void paintBase(Client& c) {
-    const int w = c.opts.width, h = c.opts.height, s = c.scale;
-    for (int py = 0; py < c.bufferHeight; ++py) {
-        for (int px = 0; px < c.bufferWidth; ++px) {
+// Background, 1 px grid every 50 px and the four 16x16 corner markers of a w x h logical surface at buffer scale s.
+void paintContent(uint32_t* out, int w, int h, int s, const Palette& pal) {
+    const int bw = w * s, bh = h * s;
+    for (int py = 0; py < bh; ++py) {
+        for (int px = 0; px < bw; ++px) {
             // A grid line is one logical pixel wide: the first buffer row/column of each 50 px step.
             const bool grid = ((px / s) % kGridStep == 0 && px % s == 0) || ((py / s) % kGridStep == 0 && py % s == 0);
-            c.canvas[static_cast<size_t>(py) * c.bufferWidth + px] = grid ? kGrid : kBackground;
+            out[static_cast<size_t>(py) * bw + px] = grid ? pal.grid : pal.background;
         }
     }
-    paintRect(c, 0, 0, kMarker, kMarker, kMarkers[0]);
-    paintRect(c, w - kMarker, 0, kMarker, kMarker, kMarkers[1]);
-    paintRect(c, 0, h - kMarker, kMarker, kMarker, kMarkers[2]);
-    paintRect(c, w - kMarker, h - kMarker, kMarker, kMarker, kMarkers[3]);
+    const int corners[4][2] = {{0, 0}, {w - kMarker, 0}, {0, h - kMarker}, {w - kMarker, h - kMarker}};
+    for (int i = 0; i < 4; ++i)
+        for (int py = corners[i][1] * s; py < (corners[i][1] + kMarker) * s; ++py)
+            for (int px = corners[i][0] * s; px < (corners[i][0] + kMarker) * s; ++px)
+                out[static_cast<size_t>(py) * bw + px] = pal.markers[i];
+}
+
+void paintBase(Client& c) {
+    paintContent(c.canvas.data(), c.opts.width, c.opts.height, c.scale, kMainPalette);
 }
 
 // ---- buffers ----------------------------------------------------------------------------------------------------
@@ -175,6 +214,31 @@ void createBuffers(Client& c) {
         close(fd);
         wl_buffer_add_listener(b.buffer, &kBufferListener, &b);
     }
+}
+
+// (Re)creates an extra surface's buffer at the client's buffer scale and attaches it; the caller commits.
+void attachExtra(Client& c, Extra& e) {
+    if (e.buffer) {
+        wl_buffer_destroy(e.buffer);
+        munmap(e.pixels, e.size);
+    }
+    const int bw = e.rect.w * c.scale, bh = e.rect.h * c.scale;
+    const size_t stride = static_cast<size_t>(bw) * 4;
+    e.size = stride * bh;
+    const int fd = memfd_create("hyprvx-testclient-extra", MFD_CLOEXEC);
+    if (fd < 0 || ftruncate(fd, static_cast<off_t>(e.size)) != 0)
+        die("cannot allocate shm buffer");
+    e.pixels = static_cast<uint32_t*>(mmap(nullptr, e.size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
+    if (e.pixels == MAP_FAILED)
+        die("cannot map shm buffer");
+    wl_shm_pool* pool = wl_shm_create_pool(c.shm, fd, static_cast<int32_t>(e.size));
+    e.buffer = wl_shm_pool_create_buffer(pool, 0, bw, bh, static_cast<int32_t>(stride), WL_SHM_FORMAT_XRGB8888);
+    wl_shm_pool_destroy(pool);
+    close(fd);
+    paintContent(e.pixels, e.rect.w, e.rect.h, c.scale, *e.palette);
+    wl_surface_set_buffer_scale(e.surface, c.scale);
+    wl_surface_attach(e.surface, e.buffer, 0, 0);
+    wl_surface_damage_buffer(e.surface, 0, 0, bw, bh);
 }
 
 void frameDone(void* data, wl_callback* callback, uint32_t) {
@@ -231,12 +295,65 @@ void wmPing(void*, xdg_wm_base* base, uint32_t serial) {
 }
 const xdg_wm_base_listener kWmBaseListener = {.ping = wmPing};
 
+void popupXdgConfigure(void* data, xdg_surface* surface, uint32_t serial) {
+    auto& c = *static_cast<Client*>(data);
+    xdg_surface_ack_configure(surface, serial);
+    if (!c.popup.buffer)
+        attachExtra(c, c.popup);
+    wl_surface_commit(c.popup.surface);
+    wl_display_flush(c.display);
+}
+const xdg_surface_listener kPopupXdgSurfaceListener = {.configure = popupXdgConfigure};
+
+void popupConfigure(void* data, xdg_popup*, int32_t x, int32_t y, int32_t w, int32_t h) {
+    logLine(*static_cast<Client*>(data), "\"ev\": \"popup_configure\", \"x\": %d, \"y\": %d, \"w\": %d, \"h\": %d", x, y, w, h);
+}
+void popupDone(void* data, xdg_popup*) {
+    logLine(*static_cast<Client*>(data), "\"ev\": \"popup_done\"");
+}
+void popupRepositioned(void*, xdg_popup*, uint32_t) {}
+const xdg_popup_listener kPopupListener = {.configure = popupConfigure, .popup_done = popupDone, .repositioned = popupRepositioned};
+
+void createPopup(Client& c) {
+    const Rect& r = c.opts.popup;
+    c.popup.surface = wl_compositor_create_surface(c.compositor);
+    c.popupXdgSurface = xdg_wm_base_get_xdg_surface(c.wmBase, c.popup.surface);
+    xdg_surface_add_listener(c.popupXdgSurface, &kPopupXdgSurfaceListener, &c);
+    xdg_positioner* pos = xdg_wm_base_create_positioner(c.wmBase);
+    xdg_positioner_set_size(pos, r.w, r.h);
+    xdg_positioner_set_anchor_rect(pos, r.x, r.y, 1, 1);
+    xdg_positioner_set_anchor(pos, XDG_POSITIONER_ANCHOR_TOP_LEFT);
+    xdg_positioner_set_gravity(pos, XDG_POSITIONER_GRAVITY_BOTTOM_RIGHT);
+    xdg_positioner_set_constraint_adjustment(pos, XDG_POSITIONER_CONSTRAINT_ADJUSTMENT_NONE);
+    c.xdgPopup = xdg_surface_get_popup(c.popupXdgSurface, c.xdgSurface, pos);
+    xdg_positioner_destroy(pos);
+    xdg_popup_add_listener(c.xdgPopup, &kPopupListener, &c);
+    wl_surface_commit(c.popup.surface);
+}
+
+// The subsurface position and stacking apply with the parent's next commit (the first redraw).
+void createSubsurface(Client& c) {
+    if (!c.subcompositor)
+        die("compositor lacks wl_subcompositor");
+    c.sub.surface = wl_compositor_create_surface(c.compositor);
+    c.subsurface = wl_subcompositor_get_subsurface(c.subcompositor, c.sub.surface, c.surface);
+    wl_subsurface_set_position(c.subsurface, c.opts.subsurface.x, c.opts.subsurface.y);
+    wl_subsurface_place_above(c.subsurface, c.surface);
+    wl_subsurface_set_desync(c.subsurface);
+    attachExtra(c, c.sub);
+    wl_surface_commit(c.sub.surface);
+}
+
 void xdgSurfaceConfigure(void* data, xdg_surface* surface, uint32_t serial) {
     auto& c = *static_cast<Client*>(data);
     xdg_surface_ack_configure(surface, serial);
     if (!c.configured) {
         c.configured = true;
+        if (c.opts.subsurface.set)
+            createSubsurface(c);
         redraw(c);
+        if (c.opts.popup.set)
+            createPopup(c);
     }
 }
 const xdg_surface_listener kXdgSurfaceListener = {.configure = xdgSurfaceConfigure};
@@ -278,6 +395,12 @@ void surfacePreferredScale(void* data, wl_surface*, int32_t factor) {
     c.scale = factor;
     createBuffers(c);
     wl_surface_set_buffer_scale(c.surface, c.scale);
+    for (Extra* e : {&c.sub, &c.popup}) {
+        if (e->buffer) {
+            attachExtra(c, *e);
+            wl_surface_commit(e->surface);
+        }
+    }
     redraw(c);
 }
 void surfacePreferredTransform(void*, wl_surface*, uint32_t) {}
@@ -288,17 +411,35 @@ const wl_surface_listener kSurfaceListener = {.enter = surfaceEnter,
 
 // ---- pointer log ------------------------------------------------------------------------------------------------
 
-void pointerEnter(void* data, wl_pointer*, uint32_t, wl_surface*, wl_fixed_t x, wl_fixed_t y) {
-    logLine(*static_cast<Client*>(data), "\"ev\": \"enter\", \"x\": %.4f, \"y\": %.4f", wl_fixed_to_double(x), wl_fixed_to_double(y));
+const char* surfaceName(const Client& c, const wl_surface* s) {
+    if (s && s == c.surface)
+        return "main";
+    if (s && s == c.popup.surface)
+        return "popup";
+    if (s && s == c.sub.surface)
+        return "sub";
+    return "unknown";
 }
-void pointerLeave(void* data, wl_pointer*, uint32_t, wl_surface*) {
-    logLine(*static_cast<Client*>(data), "\"ev\": \"leave\"");
+
+void pointerEnter(void* data, wl_pointer*, uint32_t, wl_surface* surface, wl_fixed_t x, wl_fixed_t y) {
+    auto& c = *static_cast<Client*>(data);
+    c.pointerSurface = surfaceName(c, surface);
+    logLine(c, "\"ev\": \"enter\", \"surface\": \"%s\", \"x\": %.4f, \"y\": %.4f", c.pointerSurface, wl_fixed_to_double(x),
+            wl_fixed_to_double(y));
+}
+void pointerLeave(void* data, wl_pointer*, uint32_t, wl_surface* surface) {
+    auto& c = *static_cast<Client*>(data);
+    logLine(c, "\"ev\": \"leave\", \"surface\": \"%s\"", surfaceName(c, surface));
+    c.pointerSurface = "none";
 }
 void pointerMotion(void* data, wl_pointer*, uint32_t, wl_fixed_t x, wl_fixed_t y) {
-    logLine(*static_cast<Client*>(data), "\"ev\": \"motion\", \"x\": %.4f, \"y\": %.4f", wl_fixed_to_double(x), wl_fixed_to_double(y));
+    auto& c = *static_cast<Client*>(data);
+    logLine(c, "\"ev\": \"motion\", \"surface\": \"%s\", \"x\": %.4f, \"y\": %.4f", c.pointerSurface, wl_fixed_to_double(x),
+            wl_fixed_to_double(y));
 }
 void pointerButton(void* data, wl_pointer*, uint32_t, uint32_t, uint32_t button, uint32_t state) {
-    logLine(*static_cast<Client*>(data), "\"ev\": \"button\", \"button\": %u, \"state\": \"%s\"", button,
+    auto& c = *static_cast<Client*>(data);
+    logLine(c, "\"ev\": \"button\", \"surface\": \"%s\", \"button\": %u, \"state\": \"%s\"", c.pointerSurface, button,
             state == WL_POINTER_BUTTON_STATE_PRESSED ? "pressed" : "released");
 }
 void pointerAxis(void*, wl_pointer*, uint32_t, uint32_t, wl_fixed_t) {}
@@ -341,6 +482,8 @@ void registryGlobal(void* data, wl_registry* registry, uint32_t name, const char
     if (std::strcmp(interface, wl_compositor_interface.name) == 0) {
         c.compositorVersion = std::min<uint32_t>(version, 6);
         c.compositor = static_cast<wl_compositor*>(wl_registry_bind(registry, name, &wl_compositor_interface, c.compositorVersion));
+    } else if (std::strcmp(interface, wl_subcompositor_interface.name) == 0) {
+        c.subcompositor = static_cast<wl_subcompositor*>(wl_registry_bind(registry, name, &wl_subcompositor_interface, 1));
     } else if (std::strcmp(interface, wl_shm_interface.name) == 0) {
         c.shm = static_cast<wl_shm*>(wl_registry_bind(registry, name, &wl_shm_interface, 1));
     } else if (std::strcmp(interface, xdg_wm_base_interface.name) == 0) {
@@ -405,12 +548,19 @@ Options parseArgs(int argc, char** argv) {
                 die("--position must be X,Y");
         } else if (a == "--scale-aware") {
             o.scaleAware = true;
+        } else if (a == "--popup" || a == "--subsurface") {
+            Rect& r = a == "--popup" ? o.popup : o.subsurface;
+            if (std::sscanf(next(), "%d,%d,%d,%d", &r.x, &r.y, &r.w, &r.h) != 4 || r.w < 2 * kMarker || r.h < 2 * kMarker)
+                die(a + " must be X,Y,W,H with W,H >= 32");
+            r.set = true;
         } else {
             die("unknown argument " + a);
         }
     }
     if (o.logPath.empty())
         die("--log is required");
+    if (!o.layer.empty() && (o.popup.set || o.subsurface.set))
+        die("--popup and --subsurface need a toplevel (no --layer)");
     return o;
 }
 
@@ -419,6 +569,8 @@ Options parseArgs(int argc, char** argv) {
 int main(int argc, char** argv) {
     Client c;
     c.opts = parseArgs(argc, argv);
+    c.popup = {.name = "popup", .rect = c.opts.popup, .palette = &kPopupPalette};
+    c.sub = {.name = "sub", .rect = c.opts.subsurface, .palette = &kSubPalette};
     c.log = std::fopen(c.opts.logPath.c_str(), "a");
     if (!c.log)
         die("cannot open log " + c.opts.logPath);
