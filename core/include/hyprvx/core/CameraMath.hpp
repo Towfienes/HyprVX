@@ -2,13 +2,18 @@
 // Copyright (c) 2026, the HyprVX authors.
 //
 // HyprVX camera transform: the single source of truth for world <-> screen mapping (Constitution IV).
-// Contract: specs/001-native-spatial-camera/contracts/transform-contract.md, version 1.1.
+// Contract: specs/001-native-spatial-camera/contracts/transform-contract.md, version 1.1, with the world-offset delta
+// specs/002-multi-window-drift-mvp/contracts/transform-contract.md, version 1.2.
 //
 // Header-only, C++20, standard library only. This file is vendored unchanged into the Hyprland patch series;
 // it must not depend on hyprvx_core. Adapters to other vector/box types live at the call sites and contain no
 // arithmetic beyond field copies.
 
 #pragma once
+// A classic guard as well: this file and its vendored copy in the patch series are byte-identical, and a plugin built
+// against the patched headers can include both (#pragma once compares paths, not contents).
+#ifndef HYPRVX_CAMERAMATH_HPP
+#define HYPRVX_CAMERAMATH_HPP
 
 #include <cmath>
 
@@ -122,4 +127,17 @@ enum class Error {
     return {M, 1.0};
 }
 
+// Contract 1.2: the camera that draws a window with world offset O at its logical position L, i.e.
+// forward(offsetCamera(c, O), M, L) == forward(c, M, L + O). Origin shift only; a zero offset returns c exactly.
+[[nodiscard]] constexpr CameraState offsetCamera(const CameraState& c, Vec O) noexcept {
+    return {{c.origin.x - O.x, c.origin.y - O.y}, c.zoom};
+}
+
+// Contract 1.2: a screen-space delta in world units, d / z (window move drag, floating resize drag).
+[[nodiscard]] constexpr Vec worldDelta(const CameraState& c, Vec d) noexcept {
+    return {d.x / c.zoom, d.y / c.zoom};
+}
+
 } // namespace hyprvx::cammath
+
+#endif // HYPRVX_CAMERAMATH_HPP
