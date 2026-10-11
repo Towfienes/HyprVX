@@ -1,0 +1,552 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Towfienes <ngolamtien1706@gmail.com>
+Date: Sun, 11 Oct 2026 19:56:10 +0700
+Subject: [PATCH] hyprvx: world offsets in render, culling and damage
+
+Patch 0010 of the HyprVX V3 series (Feature 002, T021).
+
+- src/hyprvx/CameraMath.hpp updated to the core header byte for byte
+  (transform contract 1.2: offsetCamera, worldDelta; classic include guard).
+- src/hyprvx/WindowOffset.{hpp,cpp}: the mechanism API for world offsets
+  O(w) (setWindowOffset, windowOffset, contentOffset, resetWindowOffsets;
+  contracts/mechanism-api.md 1.0). Storage is private; seams read
+  appliedOffset/appliedContentOffset, which are 0 while the window's
+  workspace has a fullscreen window (FR-012).
+- renderWorkspaceWindows: a window of the active workspace with a world
+  offset is drawn under its own hint cameraRenderModif(M,
+  offsetCamera(C, O)), then the pass hint returns (research R1). Nothing
+  is added for windows without an offset (FR-003).
+- visibleOnMonitor, damageWindow and damageSurface use L + O; damageBox's
+  union rule also covers boxes at L + O (popup and subsurface map/unmap).
+- Pass simplification, direct scanout and solitary client stay off while
+  any window has a world offset.
+---
+ src/desktop/view/Window.cpp |   4 +
+ src/hyprvx/CameraMath.hpp   |  20 ++++-
+ src/hyprvx/SceneCamera.cpp  |  20 +++++
+ src/hyprvx/SceneCamera.hpp  |  19 ++++
+ src/hyprvx/WindowOffset.cpp | 175 ++++++++++++++++++++++++++++++++++++
+ src/hyprvx/WindowOffset.hpp |  40 +++++++++
+ src/output/Monitor.cpp      |   9 +-
+ src/render/Renderer.cpp     |  47 ++++++++--
+ 8 files changed, 321 insertions(+), 13 deletions(-)
+ create mode 100644 src/hyprvx/WindowOffset.cpp
+ create mode 100644 src/hyprvx/WindowOffset.hpp
+
+diff --git a/src/desktop/view/Window.cpp b/src/desktop/view/Window.cpp
+index 12b023dd..dfdba4bb 100644
+--- a/src/desktop/view/Window.cpp
++++ b/src/desktop/view/Window.cpp
+@@ -67,6 +67,7 @@
+ #include "../../event/EventBus.hpp"
+ #include "../../hyprvx/SceneCamera.hpp"
+ #include "../../hyprvx/InputCamera.hpp"
++#include "../../hyprvx/WindowOffset.hpp"
+ 
+ #include <hyprutils/string/String.hpp>
+ #include <hyprutils/string/VarList.hpp>
+@@ -1197,6 +1198,9 @@ bool CWindow::visibleOnMonitor(PHLMONITOR pMonitor) {
+     if (m_isFloating)
+         wbox = getFullWindowBoundingBox();
+ 
++    // HyprVX (Feature 002 research R8): culled at the world box L + O(w)
++    wbox.translate(HyprVX::appliedOffset(*this));
++
+     // HyprVX (FR-006): under a camera the monitor shows its visible world rect instead of its logical rect
+     if UNLIKELY (const auto CAMERA = HyprVX::activeCamera(*pMonitor); CAMERA) {
+         const auto VISIBLE = hyprvx::cammath::visibleWorldRect(*CAMERA, {pMonitor->m_size.x, pMonitor->m_size.y});
+diff --git a/src/hyprvx/CameraMath.hpp b/src/hyprvx/CameraMath.hpp
+index 27d20aed..1a7f47ee 100644
+--- a/src/hyprvx/CameraMath.hpp
++++ b/src/hyprvx/CameraMath.hpp
+@@ -2,13 +2,18 @@
+ // Copyright (c) 2026, the HyprVX authors.
+ //
+ // HyprVX camera transform: the single source of truth for world <-> screen mapping (Constitution IV).
+-// Contract: specs/001-native-spatial-camera/contracts/transform-contract.md, version 1.1.
++// Contract: specs/001-native-spatial-camera/contracts/transform-contract.md, version 1.1, with the world-offset delta
++// specs/002-multi-window-drift-mvp/contracts/transform-contract.md, version 1.2.
+ //
+ // Header-only, C++20, standard library only. This file is vendored unchanged into the Hyprland patch series;
+ // it must not depend on hyprvx_core. Adapters to other vector/box types live at the call sites and contain no
+ // arithmetic beyond field copies.
+ 
+ #pragma once
++// A classic guard as well: this file and its vendored copy in the patch series are byte-identical, and a plugin built
++// against the patched headers can include both (#pragma once compares paths, not contents).
++#ifndef HYPRVX_CAMERAMATH_HPP
++#define HYPRVX_CAMERAMATH_HPP
+ 
+ #include <cmath>
+ 
+@@ -122,4 +127,17 @@ enum class Error {
+     return {M, 1.0};
+ }
+ 
++// Contract 1.2: the camera that draws a window with world offset O at its logical position L, i.e.
++// forward(offsetCamera(c, O), M, L) == forward(c, M, L + O). Origin shift only; a zero offset returns c exactly.
++[[nodiscard]] constexpr CameraState offsetCamera(const CameraState& c, Vec O) noexcept {
++    return {{c.origin.x - O.x, c.origin.y - O.y}, c.zoom};
++}
++
++// Contract 1.2: a screen-space delta in world units, d / z (window move drag, floating resize drag).
++[[nodiscard]] constexpr Vec worldDelta(const CameraState& c, Vec d) noexcept {
++    return {d.x / c.zoom, d.y / c.zoom};
++}
++
+ } // namespace hyprvx::cammath
++
++#endif // HYPRVX_CAMERAMATH_HPP
+diff --git a/src/hyprvx/SceneCamera.cpp b/src/hyprvx/SceneCamera.cpp
+index 58ea0773..56b9d8e8 100644
+--- a/src/hyprvx/SceneCamera.cpp
++++ b/src/hyprvx/SceneCamera.cpp
+@@ -71,3 +71,23 @@ void HyprVX::addCameraDamage(Monitor::CMonitor& monitor, const CRegion& globalLo
+ 
+     globalLogical.forEachRect([&monitor](const auto& RECT) { addCameraDamage(monitor, CBox(RECT.x1, RECT.y1, RECT.x2 - RECT.x1, RECT.y2 - RECT.y1)); });
+ }
++
++HyprVX::SWindowPass& HyprVX::windowPass() {
++    static SWindowPass PASS;
++    return PASS;
++}
++
++SRenderModifData HyprVX::windowRenderModif(const Monitor::CMonitor& monitor, const Vector2D& offset) {
++    const auto& PASS   = windowPass();
++    const auto  CAMERA = PASS.camera.value_or(cammath::identityFor(monitorOrigin(monitor)));
++    return cameraRenderModif(monitor, cammath::offsetCamera(CAMERA, {offset.x, offset.y}), PASS.outer);
++}
++
++SRenderModifData HyprVX::passRenderModif(const Monitor::CMonitor& monitor) {
++    const auto& PASS = windowPass();
++    return PASS.camera ? cameraRenderModif(monitor, *PASS.camera, PASS.outer) : PASS.outer;
++}
++
++void HyprVX::notePassElements(Monitor::CMonitor& monitor, uint64_t count) {
++    monitor.m_hyprvxCamera.passElementsAdded += count;
++}
+diff --git a/src/hyprvx/SceneCamera.hpp b/src/hyprvx/SceneCamera.hpp
+index f9711785..a67beab1 100644
+--- a/src/hyprvx/SceneCamera.hpp
++++ b/src/hyprvx/SceneCamera.hpp
+@@ -30,4 +30,23 @@ namespace HyprVX {
+     // window-owned content and screen-space content (layers, overlays) are both covered without classifying the owner.
+     void addCameraDamage(Monitor::CMonitor& monitor, const CBox& globalLogical);
+     void addCameraDamage(Monitor::CMonitor& monitor, const CRegion& globalLogical);
++
++    // The window pass in progress (patch 0010, Feature 002 research R1). renderAllClientsForWorkspace sets it around
++    // the window pass of the monitor's active workspace (not fullscreen); renderWorkspaceWindows draws a window with a
++    // world offset under its own camera hint. camera is the pass camera, nullopt on the stock path; outer is the
++    // workspace modifier the hints are composed with.
++    struct SWindowPass {
++        bool                                        active = false;
++        std::optional<hyprvx::cammath::CameraState> camera;
++        Render::SRenderModifData                    outer;
++    };
++    SWindowPass& windowPass();
++
++    // The hint of a window with world offset O: cameraRenderModif(M, offsetCamera(C, O)), C the pass camera or identity
++    // (transform contract 1.2), and the hint that restores the pass afterwards.
++    Render::SRenderModifData windowRenderModif(const Monitor::CMonitor& monitor, const Vector2D& offset);
++    Render::SRenderModifData passRenderModif(const Monitor::CMonitor& monitor);
++
++    // Camera/offset hint elements added to a render pass (dev-control state; identity with no offset must add none).
++    void notePassElements(Monitor::CMonitor& monitor, uint64_t count);
+ }
+diff --git a/src/hyprvx/WindowOffset.cpp b/src/hyprvx/WindowOffset.cpp
+new file mode 100644
+index 00000000..b16fd311
+--- /dev/null
++++ b/src/hyprvx/WindowOffset.cpp
+@@ -0,0 +1,175 @@
++#include "WindowOffset.hpp"
++#include "SceneCamera.hpp"
++
++#include "../debug/log/Logger.hpp"
++#include "../desktop/Workspace.hpp"
++#include "../desktop/view/Popup.hpp"
++#include "../desktop/view/WLSurface.hpp"
++#include "../desktop/view/Window.hpp"
++#include "../managers/fullscreen/FullscreenController.hpp"
++#include "../output/Monitor.hpp"
++#include "../protocols/core/Compositor.hpp"
++#include "../protocols/core/Subcompositor.hpp"
++#include "../render/Renderer.hpp"
++
++#include <cmath>
++#include <vector>
++
++using namespace hyprvx;
++
++namespace {
++    // A handful of entries (one per window with a non-zero offset); weak references drop destroyed windows.
++    struct SEntry {
++        PHLWINDOWREF window;
++        Vector2D     offset;
++    };
++
++    std::vector<SEntry>& entries() {
++        static std::vector<SEntry> ENTRIES;
++        return ENTRIES;
++    }
++
++    void purge() {
++        std::erase_if(entries(), [](const SEntry& e) { return e.window.expired(); });
++    }
++
++    const SEntry* find(const Desktop::View::CWindow* window) {
++        for (auto const& e : entries()) {
++            if (!e.window.expired() && e.window.get() == window)
++                return &e;
++        }
++        return nullptr;
++    }
++
++    // The window's drawn boxes: the window with its decorations (damageWindow applies the offset and the camera) and
++    // its mapped popups (damageBox, whose union rule adds every current offset).
++    void damageDrawn(const PHLWINDOW& window) {
++        if (!g_pHyprRenderer || !window)
++            return;
++        g_pHyprRenderer->damageWindow(window, true);
++        if (window->m_popupHead) {
++            window->m_popupHead->breadthfirst(
++                [](SP<Desktop::View::CPopup> popup, void*) {
++                    if (popup->m_mapped)
++                        g_pHyprRenderer->damageBox(CBox{popup->coordsGlobal(), popup->size()}.expand(1));
++                },
++                nullptr);
++        }
++    }
++}
++
++bool HyprVX::setWindowOffset(const PHLWINDOW& window, const Vector2D& offset) {
++    if (!window)
++        return false;
++    if (!std::isfinite(offset.x) || !std::isfinite(offset.y)) {
++        Log::logger->log(Log::ERR, "[hyprvx] window offset rejected for {:x}: non-finite ({}, {})", rc<uintptr_t>(window.get()), offset.x, offset.y);
++        return false;
++    }
++
++    purge();
++    const auto* ENTRY = find(window.get());
++    if ((ENTRY ? ENTRY->offset : Vector2D{}) == offset)
++        return true;
++
++    damageDrawn(window);
++    std::erase_if(entries(), [&window](const SEntry& e) { return e.window.get() == window.get(); });
++    if (offset != Vector2D{})
++        entries().push_back({window, offset});
++    damageDrawn(window);
++    return true;
++}
++
++Vector2D HyprVX::windowOffset(const PHLWINDOW& window) {
++    const auto* ENTRY = window ? find(window.get()) : nullptr;
++    return ENTRY ? ENTRY->offset : Vector2D{};
++}
++
++PHLWINDOW HyprVX::contentOwner(const SP<CWLSurfaceResource>& surface) {
++    // A subsurface tree is drawn with its root surface (Subcompositor role chain, bounded against cycles).
++    SP<CWLSurfaceResource> root = surface;
++    for (int depth = 0; root && root->m_role && root->m_role->role() == SURFACE_ROLE_SUBSURFACE && depth < 32; ++depth) {
++        const auto SUBSURFACE = sc<CSubsurfaceRole*>(root->m_role.get())->m_subsurface.lock();
++        root                  = SUBSURFACE ? SUBSURFACE->m_parent.lock() : nullptr;
++    }
++
++    const auto HLSURFACE = root ? Desktop::View::CWLSurface::fromResource(root) : nullptr;
++    const auto VIEW      = HLSURFACE ? HLSURFACE->view() : nullptr;
++    if (!VIEW)
++        return nullptr;
++
++    switch (VIEW->type()) {
++        case Desktop::View::VIEW_TYPE_WINDOW: return Desktop::View::CWindow::fromView(VIEW);
++        case Desktop::View::VIEW_TYPE_POPUP: {
++            const auto POPUP = Desktop::View::CPopup::fromView(VIEW);
++            if (!POPUP || POPUP->layerOwner())
++                return nullptr;
++            const auto T1 = POPUP->getT1Owner();
++            return T1 && T1->view() ? Desktop::View::CWindow::fromView(T1->view()) : nullptr;
++        }
++        default: return nullptr;
++    }
++}
++
++Vector2D HyprVX::contentOffset(const SP<CWLSurfaceResource>& surface) {
++    if (entries().empty())
++        return {};
++    return windowOffset(contentOwner(surface));
++}
++
++void HyprVX::resetWindowOffsets() {
++    purge();
++    std::vector<PHLWINDOW> windows;
++    for (auto const& e : entries())
++        windows.emplace_back(e.window.lock());
++    for (auto const& w : windows)
++        damageDrawn(w);
++    entries().clear();
++    for (auto const& w : windows)
++        damageDrawn(w);
++}
++
++Vector2D HyprVX::appliedOffset(const Desktop::View::CWindow& window) {
++    if LIKELY (entries().empty())
++        return {};
++    const auto* ENTRY = find(&window);
++    if (!ENTRY)
++        return {};
++    if (window.m_workspace && Fullscreen::controller()->hasFullscreen(window.m_workspace))
++        return {};
++    return ENTRY->offset;
++}
++
++Vector2D HyprVX::appliedContentOffset(const SP<CWLSurfaceResource>& surface) {
++    if LIKELY (entries().empty())
++        return {};
++    const auto OWNER = contentOwner(surface);
++    return OWNER ? appliedOffset(*OWNER) : Vector2D{};
++}
++
++bool HyprVX::anyWindowOffset() {
++    if LIKELY (entries().empty())
++        return false;
++    purge();
++    return !entries().empty();
++}
++
++void HyprVX::addOffsetDamage(Monitor::CMonitor& monitor, const CBox& globalLogical) {
++    if LIKELY (entries().empty() || globalLogical.empty())
++        return;
++
++    const bool CAMERA = activeCamera(monitor).has_value();
++    for (auto const& e : entries()) {
++        const auto WINDOW = e.window.lock();
++        if (!WINDOW)
++            continue;
++        const auto OFFSET = appliedOffset(*WINDOW);
++        if (OFFSET == Vector2D{})
++            continue;
++
++        const auto MOVED = globalLogical.copy().translate(OFFSET);
++        if (CAMERA)
++            addCameraDamage(monitor, MOVED);
++        else
++            monitor.addDamage(MOVED.copy().translate(-monitor.m_position).scale(monitor.m_scale).round());
++    }
++}
+diff --git a/src/hyprvx/WindowOffset.hpp b/src/hyprvx/WindowOffset.hpp
+new file mode 100644
+index 00000000..761b7128
+--- /dev/null
++++ b/src/hyprvx/WindowOffset.hpp
+@@ -0,0 +1,40 @@
++#pragma once
++
++// HyprVX world offsets O(w) (patch 0010, Feature 002 contracts/mechanism-api.md 1.0, transform contract 1.2). HyprVX
++// owns them; a window's world box is its logical box plus O(w). Hyprland's window model (workspace, logical geometry,
++// tiled/floating state, layout) is never written (Constitution V). Every seam reads the offset through
++// appliedOffset/appliedContentOffset, so the storage stays private to WindowOffset.cpp.
++
++#include "../helpers/math/Math.hpp"
++#include "../helpers/memory/Memory.hpp"
++#include "../desktop/DesktopTypes.hpp"
++
++class CWLSurfaceResource;
++
++namespace Monitor {
++    class CMonitor;
++}
++
++namespace HyprVX {
++    // Rejects non-finite values (unchanged, logged). A change damages the window's old and new drawn boxes, popups
++    // included; setting the current value does nothing. Offset 0 removes the entry.
++    bool setWindowOffset(const PHLWINDOW& window, const Vector2D& offset);
++    // The value set, or 0 if never set; destroyed windows drop their entry.
++    Vector2D windowOffset(const PHLWINDOW& window);
++    // The window that owns a surface: the window itself, its subsurfaces, its popups and their subsurfaces. Null for
++    // layer surfaces and their popups, lock, IME and cursor surfaces, and surfaces without a desktop view.
++    PHLWINDOW contentOwner(const SP<CWLSurfaceResource>& surface);
++    // windowOffset(contentOwner(surface)); 0 when there is no owner window.
++    Vector2D contentOffset(const SP<CWLSurfaceResource>& surface);
++    // Every offset -> 0 (dev panic, plugin unload).
++    void resetWindowOffsets();
++
++    // What the seams apply: the window's offset, or 0 while its workspace has a fullscreen window (FR-012).
++    Vector2D appliedOffset(const Desktop::View::CWindow& window);
++    Vector2D appliedContentOffset(const SP<CWLSurfaceResource>& surface);
++    // True while any window has a non-zero offset: pass simplification, direct scanout and solitary client are off.
++    bool anyWindowOffset();
++    // Damage-union rule (0004) for boxes whose owner is unknown (damageBox): the box is also damaged at box + O for
++    // every distinct non-zero applied offset, through the monitor's camera. Over-damage only, never a stale region.
++    void addOffsetDamage(Monitor::CMonitor& monitor, const CBox& globalLogical);
++}
+diff --git a/src/output/Monitor.cpp b/src/output/Monitor.cpp
+index dae1491f..e0ae48c1 100644
+--- a/src/output/Monitor.cpp
++++ b/src/output/Monitor.cpp
+@@ -1,4 +1,5 @@
+ #include "Monitor.hpp"
++#include "../hyprvx/WindowOffset.hpp"
+ #include "../helpers/MiscFunctions.hpp"
+ #include "../macros.hpp"
+ #include "SharedDefs.hpp"
+@@ -1813,8 +1814,8 @@ uint32_t CMonitor::isSolitaryBlocked(bool full) {
+             return reasons;
+     }
+ 
+-    // HyprVX: no solitary client while the camera is not identity
+-    if UNLIKELY (!HyprVX::cameraIsIdentity(*this)) {
++    // HyprVX: no solitary client while the camera is not identity or a window has a world offset (Feature 002)
++    if UNLIKELY (!HyprVX::cameraIsIdentity(*this) || HyprVX::anyWindowOffset()) {
+         reasons |= SC_TRANSFORM;
+         if (!full)
+             return reasons;
+@@ -2034,8 +2035,8 @@ uint16_t CMonitor::isDSBlocked(bool full) {
+             return reasons;
+     }
+ 
+-    // HyprVX: no direct scanout while the camera is not identity
+-    if UNLIKELY (!HyprVX::cameraIsIdentity(*this)) {
++    // HyprVX: no direct scanout while the camera is not identity or a window has a world offset (Feature 002)
++    if UNLIKELY (!HyprVX::cameraIsIdentity(*this) || HyprVX::anyWindowOffset()) {
+         reasons |= DS_BLOCK_TRANSFORM;
+         if (!full)
+             return reasons;
+diff --git a/src/render/Renderer.cpp b/src/render/Renderer.cpp
+index 5b23d81b..91e0e3d9 100644
+--- a/src/render/Renderer.cpp
++++ b/src/render/Renderer.cpp
+@@ -45,6 +45,7 @@
+ #include "pass/RectPassElement.hpp"
+ #include "pass/RendererHintsPassElement.hpp"
+ #include "../hyprvx/SceneCamera.hpp"
++#include "../hyprvx/WindowOffset.hpp"
+ #include "pass/SurfacePassElement.hpp"
+ #include "../debug/log/Logger.hpp"
+ #include "../protocols/ColorManagement.hpp"
+@@ -436,6 +437,20 @@ void IHyprRenderer::renderWorkspaceWindowsFullscreen(PHLMONITOR pMonitor, PHLWOR
+ void IHyprRenderer::renderWorkspaceWindows(PHLMONITOR pMonitor, PHLWORKSPACE pWorkspace, const Time::steady_tp& time) {
+     PHLWINDOW lastWindow;
+ 
++    // HyprVX (Feature 002 research R1): a window with a world offset is drawn under its own offset camera hint, then the
++    // pass hint returns. Nothing is added for a window without an offset (FR-003).
++    const auto renderSceneWindow = [&](PHLWINDOW w, eRenderPassMode mode) {
++        const auto OFFSET = HyprVX::windowPass().active ? HyprVX::appliedOffset(*w) : Vector2D{};
++        if LIKELY (OFFSET == Vector2D{}) {
++            renderWindow(w, pMonitor, time, true, mode);
++            return;
++        }
++        HyprVX::notePassElements(*pMonitor, 2);
++        m_renderPass.add(makeUnique<CRendererHintsPassElement>(CRendererHintsPassElement::SData{HyprVX::windowRenderModif(*pMonitor, OFFSET)}));
++        renderWindow(w, pMonitor, time, true, mode);
++        m_renderPass.add(makeUnique<CRendererHintsPassElement>(CRendererHintsPassElement::SData{HyprVX::passRenderModif(*pMonitor)}));
++    };
++
+     Event::bus()->m_events.render.stage.emit(RENDER_PRE_WINDOWS);
+ 
+     std::vector<PHLWINDOWREF> windows;
+@@ -471,12 +486,12 @@ void IHyprRenderer::renderWorkspaceWindows(PHLMONITOR pMonitor, PHLWORKSPACE pWo
+         }
+ 
+         // render the bad boy
+-        renderWindow(w.lock(), pMonitor, time, true, RENDER_PASS_MAIN);
++        renderSceneWindow(w.lock(), RENDER_PASS_MAIN);
+         w.reset();
+     }
+ 
+     if (lastWindow)
+-        renderWindow(lastWindow, pMonitor, time, true, RENDER_PASS_MAIN);
++        renderSceneWindow(lastWindow, RENDER_PASS_MAIN);
+ 
+     lastWindow.reset();
+ 
+@@ -497,7 +512,7 @@ void IHyprRenderer::renderWorkspaceWindows(PHLMONITOR pMonitor, PHLWORKSPACE pWo
+             continue;
+ 
+         // render the bad boy
+-        renderWindow(w.lock(), pMonitor, time, true, RENDER_PASS_POPUP);
++        renderSceneWindow(w.lock(), RENDER_PASS_POPUP);
+         w.reset();
+     }
+ 
+@@ -519,7 +534,7 @@ void IHyprRenderer::renderWorkspaceWindows(PHLMONITOR pMonitor, PHLWORKSPACE pWo
+             continue; // special on another are rendered as a part of the base pass
+ 
+         // render the bad boy
+-        renderWindow(w.lock(), pMonitor, time, true, RENDER_PASS_ALL);
++        renderSceneWindow(w.lock(), RENDER_PASS_ALL);
+     }
+     renderFadeouts(pMonitor, Desktop::FADEOUT_PLANE_WINDOW_FLOATING, pWorkspace);
+ }
+@@ -1190,11 +1205,18 @@ void IHyprRenderer::renderAllClientsForWorkspace(PHLMONITOR pMonitor, PHLWORKSPA
+     };
+     pushHyprvxCamera(true);
+ 
+-    if UNLIKELY /* subjective? */ (Fullscreen::controller()->hasFullscreen(pWorkspace))
++    // HyprVX (Feature 002): windows of the active workspace are drawn at their world offset; fullscreen ignores offsets
++    const bool HYPRVXFULLSCREEN = Fullscreen::controller()->hasFullscreen(pWorkspace);
++    HyprVX::windowPass()        = {.active = pWorkspace == pMonitor->m_activeWorkspace && !HYPRVXFULLSCREEN, .camera = HYPRVXCAMERA, .outer = RENDERMODIFDATA};
++    CScopeGuard hyprvxWindowPass([] { HyprVX::windowPass() = {}; });
++
++    if UNLIKELY /* subjective? */ (HYPRVXFULLSCREEN)
+         renderWorkspaceWindowsFullscreen(pMonitor, pWorkspace, time);
+     else
+         renderWorkspaceWindows(pMonitor, pWorkspace, time);
+ 
++    HyprVX::windowPass().active = false;
++
+     // HyprVX: the special-workspace dim and blur cover the output, outside the camera
+     pushHyprvxCamera(false);
+ 
+@@ -2178,7 +2200,7 @@ void IHyprRenderer::renderMonitor(PHLMONITOR pMonitor, bool commit) {
+ 
+     // HyprVX (RC2): pass simplification uses untransformed bounding boxes and opaque regions, so it is off while a
+     // camera applies. The pass is rendered by endRender() below, before the guard restores the flag.
+-    const bool HYPRVXNOSIMPLIFY = !m_renderData.noSimplify && HyprVX::activeCamera(*pMonitor).has_value();
++    const bool HYPRVXNOSIMPLIFY = !m_renderData.noSimplify && (HyprVX::activeCamera(*pMonitor).has_value() || HyprVX::anyWindowOffset());
+     if UNLIKELY (HYPRVXNOSIMPLIFY)
+         m_renderData.noSimplify = true;
+     CScopeGuard hyprvxNoSimplify([this, HYPRVXNOSIMPLIFY] {
+@@ -2740,9 +2762,14 @@ void IHyprRenderer::damageSurface(SP<CWLSurfaceResource> pSurface, double x, dou
+         return;
+     }
+ 
++    // HyprVX (Feature 002 research R8): window content is drawn at its owner window's world offset
++    const auto HYPRVXOFFSET = HyprVX::appliedContentOffset(pSurface);
++
+     // hack: schedule frame events
+     if (!WLSURF->resource()->m_current.callbacks.empty() && pSurface->m_hlSurface) {
+-        const auto BOX = pSurface->m_hlSurface->getSurfaceBoxGlobal();
++        auto BOX = pSurface->m_hlSurface->getSurfaceBoxGlobal();
++        if (BOX)
++            BOX->translate(HYPRVXOFFSET);
+         if (BOX && !BOX->empty()) {
+             for (auto const& m : State::monitorState()->monitors()) {
+                 if (!m->m_output)
+@@ -2761,7 +2788,7 @@ void IHyprRenderer::damageSurface(SP<CWLSurfaceResource> pSurface, double x, dou
+     if (scale != 1.0)
+         damageBox.scale(scale);
+ 
+-    damageBox.translate({x, y});
++    damageBox.translate({x + HYPRVXOFFSET.x, y + HYPRVXOFFSET.y});
+ 
+     const auto EXTENTS = damageBox.getExtents();
+ 
+@@ -2796,6 +2823,8 @@ void IHyprRenderer::damageWindow(PHLWINDOW pWindow, bool forceFull) {
+     if (PWINDOWWORKSPACE && PWINDOWWORKSPACE->m_renderOffset->isBeingAnimated() && !pWindow->m_pinned)
+         windowBox.translate(PWINDOWWORKSPACE->m_renderOffset->value());
+     windowBox.translate(pWindow->m_floatingOffset);
++    // HyprVX (Feature 002 research R8): the window is drawn at its world offset
++    windowBox.translate(HyprVX::appliedOffset(*pWindow));
+ 
+     for (auto const& m : State::monitorState()->monitors()) {
+         if (forceFull || shouldRenderWindow(pWindow, m)) { // only damage if window is rendered on monitor
+@@ -2836,6 +2865,8 @@ void IHyprRenderer::damageBox(const CBox& box, bool skipFrameSchedule) {
+             m->addDamage(damageBox);
+             // HyprVX (FR-005): damage-union rule, see HyprVX::addCameraDamage
+             HyprVX::addCameraDamage(*m, box);
++            // HyprVX (Feature 002): the union also covers window content drawn at a world offset
++            HyprVX::addOffsetDamage(*m, box);
+         }
+     }
+ 

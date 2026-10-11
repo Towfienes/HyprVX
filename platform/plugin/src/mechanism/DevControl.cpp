@@ -1,5 +1,8 @@
 // `hyprctl hyprvx-dev <command>` for the delivery spike: the dev-control contract (contracts/dev-control.md, transport
-// A) of patch 0005, registered through the plugin API so that the native tests run unchanged.
+// A) of patch 0005, registered through the plugin API so that the native tests run unchanged. Compiled only into the
+// form S test build (HYPRVX_PLUGIN_DEV=ON -> HYPRVX_DEV); a delivered build has no dev control (FR-016).
+
+#ifdef HYPRVX_DEV
 
 #include "Hooks.hpp"
 #include "Camera.hpp"
@@ -109,3 +112,5 @@ void HyprVXSpike::registerDevControl() {
     HyprlandAPI::registerHyprCtlCommand(PHANDLE, SHyprCtlCommand{.name = "hyprvx-dev", .exact = false, .fn = hyprctlCommand});
     Log::logger->log(Log::WARN, "[hyprvx] dev camera control enabled (delivery spike plugin)");
 }
+
+#endif // HYPRVX_DEV

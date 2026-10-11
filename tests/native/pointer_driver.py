@@ -18,7 +18,8 @@ import sys
 import time
 from pathlib import Path
 
-POINTER_EVENTS = {"enter", "leave", "motion", "button", "warp"}
+# Feature 002 adds axis (scroll) and key events, logged by hyprvx-testclient and hyprvx-x11client (test-tooling 1.4).
+POINTER_EVENTS = {"enter", "leave", "motion", "button", "warp", "axis", "key"}
 
 
 class Blocked(Exception):
@@ -61,8 +62,30 @@ def run_vpointer(fifo, log, cmd, timeout):
     wait_for(finished, timeout, f"vpointer done for {cmd!r}")
 
 
+def x11_barrier(name, fifo, log, timeout):
+    """hyprvx-x11client (test-tooling 1.4 4c): "sync" redraws and logs "drawn" after an X round trip. Done twice, so
+    XWayland has processed the Wayland pointer events sent before the first sync; returns the last drawn line index."""
+    end = None
+    for _ in range(2):
+        count = sum(1 for e in read_lines(log) if e.get("ev") == "drawn")
+        send(fifo, "sync")
+
+        def drawn():
+            seen = 0
+            for i, e in enumerate(read_lines(log)):
+                if e.get("ev") == "drawn":
+                    seen += 1
+                    if seen > count:
+                        return i
+            return None
+        end = wait_for(drawn, timeout, f"{name} drawn")
+    return end
+
+
 def barrier(name, fifo, log, timeout):
     """sync the client and wait for frame_done of that commit; returns the index of the frame_done line."""
+    if any(e.get("ev") == "drawn" for e in read_lines(log)):
+        return x11_barrier(name, fifo, log, timeout)
     last = max((e.get("seq", 0) for e in read_lines(log) if e.get("ev") == "commit"), default=0)
     send(fifo, "sync")
     seq = wait_for(lambda: next((e["seq"] for e in read_lines(log) if e.get("ev") == "commit" and e["seq"] > last), None),

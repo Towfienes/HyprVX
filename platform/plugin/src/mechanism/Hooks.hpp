@@ -37,4 +37,7 @@ namespace HyprVXSpike {
     void addCopiedPopupHooks(std::vector<SHookSpec>& specs);
 
     void registerDevControl();
+
+    // Installs every hook (resolved by exact demangled signature first) or throws; then the dev control (HYPRVX_DEV).
+    void installMechanism(HANDLE handle);
 }

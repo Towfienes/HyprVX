@@ -1,0 +1,321 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Towfienes <ngolamtien1706@gmail.com>
+Date: Sun, 11 Oct 2026 19:56:10 +0700
+Subject: [PATCH] hyprvx: world offsets in hit-testing, surface-local
+ coordinates, warps, constraints and popups
+
+Patch 0011 of the HyprVX V3 series (Feature 002, T022).
+
+Every seam of research R8 takes the pointer in the owner window's L space
+(the world point minus O(w)): windowAt, windowSurfaceAt and
+surfaceLocalAt; the mouseMoveUnified surface fallback and cursor-shape
+check; sendMotionEventsToFocused; pointer constraints and locks; warps
+(warpCursor, updateRelativeCursorCoords); decoration and border hit
+selection; the off-window axis warp; and the popup unconstrain box.
+---
+ src/config/shared/actions/ConfigActions.cpp |  8 ++---
+ src/desktop/state/ViewHitTester.cpp         | 23 ++++++++------
+ src/desktop/view/Popup.cpp                  | 11 +++++--
+ src/desktop/view/Window.cpp                 |  9 ++++--
+ src/managers/input/InputManager.cpp         | 34 +++++++++++++--------
+ 5 files changed, 54 insertions(+), 31 deletions(-)
+
+diff --git a/src/config/shared/actions/ConfigActions.cpp b/src/config/shared/actions/ConfigActions.cpp
+index 2f2d85a5..c64ffbf7 100644
+--- a/src/config/shared/actions/ConfigActions.cpp
++++ b/src/config/shared/actions/ConfigActions.cpp
+@@ -34,6 +34,7 @@
+ 
+ #include <numbers>
+ #include "../../../hyprvx/InputCamera.hpp"
++#include "../../../hyprvx/WindowOffset.hpp"
+ #include <utility>
+ #include <type_traits>
+ 
+@@ -55,10 +56,9 @@ static void updateRelativeCursorCoords() {
+     if (*PNOWARPS)
+         return;
+ 
+-    // HyprVX: the window box is in world coordinates.
+-    if (Desktop::focusState()->window())
+-        Desktop::focusState()->window()->m_relativeCursorCoordsOnLastWarp =
+-            HyprVX::screenToWorld(g_pInputManager->getMouseCoordsInternal()) - Desktop::focusState()->window()->layoutBox().pos();
++    // HyprVX: the window box is in world coordinates, drawn at L + O(w) (Feature 002).
++    if (const auto PWINDOW = Desktop::focusState()->window(); PWINDOW)
++        PWINDOW->m_relativeCursorCoordsOnLastWarp = HyprVX::screenToWorld(g_pInputManager->getMouseCoordsInternal()) - HyprVX::appliedOffset(*PWINDOW) - PWINDOW->layoutBox().pos();
+ }
+ 
+ static void switchToWindow(PHLWINDOW PWINDOWTOCHANGETO, bool forceFSCycle = false) {
+diff --git a/src/desktop/state/ViewHitTester.cpp b/src/desktop/state/ViewHitTester.cpp
+index adaf8b1a..3195d554 100644
+--- a/src/desktop/state/ViewHitTester.cpp
++++ b/src/desktop/state/ViewHitTester.cpp
+@@ -15,6 +15,7 @@
+ #include "../../xwayland/XWayland.hpp"
+ #include "../../managers/fullscreen/FullscreenController.hpp"
+ #include "../../hyprvx/InputCamera.hpp"
++#include "../../hyprvx/WindowOffset.hpp"
+ 
+ #include <cmath>
+ #include <ranges>
+@@ -34,6 +35,8 @@ PHLWINDOW CViewHitTester::windowAt(const Vector2D& screenPos, uint16_t propertie
+ 
+     // HyprVX: the monitor is chosen by the screen position; windows are tested in world coordinates (FR-007).
+     const auto pos = HyprVX::screenToWorld(*PMONITOR, screenPos);
++    // HyprVX (Feature 002 research R8): each window is tested at its world box L + O(w), i.e. at pos - O(w) in L space
++    const auto posFor = [&pos](const PHLWINDOW& w) { return pos - HyprVX::appliedOffset(*w); };
+ 
+     static auto PRESIZEONBORDER       = CConfigValue<Config::INTEGER>("general:resize_on_border");
+     static auto PBORDERSIZE           = CConfigValue<Config::INTEGER>("general:border_size");
+@@ -64,11 +67,11 @@ PHLWINDOW CViewHitTester::windowAt(const Vector2D& screenPos, uint16_t propertie
+                 CBox       box = BB.copy().expand(!w->isX11OverrideRedirect() ? BORDER_GRAB_AREA : 0);
+                 if (HITBOX_SHRINK > 0 && w != LASTFOCUSED)
+                     box = box.copy().expand(-HITBOX_SHRINK);
+-                if (box.containsPoint(pos))
++                if (box.containsPoint(posFor(w)))
+                     return w;
+ 
+                 if (!w->m_isX11) {
+-                    if (w->hasPopupAt(pos))
++                    if (w->hasPopupAt(posFor(w)))
+                         return w;
+                 }
+             }
+@@ -107,7 +110,7 @@ PHLWINDOW CViewHitTester::windowAt(const Vector2D& screenPos, uint16_t propertie
+                     CBox       box = BB.copy().expand(!w->isX11OverrideRedirect() ? BORDER_GRAB_AREA : 0);
+                     if (HITBOX_SHRINK > 0 && w != LASTFOCUSED)
+                         box = box.copy().expand(-HITBOX_SHRINK);
+-                    if (box.containsPoint(pos)) {
++                    if (box.containsPoint(posFor(w))) {
+                         if (w->m_isX11 && w->isX11OverrideRedirect() && !w->m_xwaylandSurface->wantsFocus()) {
+                             // Override Redirect
+                             return focusState()->window(); // we kinda trick everything here.
+@@ -118,7 +121,7 @@ PHLWINDOW CViewHitTester::windowAt(const Vector2D& screenPos, uint16_t propertie
+                     }
+ 
+                     if (!w->m_isX11) {
+-                        if (w->hasPopupAt(pos))
++                        if (w->hasPopupAt(posFor(w)))
+                             return w;
+                     }
+                 }
+@@ -147,7 +150,7 @@ PHLWINDOW CViewHitTester::windowAt(const Vector2D& screenPos, uint16_t propertie
+                 return nullptr;
+ 
+             // for maximized windows, don't return a window if we are not directly on it.
+-            if (!Fullscreen::controller()->isFullscreen(FS_WINDOW, Fullscreen::FSMODE_MAXIMIZED) || FS_WINDOW->getWindowBoxUnified(properties).containsPoint(pos))
++            if (!Fullscreen::controller()->isFullscreen(FS_WINDOW, Fullscreen::FSMODE_MAXIMIZED) || FS_WINDOW->getWindowBoxUnified(properties).containsPoint(posFor(FS_WINDOW)))
+                 return Fullscreen::controller()->getFullscreenWindow(PWORKSPACE);
+             else
+                 return nullptr;
+@@ -170,7 +173,7 @@ PHLWINDOW CViewHitTester::windowAt(const Vector2D& screenPos, uint16_t propertie
+ 
+             if (!w->m_isX11 && !w->m_isFloating && w->m_isMapped && w->workspaceID() == WSPID && w->acceptsInput() && !w->m_X11ShouldntFocus &&
+                 !w->m_ruleApplicator->noFocus().valueOrDefault() && w != ignoreWindow && !isShadowedByModal(w)) {
+-                if (w->hasPopupAt(pos))
++                if (w->hasPopupAt(posFor(w)))
+                     return w;
+             }
+         }
+@@ -236,7 +239,7 @@ PHLWINDOW CViewHitTester::windowAt(const Vector2D& screenPos, uint16_t propertie
+                 }
+                 if (HITBOX_SHRINK > 0 && w != LASTFOCUSED)
+                     box = box.copy().expand(-HITBOX_SHRINK);
+-                if (box.containsPoint(pos))
++                if (box.containsPoint(posFor(w)))
+                     return w;
+             }
+         }
+@@ -262,7 +265,8 @@ SP<CWLSurfaceResource> CViewHitTester::windowSurfaceAt(const Vector2D& screenPos
+     if (!validMapped(window))
+         return nullptr;
+ 
+-    const auto pos = HyprVX::screenToWorld(screenPos); // HyprVX: surface-local through the camera (FR-007)
++    // HyprVX: surface-local through the camera (FR-007), in the window's L space (Feature 002, pos - O(w))
++    const auto pos = HyprVX::screenToWorld(screenPos) - HyprVX::appliedOffset(*window);
+ 
+     RASSERT(!window->m_isX11, "Cannot call windowSurfaceAt on an X11 window!");
+ 
+@@ -288,7 +292,8 @@ Vector2D CViewHitTester::surfaceLocalAt(const Vector2D& screenPos, PHLWINDOW win
+     if (!validMapped(window))
+         return {};
+ 
+-    const auto pos = HyprVX::screenToWorld(screenPos); // HyprVX: surface-local through the camera (FR-007)
++    // HyprVX: surface-local through the camera (FR-007), in the window's L space (Feature 002, pos - O(w))
++    const auto pos = HyprVX::screenToWorld(screenPos) - HyprVX::appliedOffset(*window);
+ 
+     if (window->m_isX11)
+         return pos - window->position(Desktop::View::IGeometric::GEOMETRIC_GOAL);
+diff --git a/src/desktop/view/Popup.cpp b/src/desktop/view/Popup.cpp
+index 17da1bcd..b0a470ab 100644
+--- a/src/desktop/view/Popup.cpp
++++ b/src/desktop/view/Popup.cpp
+@@ -17,6 +17,7 @@
+ #include "../../output/Monitor.hpp"
+ #include "../../state/MonitorState.hpp"
+ #include "../../hyprvx/SceneCamera.hpp"
++#include "../../hyprvx/WindowOffset.hpp"
+ #include <array>
+ #include <ranges>
+ 
+@@ -382,11 +383,15 @@ void CPopup::reposition() {
+ 
+     // HyprVX: while the owner window's monitor has an active camera, the parent is placed in world coordinates and the
+     // popup is constrained to the world rectangle shown in the monitor's usable area (cammath::inverseBox).
++    // Feature 002: a window drawn at L + O(w) is constrained in its L space, so the rectangle moves by -O(w).
+     if (const auto OWNERMONITOR = m_windowOwner ? m_windowOwner->m_monitor.lock() : nullptr; OWNERMONITOR) {
+-        if (const auto CAMERA = HyprVX::activeCamera(*OWNERMONITOR); CAMERA) {
++        const auto CAMERA = HyprVX::activeCamera(*OWNERMONITOR);
++        const auto OFFSET = HyprVX::appliedOffset(*m_windowOwner);
++        if (CAMERA || OFFSET != Vector2D{}) {
++            const auto M     = HyprVX::monitorOrigin(*OWNERMONITOR);
+             const auto AREA  = OWNERMONITOR->logicalBoxMinusReserved();
+-            const auto WORLD = hyprvx::cammath::inverseBox(*CAMERA, HyprVX::monitorOrigin(*OWNERMONITOR), {{AREA.x, AREA.y}, {AREA.w, AREA.h}});
+-            m_resource->applyPositioning(CBox{WORLD.pos.x, WORLD.pos.y, WORLD.size.x, WORLD.size.y}, COORDS);
++            const auto WORLD = hyprvx::cammath::inverseBox(CAMERA.value_or(hyprvx::cammath::identityFor(M)), M, {{AREA.x, AREA.y}, {AREA.w, AREA.h}});
++            m_resource->applyPositioning(CBox{WORLD.pos.x - OFFSET.x, WORLD.pos.y - OFFSET.y, WORLD.size.x, WORLD.size.y}, COORDS);
+             return;
+         }
+     }
+diff --git a/src/desktop/view/Window.cpp b/src/desktop/view/Window.cpp
+index dfdba4bb..176a0801 100644
+--- a/src/desktop/view/Window.cpp
++++ b/src/desktop/view/Window.cpp
+@@ -452,8 +452,9 @@ void CWindow::uncacheWindowDecos() {
+ }
+ 
+ bool CWindow::checkInputOnDecos(const eInputType type, const Vector2D& screenCoords, std::any data) {
+-    // HyprVX: decoration boxes and popups are window content, selected at the world point (FR-012).
+-    const auto mouseCoords = HyprVX::screenToWorld(screenCoords);
++    // HyprVX: decoration boxes and popups are window content, selected at the world point (FR-012), in the window's L
++    // space (Feature 002: minus its world offset).
++    const auto mouseCoords = HyprVX::screenToWorld(screenCoords) - HyprVX::appliedOffset(*this);
+ 
+     if (type != INPUT_TYPE_DRAG_END && hasPopupAt(mouseCoords))
+         return false;
+@@ -1629,7 +1630,9 @@ void CWindow::warpCursor(bool force) {
+     const auto BOX      = layoutBox();
+     const auto PMONITOR = m_monitor.lock();
+     // HyprVX: warp to where the window is drawn (cammath::forward); unchanged without a camera.
+-    const auto toScreen = [&PMONITOR](const Vector2D& world) { return PMONITOR ? HyprVX::worldToScreen(*PMONITOR, world) : world; };
++    // Feature 002: the window is drawn at its world box L + O(w).
++    const auto OFFSET   = HyprVX::appliedOffset(*this);
++    const auto toScreen = [&PMONITOR, &OFFSET](const Vector2D& world) { return PMONITOR ? HyprVX::worldToScreen(*PMONITOR, world + OFFSET) : world + OFFSET; };
+ 
+     if (*PERSISTENTWARPS && coords.x > 0 && coords.y > 0 && coords < BOX.size()) // don't warp cursor outside the window
+         Pointer::pointerController()->warpTo(toScreen(BOX.pos() + coords), force);
+diff --git a/src/managers/input/InputManager.cpp b/src/managers/input/InputManager.cpp
+index 729070c2..c2fea180 100644
+--- a/src/managers/input/InputManager.cpp
++++ b/src/managers/input/InputManager.cpp
+@@ -60,6 +60,7 @@
+ #include <aquamarine/input/Input.hpp>
+ #include "../../hyprvx/InputCamera.hpp"
+ #include "../../hyprvx/SceneCamera.hpp"
++#include "../../hyprvx/WindowOffset.hpp"
+ #include <hyprutils/string/VarList.hpp>
+ #include <hyprutils/string/VarList2.hpp>
+ 
+@@ -228,7 +229,7 @@ void CInputManager::sendMotionEventsToFocused() {
+ 
+     // HyprVX: the box of window content is in world coordinates.
+     const auto POINTER = getMouseCoordsInternal().floor();
+-    g_pSeatManager->setPointerFocus(SURF, (HyprVX::isWindowContent(SURF) ? HyprVX::screenToWorld(POINTER) : POINTER) - BOX->pos());
++    g_pSeatManager->setPointerFocus(SURF, (HyprVX::isWindowContent(SURF) ? HyprVX::screenToWorld(POINTER) - HyprVX::appliedContentOffset(SURF) : POINTER) - BOX->pos());
+ }
+ 
+ void CInputManager::mouseMoveUnified(uint32_t time, bool refocus, bool mouse, std::optional<Vector2D> overridePos) {
+@@ -304,7 +305,9 @@ void CInputManager::mouseMoveUnified(uint32_t time, bool refocus, bool mouse, st
+ 
+         // HyprVX: a window-content constraint region is in world coordinates; the cursor goes to its screen image.
+         const bool WORLD        = HyprVX::isWindowContent(surf->resource());
+-        const auto CLOSEST      = rg.closestPoint(WORLD ? WINDOWCOORDS : mouseCoords);
++        // HyprVX (Feature 002): the region is in the owner window's L space; it is drawn at L + O(w)
++        const auto OFFSET       = WORLD ? HyprVX::appliedContentOffset(surf->resource()) : Vector2D{};
++        const auto CLOSEST      = rg.closestPoint(WORLD ? WINDOWCOORDS - OFFSET : mouseCoords);
+         const auto BOX          = surf->getSurfaceBoxGlobal();
+         const auto WINDOW       = Desktop::View::CWindow::fromView(surf->view());
+         const auto CLOSESTLOCAL = (CLOSEST - (BOX.has_value() ? BOX->pos() : Vector2D{})) * (WINDOW ? WINDOW->m_X11SurfaceScaledBy : 1.0);
+@@ -312,7 +315,7 @@ void CInputManager::mouseMoveUnified(uint32_t time, bool refocus, bool mouse, st
+         if (g_pSeatManager->m_state.pointerFocus != surf->resource())
+             g_pSeatManager->setPointerFocus(surf->resource(), CLOSESTLOCAL);
+ 
+-        Pointer::pointerController()->warpTo(WORLD ? HyprVX::worldToScreen(*PMONITOR, CLOSEST) : CLOSEST, true);
++        Pointer::pointerController()->warpTo(WORLD ? HyprVX::worldToScreen(*PMONITOR, CLOSEST + OFFSET) : CLOSEST, true);
+         g_pSeatManager->sendPointerMotion(time, CLOSESTLOCAL);
+         PROTO::relativePointer->sendRelativeMotion(sc<uint64_t>(time) * 1000, {}, {});
+     };
+@@ -326,7 +329,8 @@ void CInputManager::mouseMoveUnified(uint32_t time, bool refocus, bool mouse, st
+             if (CONSTRAINT) {
+                 if (CONSTRAINT->isLocked()) {
+                     const auto HINT = CONSTRAINT->logicPositionHint();
+-                    Pointer::pointerController()->warpTo(HyprVX::isWindowContent(SURF->resource()) ? HyprVX::worldToScreen(*PMONITOR, HINT) : HINT, true);
++                    Pointer::pointerController()->warpTo(
++                        HyprVX::isWindowContent(SURF->resource()) ? HyprVX::worldToScreen(*PMONITOR, HINT + HyprVX::appliedContentOffset(SURF->resource())) : HINT, true);
+                 } else {
+                     confineToRegion(CONSTRAINT->logicConstraintRegion(), SURF);
+                 }
+@@ -638,7 +642,10 @@ void CInputManager::mouseMoveUnified(uint32_t time, bool refocus, bool mouse, st
+     m_emptyFocusCursorSet = false;
+ 
+     // HyprVX: surfacePos of window content is a world position, so the pointer must be in world coordinates too.
+-    Vector2D surfaceLocal = surfacePos == Vector2D(-1337, -1337) ? surfaceCoords : (HyprVX::isWindowContent(foundSurface) ? WINDOWCOORDS : mouseCoords) - surfacePos;
++    // HyprVX (Feature 002): and in the owner window's L space (minus its world offset O(w)).
++    Vector2D surfaceLocal = surfacePos == Vector2D(-1337, -1337) ?
++        surfaceCoords :
++        (HyprVX::isWindowContent(foundSurface) ? WINDOWCOORDS - HyprVX::appliedContentOffset(foundSurface) : mouseCoords) - surfacePos;
+ 
+     if (pFoundWindow && pFoundWindow->m_isX11) // for x11 force scale zero
+         surfaceLocal = surfaceLocal * pFoundWindow->m_X11SurfaceScaledBy;
+@@ -665,8 +672,9 @@ void CInputManager::mouseMoveUnified(uint32_t time, bool refocus, bool mouse, st
+     }
+ 
+     if (pFoundWindow && foundSurface == pFoundWindow->wlSurface()->resource() && !m_cursorImageOverridden) {
+-        const auto BOX = pFoundWindow->getWindowMainSurfaceBox();
+-        if (VECNOTINRECT(WINDOWCOORDS, BOX.x, BOX.y, BOX.x + BOX.width, BOX.y + BOX.height))
++        const auto BOX   = pFoundWindow->getWindowMainSurfaceBox();
++        const auto LOCAL = WINDOWCOORDS - HyprVX::appliedOffset(*pFoundWindow); // HyprVX: L space of the window
++        if (VECNOTINRECT(LOCAL, BOX.x, BOX.y, BOX.x + BOX.width, BOX.y + BOX.height))
+             g_pHyprRenderer->setCursorFromName("left_ptr");
+         else
+             restoreCursorIconToApp();
+@@ -676,7 +684,7 @@ void CInputManager::mouseMoveUnified(uint32_t time, bool refocus, bool mouse, st
+         // change cursor icon if hovering over border
+         // HyprVX: no resize icon while a camera applies (border resize is blocked, FR-012).
+         if (*PRESIZEONBORDER && *PRESIZECURSORICON && !HyprVX::activeCamera(*PMONITOR)) {
+-            if (!Fullscreen::controller()->isFullscreen(pFoundWindow) && !pFoundWindow->hasPopupAt(WINDOWCOORDS))
++            if (!Fullscreen::controller()->isFullscreen(pFoundWindow) && !pFoundWindow->hasPopupAt(WINDOWCOORDS - HyprVX::appliedOffset(*pFoundWindow)))
+                 setCursorIconOnBorder(pFoundWindow);
+             else if (m_borderIconDirection != BORDERICON_NONE) {
+                 m_borderIconDirection = BORDERICON_NONE;
+@@ -885,8 +893,9 @@ void CInputManager::processMouseDownNormal(const IPointer::SButtonEvent& e, SP<I
+ 
+     const auto mouseCoords = g_pInputManager->getMouseCoordsInternal();
+     const auto w           = Desktop::viewState()->hitTest().windowAt(mouseCoords, Desktop::View::ALLOW_FLOATING | Desktop::View::RESERVED_EXTENTS | Desktop::View::INPUT_EXTENTS);
+-    // HyprVX: window geometry is in world coordinates (border selection by the inverse transform, FR-012).
+-    const auto worldCoords = HyprVX::screenToWorld(mouseCoords);
++    // HyprVX: window geometry is in world coordinates (border selection by the inverse transform, FR-012), in the
++    // window's L space (Feature 002: minus its world offset).
++    const auto worldCoords = HyprVX::screenToWorld(mouseCoords) - (w ? HyprVX::appliedOffset(*w) : Vector2D{});
+ 
+     if (w && !m_lastFocusOnLS && !g_pSessionLockManager->isSessionLocked() && w->checkInputOnDecos(INPUT_TYPE_BUTTON, mouseCoords, e))
+         return;
+@@ -1027,7 +1036,8 @@ void CInputManager::onMouseWheel(IPointer::SAxisEvent e, SP<IPointer> pointer) {
+             if (*POFFWINDOWAXIS != 1) {
+                 // HyprVX: the window box is in world coordinates; a warp goes to its screen image.
+                 const auto BOX         = PWINDOW->getWindowMainSurfaceBox();
+-                const auto WORLDCOORDS = HyprVX::screenToWorld(MOUSECOORDS);
++                const auto OFFSET      = HyprVX::appliedOffset(*PWINDOW); // Feature 002: L space of the window
++                const auto WORLDCOORDS = HyprVX::screenToWorld(MOUSECOORDS) - OFFSET;
+ 
+                 if (!BOX.containsPoint(WORLDCOORDS) && !PWINDOW->hasPopupAt(WORLDCOORDS)) {
+                     if (*POFFWINDOWAXIS == 0)
+@@ -1038,7 +1048,7 @@ void CInputManager::onMouseWheel(IPointer::SAxisEvent e, SP<IPointer> pointer) {
+ 
+                     if (*POFFWINDOWAXIS == 3) {
+                         const auto PMONITOR = State::monitorState()->query().vec(MOUSECOORDS).run();
+-                        Pointer::pointerController()->warpTo(PMONITOR ? HyprVX::worldToScreen(*PMONITOR, {TEMPCURX, TEMPCURY}) : Vector2D{TEMPCURX, TEMPCURY}, true);
++                        Pointer::pointerController()->warpTo(PMONITOR ? HyprVX::worldToScreen(*PMONITOR, Vector2D{TEMPCURX, TEMPCURY} + OFFSET) : Vector2D{TEMPCURX, TEMPCURY} + OFFSET, true);
+                     }
+ 
+                     g_pSeatManager->sendPointerMotion(e.timeMs, Vector2D{TEMPCURX, TEMPCURY} - BOX.pos());
