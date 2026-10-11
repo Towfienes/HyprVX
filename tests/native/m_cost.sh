@@ -3,8 +3,11 @@
 # optimized"; Constitution VI). Measures the nested compositor's utime+stime (/proc/<pid>/stat, all threads) over
 # fixed windows, for stock, patched identity and patched non-identity, HVX_COST_RUNS (>= 5) sessions each:
 #   redraw  10 s, 50 full-surface client redraws every 200 ms (camera fixed: identity, or z = 0.5 for non-identity)
-#   camera  10 s, 50 dev-control camera sets every 200 ms: identity re-sets (patched identity) or the P-zoom sweep
-#           1.0 -> 0.1 -> 2.0 -> 1.0 anchored at the output centre (patched non-identity); stock has no dev control
+#   camera  50 dev-control camera sets, paced at most every 200 ms: identity re-sets (patched identity) or the P-zoom
+#           sweep 1.0 -> 0.1 -> 2.0 -> 1.0 anchored at the output centre (patched non-identity; 50 samples, z in
+#           [0.136, 1.962] and back to exactly 1.0); stock has no dev control. Each scripts/nested.sh call re-verifies
+#           the session identity (~0.44 s), so this window runs ~22 s instead of 10 s; wall time is recorded per window
+# CPU resolution is one clock tick (getconf CLK_TCK; 10 ms at 100 Hz), so small windows sit at that resolution.
 #   idle    60 s, no input (camera fixed as in redraw)
 # Frames presented are NOT MEASURED: stock Hyprland 0.56.2 exposes no presented-frame counter, a client that keeps a
 # frame callback pending forces renders (src/render/Renderer.cpp "hack: schedule frame events"), and the scheduler

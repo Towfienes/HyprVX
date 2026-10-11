@@ -1,0 +1,20 @@
+{
+  "run_id": "20261011-092815-mixed-a4e8fbf-m_cost",
+  "test": "M-COST informational compositor CPU cost (T045, not a gate)",
+  "result": "MEASURED",
+  "agent": "claude",
+  "git_sha": "a4e8fbfb7d9d9d368ce0d09f9fd3f88829f3d467",
+  "note": "runs 5 per variant; frames presented NOT MEASURED",
+  "artifacts": [
+    "build-info-patched.json",
+    "build-info-stock.json",
+    "client.jsonl",
+    "conditions.json",
+    "cost_report.json",
+    "cost_table.md",
+    "preflight.log",
+    "samples.txt",
+    "session.log"
+  ],
+  "not_run": []
+}
