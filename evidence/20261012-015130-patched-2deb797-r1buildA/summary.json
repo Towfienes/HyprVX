@@ -1,0 +1,24 @@
+{
+  "run_id": "20261012-015130-patched-2deb797-r1buildA",
+  "test": "T057 R1 clean-room build A (final commit): patched, patched-nodev, plugins P/S/S-dev from a fresh worktree, fresh build dirs, CCACHE_DISABLE=1",
+  "result": "PASS",
+  "agent": "claude",
+  "git_sha": "2deb797056a8adf5a8459aa95696920d77c64ce2",
+  "note": "0 compiler warnings (Hyprland and the three plugins); ccache stats unchanged since 2026-10-11 20:05",
+  "artifacts": [
+    "ccache-stats-after.txt",
+    "chain-build.log",
+    "plugin-P-build.log",
+    "plugin-P.json",
+    "plugin-S-build.log",
+    "plugin-S-dev-build.log",
+    "plugin-S-dev.json",
+    "plugin-S.json",
+    "prefix-nodev.json",
+    "prefix-patched.json",
+    "preflight.log",
+    "sha256",
+    "worktree-head.txt"
+  ],
+  "not_run": []
+}

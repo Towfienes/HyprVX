@@ -93,3 +93,61 @@ of 0010 (`platform/plugin/src/mechanism/WindowOffset.cpp`). Known gap carried fr
 windows rendered inline in `renderAllClientsForWorkspace` get no camera hint in form S (a wrapper cannot reach them);
 special workspaces never become a Drift scene, so no Feature 002 test exercises them. Native evidence: V-23 (532
 captures byte-identical between forms).
+
+## Results (written after the re-runs, 2026-10-12)
+
+The source review above was committed at `13e40f6` before any clean-room result was read. Clean-room procedure:
+a fresh `git worktree` of this repository at the commit under test, `apply-patches.sh --variant patched --reset`
+(the patch series re-applied with `git am` onto the pin), `CCACHE_DISABLE=1` (ccache statistics unchanged since
+2026-10-11 20:05, i.e. no lookup), fresh build directories for Hyprland (`patched`, `patched-nodev`) and the three
+plugin builds (P, S, S-dev); 0 compiler warnings in every build.
+
+| Round | Commit | Build archive | Suite (88 runs) | Other |
+|---|---|---|---|---|
+| 1 | `13e40f6` | `20261012-005110-patched-e5baac3-r1build1` | `20261012-005054-suite-e5baac3-feature002` PASS | `t_fr016` BLOCKED, then FAIL (below) |
+| A | `2deb797` (final code) | `20261012-015130-patched-2deb797-r1buildA` | `20261012-013047-suite-2deb797-feature002` PASS | `t_fr016` `20261012-015041-patched-2deb797-t_fr016` PASS |
+| B | `2deb797` (same worktree path as A) | `20261012-023141-patched-420efff-r1buildB` | `20261012-020804-suite-2deb797-feature002` FAIL 87/88 (finding 5); re-run at `420efff` `20261012-023154-suite-420efff-feature002` PASS | `t_fr016` `20261012-032119-patched-420efff-t_fr016` PASS; Sprint 1 and Phase 2 in both forms PASS |
+
+Findings, in the order they happened:
+
+1. **`t_fr016` static check was vacuous-prone, caught by its own positive control** (`20261012-011047-…-t_fr016`,
+   BLOCKED). The compiler builds the 10-byte `"hyprvx-dev"` std::string from immediates, so `strings` finds no
+   literal even in S-dev. Section (e) above predicted a literal search; the check now counts the dev command table
+   keywords (`camera-mon`, `full-damage`) and the `HyprVXSpike::registerDevControl` symbol, with S-dev and the dev
+   build as positive controls (`6dce348`).
+2. **FR-016 defect in the policy, fixed** (`20261012-011204-…-t_fr016`, FAIL). The policy registers the non-exact
+   hyprctl command `hyprvx`; Hyprland gives the first matching non-exact command every request that starts with its
+   name (`debug/HyprCtl.cpp`), so a build without the dev control answered `hyprctl hyprvx-dev state` with the policy
+   state instead of rejecting it. The dev control itself was absent (the reply had the policy's shape), but the
+   acceptance wording "hyprvx-dev rejected" was not met. Fix `2deb797` (`platform/plugin/src/policy/Session.cpp`
+   `hyprctlCommand`): only the command word `hyprvx` is answered; any other gives an empty result and Hyprland's
+   `unknown request`. `t_fr016` now requires that exact text. Round 1 was then repeated as round A on the final
+   commit.
+3. **Lint heuristic on core, not a defect.** Run beyond the V-28 scope on `core/src/DriftModel.cpp`, the lint flags
+   line 170 `current.zoom * factor`: the requested zoom level (a scalar) passed to `cammath::anchorZoom`, which owns
+   the equation (Feature 001 `CameraMotion.cpp:253` does the same). No second camera equation exists; section (b)
+   holds for the patches, the policy and form S (`20261012-003558-static-02f7e7d-f002_static`).
+4. **Form S embeds source paths** (`__FILE__` in the copied `OpenGL.cpp` and `ViewHitTester.cpp` bodies), so its
+   binary depends on the checkout path; form P does not (round 1 reproduced the earlier P plugin bit for bit). Round
+   B uses the same worktree path as round A.
+
+5. **Timing-dependent `t_resize`, a test defect, fixed** (`20261012-021950-formS-2deb797-t_resize`, FAIL, round B,
+   with plugins bit-identical to round A where it passed). Hyprland's `CDragStateController::mouseMove` skips a resize
+   update that arrives within one monitor frame of the last applied one and applies nothing at release
+   (`layout/supplementary/DragController.cpp`, `TIMERDELTA < MSMONITOR && canSkipUpdate`, stock behaviour). The driver's
+   per-step barrier spaced the two drag moves by about one frame: 15.8–17.4 ms in the 11 passing runs, 12.0 ms in the
+   failing one, so its last step was skipped. `pointer_driver.py` gained `pause MS` and every compositor resize drag
+   in `t_resize` and `t_drag_scope` waits 40 ms before each move (`420efff`); the acceptance tolerance is unchanged.
+
+Reproducibility (V-27): rounds A and B built the same commit from fresh worktrees at the same path. Plugins P, S and
+S-dev are bit-identical; the Hyprland binaries differ only through the commit `git am` creates (source commits
+`e0bcb3fc` and `f07201d5`, both tree `55316a2b`, i.e. identical sources; the commit hash and date are embedded through
+`GIT_COMMIT_HASH`/`GIT_COMMIT_DATE`). Captures of the round A suite and the round B re-run: 556/556 byte-identical in
+each form.
+
+Captures: round 1 vs T056 (ccache builds), round A vs round 1, round B (re-run) vs round A, and P vs S inside rounds
+1, A and B: 556/556 byte-identical in every comparison (`compare_forms.py`, which gained a form filter for single-form comparisons).
+
+Tests changed after the code existed (addition to section (f)): `t_fr016` static method (finding 1) and rejection
+criterion (finding 2); `t_resize`, `t_drag_scope` and `pointer_driver.py` resize-drag pacing (finding 5);
+`compare_forms.py` form filter (comparison tooling only).

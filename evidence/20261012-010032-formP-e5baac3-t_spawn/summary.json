@@ -1,0 +1,33 @@
+{
+  "run_id": "20261012-010032-formP-e5baac3-t_spawn",
+  "test": "T-SPAWN mapped in Drift: centred in the viewport +-2 px; mapped OFF: as stock (V-22)",
+  "result": "PASS",
+  "agent": "claude",
+  "git_sha": "e5baac3aac6c72b5f2c8bbc93b88059f4a9a3f8e",
+  "note": "form P; camera zoom 0.5 at (0,0) then pan (300,-100); output 1600x1000 scale 1.25",
+  "artifacts": [
+    "a.jsonl",
+    "build-info-patched.json",
+    "build-info-plugin.json",
+    "c.jsonl",
+    "camera.reply",
+    "d.jsonl",
+    "drift.clients.json",
+    "home.cmds",
+    "home.steps.json",
+    "off.reply",
+    "on.reply",
+    "plugin-load.log",
+    "plugin.sha256",
+    "preflight.log",
+    "session.log",
+    "spawn-drift.json",
+    "spawn-drift.png",
+    "spawn-drift.state.json",
+    "spawn-off.json",
+    "spawn-off.png",
+    "spawn-off.state.json",
+    "vp.jsonl"
+  ],
+  "not_run": []
+}
