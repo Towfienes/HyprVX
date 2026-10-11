@@ -22,17 +22,19 @@ A dispatcher `ok` is never an artifact.
 | V-12b | L5 | T-STALE-STATIC: fixed non-identity camera, deterministic client partial updates, 0 mismatches vs full damage | PASS | scale 1: `20261011-062624-patched-2bfe8a4-t_stale_static`; scale 1.25: `20261011-063854-patched-2bfe8a4-t_stale_static` (archived under `~/.local/share/hyprvx/evidence/claude/`) |
 | V-13 | L5 | T-OFF / panic ⇒ identity image (10/10) | PASS | scale 1: `20261011-062742-patched-2bfe8a4-t_off`; scale 1.25: `20261011-064019-patched-2bfe8a4-t_off` (archived under `~/.local/share/hyprvx/evidence/claude/`) |
 | V-14 | L5 | Layer-shell test surface unchanged under camera | PASS | scale 1: `20261011-062716-patched-2bfe8a4-t_layer`; scale 1.25: `20261011-063952-patched-2bfe8a4-t_layer` (archived under `~/.local/share/hyprvx/evidence/claude/`) |
-| V-15 | L5 | Scale 1.25 repeats V-10..V-12 | PASS | suite `~/.local/share/hyprvx/evidence/claude/20261011-061805-patched-2bfe8a4-sprint1/` (16/16 at scales 1 and 1.25; patchset 47b6baa12904) |
+| V-15 | L5 | Scale 1.25 repeats V-10..V-12 | PASS | suite `~/.local/share/hyprvx/evidence/claude/20261011-061805-patched-2bfe8a4-sprint1/` (16/16 at scales 1 and 1.25; patchset 47b6baa12904); re-confirmed 16/16 on two clean-room rebuilds: `20261011-074421-patched-03c469e-sprint1` (T044 R1) and `20261011-090525-patched-197511e-sprint1` (T046) |
 | V-16 | L5b | Surface-local ± 1 at ≥ 20 points per state | NOT RUN | |
 | V-17 | L5b | Click focuses the drawn window; empty canvas gets no motion | NOT RUN | |
 | V-18 | L5 | Popup drawn attached and hit-testable when zoomed | NOT RUN | |
 | V-19 | L5 | Popup mapped outside all monitors: no crash | NOT RUN | |
 | V-20 | — | Human review of the image set (no clipping/stair-step/detached deco) | NOT AUTOMATABLE | reviewer + date |
 | V-21 | — | Delivery spike report (hooks vs patch) written | NOT RUN | `delivery-decision.md` |
-| V-22 | — | Host untouched: no host hyprctl/plugin/config change during the run | PASS | `~/.local/share/hyprvx/evidence/claude/20261011-053517-audit-4411e95-v22/` (95 nested sessions, none with the host signature, all private runtime dirs, agent-prefix binaries only; host hypr/caelestia config unchanged) |
+| V-22 | — | Host untouched: no host hyprctl/plugin/config change during the run | PASS | `~/.local/share/hyprvx/evidence/claude/20261011-053517-audit-4411e95-v22/` (95 nested sessions, none with the host signature, all private runtime dirs, agent-prefix binaries only; host hypr/caelestia config unchanged); repeated at G1: `~/.local/share/hyprvx/evidence/claude/20261011-095853-audit-b15784b-v22/` (201 sessions, same results) |
 | V-23 | L5 | GATE-A: stock vs stock ×3 pixel-identical with the shared nested config (precondition for V-09) | PASS | `~/.local/share/hyprvx/evidence/claude/20261011-030116-stock-401d74b/` (3 identical PNGs sha256 6d7f6bd6…; diff 0 px) |
 | V-24 | L5 | GATE-N per `contracts/test-tooling.md` §6.1: setup valid (S1), camera applied (S2), analyzer PASS on stock and good fixtures (P), analyzer FAIL with expected reasons on V2-as-is (N), artifact visually confirmed (H). Any other outcome is FAIL or BLOCKED with its classification, never PASS | PASS | S1/S2/P/N `~/.local/share/hyprvx/evidence/claude/20261011-032750-v2-02a59d1/`; H `~/.local/share/hyprvx/evidence/claude/20261011-032829-v2-02a59d1-h/` (RC1 detected on v2_pan_right; RC2 not reproduced in this scene) |
 | V-25 | L2 | V1 equivalence: `Camera` (M = 0) equals `CameraMath` forward/inverse; existing camera tests unchanged | PASS | `~/.local/share/hyprvx/evidence/claude/20261011-003807-core-e94ffd2/` (ctest unchanged, 200 000-case bit-exact self-check) and `~/.local/share/hyprvx/evidence/claude/20261011-023218-unit-729ce2d/` (invariant 7 with ==) |
+
+V-09..V-14 were re-run with identical verdicts in both clean-room suites above (per-test run-ids in each suite's `results.txt`); all 346 captured PNGs are byte-identical between those two suites. Every archive listed on this page verified with `sha256sum -c` on 2026-10-11 (T052).
 
 ## T045 cost measurement (informational, NOT a gate)
 
