@@ -54,6 +54,9 @@ misc {
 
 cursor {
     inactive_timeout = 1
+    # The cursor sprite is never judged; inactive_timeout alone races a capture taken within 1 s of a pointer device
+    # appearing (hyprvx-vpointer), which put the sprite into some t_popup identity captures but not others.
+    invisible = true
 }
 
 ecosystem {
