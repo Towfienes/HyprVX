@@ -177,7 +177,7 @@ proven on synthetic data; GATE-A PASS. Claude may write patches during this phas
 - [X] T050 Validate `quickstart.md` steps 1–4 against the delivered scripts; correct documentation drift in `specs/001-native-spatial-camera/quickstart.md` (owner: claude)
 - [X] T051 Constitution re-check of delivered Sprint 1 code against principles I–X; record exceptions in `plan.md` Complexity Tracking (owner: claude)
 - [X] T052 Merge-readiness review: every Sprint 1 commit since `966e6b6` reviewed (including the integrated Codex commits), every PASS backed by archived evidence, `git rev-parse dev == 15f75b0` (owner: claude)
-- [ ] T053 **G1 — Sprint 1 gate**: present results; STOP for user approval before any Phase 2 task (owner: claude)
+- [X] T053 **G1 — Sprint 1 gate**: present results; STOP for user approval before any Phase 2 task (owner: claude)
 
 ---
 

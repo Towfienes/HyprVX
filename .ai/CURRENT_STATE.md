@@ -367,7 +367,7 @@ Production safety: host Hyprland and Caelestia untouched; no plugin loaded; no p
 ## Sprint 1 status at G1 (2026-10-11)
 
 - Since DV3-15 Claude Code is the only implementation agent; Codex history is kept (merges, clone, evidence).
-- T001–T052 done and ticked; T053 (G1) presents the results and stops for user approval.
+- T001–T053 done and ticked; the user approved G1 on 2026-10-11 and authorized Phase 2 (T054–T071) up to T071.
 - Patch series 0001–0005 (patchset `47b6baa12904`): camera as a pure view in the render pass, culling, damage union,
   dev control behind `-DHYPRVX_DEV=ON`. Two defects found and fixed by native tests during T040 (border interior,
   fractional-edge round-out).
