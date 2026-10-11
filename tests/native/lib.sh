@@ -26,7 +26,7 @@ hvx_init_run() {
     sha=$(git -C "$HVX_REPO" rev-parse --short=7 HEAD)
     HVX_TEST="$2"
     # The test name keeps run-ids unique when tests start within the same second (e.g. run_sprint1).
-    HVX_RUN_ID="$(date +%Y%m%d-%H%M%S)-$1-$sha-$2"
+    HVX_RUN_ID="$(date +%Y%m%d-%H%M%S)-$1-$sha-$2${HVX_PATCHED_PREFIX:+-negctl-$HVX_PATCHED_PREFIX}"
     HVX_EVID="$HOME/.cache/hyprvx/$HYPRVX_AGENT/evidence/$HVX_RUN_ID"
     mkdir -p "$HVX_EVID"
     { date -Is; git -C "$HVX_REPO" rev-parse HEAD; grep MemAvailable /proc/meminfo; cat /proc/pressure/memory; } \
@@ -40,8 +40,14 @@ hvx_nested() {
 
 # Sessions this test started are stopped on any exit (PASS, FAIL or BLOCKED); stop re-verifies identity first.
 HVX_OWN_SESSION=0
+# HVX_PATCHED_PREFIX=<prefix id> (negative controls only): the patched variant runs that archived agent prefix, e.g.
+# the 0001-0005 build, to show that a test fails without the patches it covers. The run-id gets "-negctl-<id>" and the
+# evidence records that prefix's build-info; such a run never counts as the test's PASS evidence.
 hvx_start() {
-    hvx_nested start "$@" && HVX_OWN_SESSION=1
+    local extra=()
+    [[ -n ${HVX_PATCHED_PREFIX:-} && " $* " == *" --variant patched "* ]] \
+        && extra=(--binary "$HOME/.cache/hyprvx/$HYPRVX_AGENT/prefix/$HVX_PATCHED_PREFIX/bin/Hyprland")
+    hvx_nested start "$@" "${extra[@]}" && HVX_OWN_SESSION=1
 }
 hvx_stop() {
     hvx_nested stop && HVX_OWN_SESSION=0
@@ -169,6 +175,7 @@ print('%d,%d,%d,%d' % (round(x * s), round(y * s), round(w * s), round(h * s)))"
 
 # hvx_prefix_id VARIANT: the prefix id (patchset id or stock id) of the variant built from this checkout.
 hvx_prefix_id() {
+    [[ $1 == patched && -n ${HVX_PATCHED_PREFIX:-} ]] && { echo "$HVX_PATCHED_PREFIX"; return; }
     python3 -I -c "
 import importlib.util, sys; from pathlib import Path
 spec = importlib.util.spec_from_file_location('b', '$HVX_REPO/tools/hyprvx_build.py'); b = importlib.util.module_from_spec(spec)
