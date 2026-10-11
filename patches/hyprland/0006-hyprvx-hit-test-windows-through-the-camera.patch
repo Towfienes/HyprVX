@@ -1,0 +1,173 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Towfienes <ngolamtien1706@gmail.com>
+Date: Sun, 11 Oct 2026 12:07:49 +0700
+Subject: [PATCH] hyprvx: hit-test windows through the camera
+
+Patch 0006 of the HyprVX V3 series (Feature 001, Phase 2, T061).
+
+- src/hyprvx/InputCamera.{hpp,cpp}: screenToWorld / worldToScreen
+  (cammath::inverse / forward, monitor chosen by screen position, stock
+  path unchanged when no camera applies) and isWindowContent (window-pass
+  surfaces vs. layer, lock and IME surfaces).
+- windowAt: monitor from the screen position, window boxes and popups
+  tested at the world point (FR-007).
+- windowSurfaceAt / surfaceLocalAt: surface-local coordinates from the
+  world point, so wl_pointer coordinates equal surfaceLocal(S).
+---
+ src/desktop/state/ViewHitTester.cpp | 16 ++++++---
+ src/hyprvx/InputCamera.cpp          | 52 +++++++++++++++++++++++++++++
+ src/hyprvx/InputCamera.hpp          | 29 ++++++++++++++++
+ 3 files changed, 93 insertions(+), 4 deletions(-)
+ create mode 100644 src/hyprvx/InputCamera.cpp
+ create mode 100644 src/hyprvx/InputCamera.hpp
+
+diff --git a/src/desktop/state/ViewHitTester.cpp b/src/desktop/state/ViewHitTester.cpp
+index 1b7ecdc7..adaf8b1a 100644
+--- a/src/desktop/state/ViewHitTester.cpp
++++ b/src/desktop/state/ViewHitTester.cpp
+@@ -14,6 +14,7 @@
+ #include "../../state/WorkspaceState.hpp"
+ #include "../../xwayland/XWayland.hpp"
+ #include "../../managers/fullscreen/FullscreenController.hpp"
++#include "../../hyprvx/InputCamera.hpp"
+ 
+ #include <cmath>
+ #include <ranges>
+@@ -26,11 +27,14 @@ CViewHitTester::CViewHitTester(const IViewStateTracker& tracker) : m_tracker(tra
+     ;
+ }
+ 
+-PHLWINDOW CViewHitTester::windowAt(const Vector2D& pos, uint16_t properties, PHLWINDOW ignoreWindow) const {
+-    const auto PMONITOR = State::monitorState()->query().vec(pos).run();
++PHLWINDOW CViewHitTester::windowAt(const Vector2D& screenPos, uint16_t properties, PHLWINDOW ignoreWindow) const {
++    const auto PMONITOR = State::monitorState()->query().vec(screenPos).run();
+     if (!PMONITOR)
+         return nullptr;
+ 
++    // HyprVX: the monitor is chosen by the screen position; windows are tested in world coordinates (FR-007).
++    const auto pos = HyprVX::screenToWorld(*PMONITOR, screenPos);
++
+     static auto PRESIZEONBORDER       = CConfigValue<Config::INTEGER>("general:resize_on_border");
+     static auto PBORDERSIZE           = CConfigValue<Config::INTEGER>("general:border_size");
+     static auto PBORDERGRABEXTEND     = CConfigValue<Config::INTEGER>("general:extend_border_grab_area");
+@@ -254,10 +258,12 @@ PHLWINDOW CViewHitTester::windowAt(const Vector2D& pos, uint16_t properties, PHL
+     return windowForWorkspace(false);
+ }
+ 
+-SP<CWLSurfaceResource> CViewHitTester::windowSurfaceAt(const Vector2D& pos, PHLWINDOW window, Vector2D& surfaceLocal) const {
++SP<CWLSurfaceResource> CViewHitTester::windowSurfaceAt(const Vector2D& screenPos, PHLWINDOW window, Vector2D& surfaceLocal) const {
+     if (!validMapped(window))
+         return nullptr;
+ 
++    const auto pos = HyprVX::screenToWorld(screenPos); // HyprVX: surface-local through the camera (FR-007)
++
+     RASSERT(!window->m_isX11, "Cannot call windowSurfaceAt on an X11 window!");
+ 
+     // try popups first
+@@ -278,10 +284,12 @@ SP<CWLSurfaceResource> CViewHitTester::windowSurfaceAt(const Vector2D& pos, PHLW
+     return nullptr;
+ }
+ 
+-Vector2D CViewHitTester::surfaceLocalAt(const Vector2D& pos, PHLWINDOW window, SP<CWLSurfaceResource> surface) const {
++Vector2D CViewHitTester::surfaceLocalAt(const Vector2D& screenPos, PHLWINDOW window, SP<CWLSurfaceResource> surface) const {
+     if (!validMapped(window))
+         return {};
+ 
++    const auto pos = HyprVX::screenToWorld(screenPos); // HyprVX: surface-local through the camera (FR-007)
++
+     if (window->m_isX11)
+         return pos - window->position(Desktop::View::IGeometric::GEOMETRIC_GOAL);
+ 
+diff --git a/src/hyprvx/InputCamera.cpp b/src/hyprvx/InputCamera.cpp
+new file mode 100644
+index 00000000..05a4af27
+--- /dev/null
++++ b/src/hyprvx/InputCamera.cpp
+@@ -0,0 +1,52 @@
++#include "InputCamera.hpp"
++#include "SceneCamera.hpp"
++
++#include "../desktop/state/ViewState.hpp"
++#include "../desktop/view/Popup.hpp"
++#include "../desktop/view/WLSurface.hpp"
++#include "../output/Monitor.hpp"
++#include "../protocols/core/Compositor.hpp"
++#include "../state/MonitorState.hpp"
++
++using namespace hyprvx;
++
++Vector2D HyprVX::screenToWorld(const Vector2D& screen) {
++    const auto PMONITOR = State::monitorState()->query().vec(screen).run();
++    return PMONITOR ? screenToWorld(*PMONITOR, screen) : screen;
++}
++
++Vector2D HyprVX::screenToWorld(const Monitor::CMonitor& monitor, const Vector2D& screen) {
++    const auto CAMERA = activeCamera(monitor);
++    if (!CAMERA)
++        return screen;
++
++    const auto WORLD = cammath::inverse(*CAMERA, monitorOrigin(monitor), {screen.x, screen.y});
++    return {WORLD.x, WORLD.y};
++}
++
++Vector2D HyprVX::worldToScreen(const Monitor::CMonitor& monitor, const Vector2D& world) {
++    const auto CAMERA = activeCamera(monitor);
++    if (!CAMERA)
++        return world;
++
++    const auto SCREEN = cammath::forward(*CAMERA, monitorOrigin(monitor), {world.x, world.y});
++    return {SCREEN.x, SCREEN.y};
++}
++
++bool HyprVX::isWindowContent(const SP<CWLSurfaceResource>& surface) {
++    const auto HLSURFACE = surface ? Desktop::View::CWLSurface::fromResource(surface) : nullptr;
++    const auto VIEW      = HLSURFACE ? HLSURFACE->view() : nullptr;
++    if (!VIEW)
++        return false;
++
++    switch (VIEW->type()) {
++        case Desktop::View::VIEW_TYPE_WINDOW: return true;
++        case Desktop::View::VIEW_TYPE_POPUP: {
++            const auto POPUP = Desktop::View::CPopup::fromView(VIEW);
++            return POPUP && !POPUP->layerOwner();
++        }
++        case Desktop::View::VIEW_TYPE_SUBSURFACE:
++            return !Desktop::viewState()->query().type(Desktop::View::VIEW_TYPE_LAYER_SURFACE).surface(surface).runLayer();
++        default: return false;
++    }
++}
+diff --git a/src/hyprvx/InputCamera.hpp b/src/hyprvx/InputCamera.hpp
+new file mode 100644
+index 00000000..0c6a484f
+--- /dev/null
++++ b/src/hyprvx/InputCamera.hpp
+@@ -0,0 +1,29 @@
++#pragma once
++
++// HyprVX: pointer coordinates through the camera (patches 0006-0009). Window content (the window pass: windows, their
++// subsurfaces and popups) is drawn through the camera, so its hit-testing and surface-local coordinates use world
++// coordinates. Layer, lock-screen and IME surfaces and the cursor stay in screen space (FR-004, FR-007).
++
++#include "../helpers/math/Math.hpp"
++#include "../helpers/memory/Memory.hpp"
++
++class CWLSurfaceResource;
++
++namespace Monitor {
++    class CMonitor;
++}
++
++namespace HyprVX {
++    // World point under a screen-logical point. The monitor is selected by the screen position (FR-007), then
++    // cammath::inverse. Returns the input unchanged on the stock path (no monitor under it, or no active camera).
++    Vector2D screenToWorld(const Vector2D& screen);
++    Vector2D screenToWorld(const Monitor::CMonitor& monitor, const Vector2D& screen);
++
++    // Screen-logical image of a world point on a monitor (cammath::forward); unchanged on the stock path.
++    Vector2D worldToScreen(const Monitor::CMonitor& monitor, const Vector2D& world);
++
++    // True for surfaces drawn in the window pass. Layer surfaces and the subsurfaces in their tree, layer popups, lock
++    // surfaces and surfaces without a desktop view (IME popups) are screen space. Known gap: a subsurface of a layer
++    // popup is reported as window content (layer popups with subsurfaces are out of scope for Feature 001).
++    bool isWindowContent(const SP<CWLSurfaceResource>& surface);
++}

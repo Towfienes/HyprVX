@@ -1,0 +1,77 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Towfienes <ngolamtien1706@gmail.com>
+Date: Sun, 11 Oct 2026 12:10:18 +0700
+Subject: [PATCH] hyprvx: popups in world terms; null-monitor guard on popup
+ map
+
+Patch 0009 of the HyprVX V3 series (Feature 001, Phase 2, T064).
+
+- CPopup::reposition: while the owner window's monitor has an active
+  camera, the parent position is a world position and the constraint box
+  is the world rectangle shown in the monitor's usable area
+  (cammath::inverseBox); the stock path is unchanged otherwise.
+- CPopup::onMap: a popup mapped outside every monitor falls back to its
+  owner's monitor and never dereferences a null monitor (spec edge case,
+  research R3; V-19).
+---
+ src/desktop/view/Popup.cpp | 26 ++++++++++++++++++++++----
+ 1 file changed, 22 insertions(+), 4 deletions(-)
+
+diff --git a/src/desktop/view/Popup.cpp b/src/desktop/view/Popup.cpp
+index e21ce7be..17da1bcd 100644
+--- a/src/desktop/view/Popup.cpp
++++ b/src/desktop/view/Popup.cpp
+@@ -16,6 +16,7 @@
+ #include "../../render/OpenGL.hpp"
+ #include "../../output/Monitor.hpp"
+ #include "../../state/MonitorState.hpp"
++#include "../../hyprvx/SceneCamera.hpp"
+ #include <array>
+ #include <ranges>
+ 
+@@ -204,8 +205,12 @@ void CPopup::onMap() {
+     m_mapped   = true;
+     m_lastSize = m_resource->m_surface->m_surface->m_current.size;
+ 
+-    const auto COORDS   = coordsGlobal();
+-    const auto PMONITOR = State::monitorState()->query().vec(COORDS).run();
++    const auto COORDS = coordsGlobal();
++    // HyprVX: a popup mapped outside every monitor (possible in world coordinates, and for any client) falls back to its
++    // owner's monitor instead of dereferencing null (spec edge case, research R3).
++    auto PMONITOR = State::monitorState()->query().vec(COORDS).run();
++    if (!PMONITOR)
++        PMONITOR = getMonitor();
+ 
+     CBox       box = m_wlSurface->resource()->extends();
+     box.translate(COORDS).expand(4);
+@@ -221,7 +226,8 @@ void CPopup::onMap() {
+ 
+     //unconstrain();
+     sendScale();
+-    m_wlSurface->resource()->breadthfirst([PMONITOR](SP<CWLSurfaceResource> s, const Vector2D& offset, void* d) { s->enter(PMONITOR->m_self.lock()); }, nullptr);
++    if (PMONITOR)
++        m_wlSurface->resource()->breadthfirst([PMONITOR](SP<CWLSurfaceResource> s, const Vector2D& offset, void* d) { s->enter(PMONITOR->m_self.lock()); }, nullptr);
+ 
+     if (!m_layerOwner.expired() && m_layerOwner->m_layer < ZWLR_LAYER_SHELL_V1_LAYER_TOP) {
+         if (m_layerOwner->m_monitor)
+@@ -372,7 +378,19 @@ void CPopup::onReposition() {
+ }
+ 
+ void CPopup::reposition() {
+-    const auto COORDS   = t1ParentCoords();
++    const auto COORDS = t1ParentCoords();
++
++    // HyprVX: while the owner window's monitor has an active camera, the parent is placed in world coordinates and the
++    // popup is constrained to the world rectangle shown in the monitor's usable area (cammath::inverseBox).
++    if (const auto OWNERMONITOR = m_windowOwner ? m_windowOwner->m_monitor.lock() : nullptr; OWNERMONITOR) {
++        if (const auto CAMERA = HyprVX::activeCamera(*OWNERMONITOR); CAMERA) {
++            const auto AREA  = OWNERMONITOR->logicalBoxMinusReserved();
++            const auto WORLD = hyprvx::cammath::inverseBox(*CAMERA, HyprVX::monitorOrigin(*OWNERMONITOR), {{AREA.x, AREA.y}, {AREA.w, AREA.h}});
++            m_resource->applyPositioning(CBox{WORLD.pos.x, WORLD.pos.y, WORLD.size.x, WORLD.size.y}, COORDS);
++            return;
++        }
++    }
++
+     const auto PMONITOR = State::monitorState()->query().vec(COORDS).run();
+ 
+     if (!PMONITOR)

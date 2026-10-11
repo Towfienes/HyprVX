@@ -1,0 +1,190 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Towfienes <ngolamtien1706@gmail.com>
+Date: Sun, 11 Oct 2026 12:08:50 +0700
+Subject: [PATCH] hyprvx: seat-local pointer coordinates, constraints and warps
+ through the camera
+
+Patch 0007 of the HyprVX V3 series (Feature 001, Phase 2, T062).
+
+mouseMoveUnified computes the pointer in window-content (world)
+coordinates once (screenToWorld, monitor by screen position) and uses it
+wherever a window-content position is subtracted: the fallback local
+(forced focus, X11, held-button focus, seat grab), the main-surface box
+check and sendMotionEventsToFocused. Layer, lock and IME surfaces keep
+screen coordinates (isWindowContent).
+
+Pointer constraints of window content: the confine region and the lock
+hint are world positions; the closest point is found in world space and
+the cursor is warped to its screen image (cammath::forward).
+CWindow::warpCursor and the persistent-warp bookkeeping, and the
+off-window axis clamp/warp, use the same conversions.
+---
+ src/config/shared/actions/ConfigActions.cpp |  5 ++-
+ src/desktop/view/Window.cpp                 | 10 ++++--
+ src/managers/input/InputManager.cpp         | 37 ++++++++++++++-------
+ 3 files changed, 36 insertions(+), 16 deletions(-)
+
+diff --git a/src/config/shared/actions/ConfigActions.cpp b/src/config/shared/actions/ConfigActions.cpp
+index cf388167..2f2d85a5 100644
+--- a/src/config/shared/actions/ConfigActions.cpp
++++ b/src/config/shared/actions/ConfigActions.cpp
+@@ -33,6 +33,7 @@
+ #include "../../../state/WorkspaceState.hpp"
+ 
+ #include <numbers>
++#include "../../../hyprvx/InputCamera.hpp"
+ #include <utility>
+ #include <type_traits>
+ 
+@@ -54,8 +55,10 @@ static void updateRelativeCursorCoords() {
+     if (*PNOWARPS)
+         return;
+ 
++    // HyprVX: the window box is in world coordinates.
+     if (Desktop::focusState()->window())
+-        Desktop::focusState()->window()->m_relativeCursorCoordsOnLastWarp = g_pInputManager->getMouseCoordsInternal() - Desktop::focusState()->window()->layoutBox().pos();
++        Desktop::focusState()->window()->m_relativeCursorCoordsOnLastWarp =
++            HyprVX::screenToWorld(g_pInputManager->getMouseCoordsInternal()) - Desktop::focusState()->window()->layoutBox().pos();
+ }
+ 
+ static void switchToWindow(PHLWINDOW PWINDOWTOCHANGETO, bool forceFSCycle = false) {
+diff --git a/src/desktop/view/Window.cpp b/src/desktop/view/Window.cpp
+index ded1e591..f27f66b8 100644
+--- a/src/desktop/view/Window.cpp
++++ b/src/desktop/view/Window.cpp
+@@ -66,6 +66,7 @@
+ #include "../../layout/target/WindowGroupTarget.hpp"
+ #include "../../event/EventBus.hpp"
+ #include "../../hyprvx/SceneCamera.hpp"
++#include "../../hyprvx/InputCamera.hpp"
+ 
+ #include <hyprutils/string/String.hpp>
+ #include <hyprutils/string/VarList.hpp>
+@@ -1618,12 +1619,15 @@ void CWindow::warpCursor(bool force) {
+     const auto  coords                 = m_relativeCursorCoordsOnLastWarp;
+     m_relativeCursorCoordsOnLastWarp.x = -1; // reset m_vRelativeCursorCoordsOnLastWarp
+ 
+-    const auto BOX = layoutBox();
++    const auto BOX      = layoutBox();
++    const auto PMONITOR = m_monitor.lock();
++    // HyprVX: warp to where the window is drawn (cammath::forward); unchanged without a camera.
++    const auto toScreen = [&PMONITOR](const Vector2D& world) { return PMONITOR ? HyprVX::worldToScreen(*PMONITOR, world) : world; };
+ 
+     if (*PERSISTENTWARPS && coords.x > 0 && coords.y > 0 && coords < BOX.size()) // don't warp cursor outside the window
+-        Pointer::pointerController()->warpTo(BOX.pos() + coords, force);
++        Pointer::pointerController()->warpTo(toScreen(BOX.pos() + coords), force);
+     else
+-        Pointer::pointerController()->warpTo(middle(), force);
++        Pointer::pointerController()->warpTo(toScreen(middle()), force);
+ }
+ 
+ PHLWINDOW CWindow::getSwallowee() {
+diff --git a/src/managers/input/InputManager.cpp b/src/managers/input/InputManager.cpp
+index 187dbe89..12f27bc7 100644
+--- a/src/managers/input/InputManager.cpp
++++ b/src/managers/input/InputManager.cpp
+@@ -58,6 +58,7 @@
+ #include "../../pointer/cursor/CursorShapeOverrideController.hpp"
+ 
+ #include <aquamarine/input/Input.hpp>
++#include "../../hyprvx/InputCamera.hpp"
+ #include <hyprutils/string/VarList.hpp>
+ #include <hyprutils/string/VarList2.hpp>
+ 
+@@ -224,7 +225,9 @@ void CInputManager::sendMotionEventsToFocused() {
+ 
+     m_emptyFocusCursorSet = false;
+ 
+-    g_pSeatManager->setPointerFocus(Desktop::focusState()->surface(), getMouseCoordsInternal().floor() - BOX->pos());
++    // HyprVX: the box of window content is in world coordinates.
++    const auto POINTER = getMouseCoordsInternal().floor();
++    g_pSeatManager->setPointerFocus(SURF, (HyprVX::isWindowContent(SURF) ? HyprVX::screenToWorld(POINTER) : POINTER) - BOX->pos());
+ }
+ 
+ void CInputManager::mouseMoveUnified(uint32_t time, bool refocus, bool mouse, std::optional<Vector2D> overridePos) {
+@@ -279,6 +282,9 @@ void CInputManager::mouseMoveUnified(uint32_t time, bool refocus, bool mouse, st
+     if (PMONITOR == nullptr)
+         return;
+ 
++    // HyprVX: the pointer in window-content (world) coordinates; equal to mouseCoords when no camera applies.
++    const auto WINDOWCOORDS = HyprVX::screenToWorld(*PMONITOR, mouseCoords);
++
+     if (PMONITOR->m_cursorZoom->value() != 1.f)
+         g_pHyprRenderer->damageMonitor(PMONITOR);
+ 
+@@ -295,7 +301,9 @@ void CInputManager::mouseMoveUnified(uint32_t time, bool refocus, bool mouse, st
+         if (!surf)
+             return;
+ 
+-        const auto CLOSEST      = rg.closestPoint(mouseCoords);
++        // HyprVX: a window-content constraint region is in world coordinates; the cursor goes to its screen image.
++        const bool WORLD        = HyprVX::isWindowContent(surf->resource());
++        const auto CLOSEST      = rg.closestPoint(WORLD ? WINDOWCOORDS : mouseCoords);
+         const auto BOX          = surf->getSurfaceBoxGlobal();
+         const auto WINDOW       = Desktop::View::CWindow::fromView(surf->view());
+         const auto CLOSESTLOCAL = (CLOSEST - (BOX.has_value() ? BOX->pos() : Vector2D{})) * (WINDOW ? WINDOW->m_X11SurfaceScaledBy : 1.0);
+@@ -303,7 +311,7 @@ void CInputManager::mouseMoveUnified(uint32_t time, bool refocus, bool mouse, st
+         if (g_pSeatManager->m_state.pointerFocus != surf->resource())
+             g_pSeatManager->setPointerFocus(surf->resource(), CLOSESTLOCAL);
+ 
+-        Pointer::pointerController()->warpTo(CLOSEST, true);
++        Pointer::pointerController()->warpTo(WORLD ? HyprVX::worldToScreen(*PMONITOR, CLOSEST) : CLOSEST, true);
+         g_pSeatManager->sendPointerMotion(time, CLOSESTLOCAL);
+         PROTO::relativePointer->sendRelativeMotion(sc<uint64_t>(time) * 1000, {}, {});
+     };
+@@ -317,7 +325,7 @@ void CInputManager::mouseMoveUnified(uint32_t time, bool refocus, bool mouse, st
+             if (CONSTRAINT) {
+                 if (CONSTRAINT->isLocked()) {
+                     const auto HINT = CONSTRAINT->logicPositionHint();
+-                    Pointer::pointerController()->warpTo(HINT, true);
++                    Pointer::pointerController()->warpTo(HyprVX::isWindowContent(SURF->resource()) ? HyprVX::worldToScreen(*PMONITOR, HINT) : HINT, true);
+                 } else {
+                     confineToRegion(CONSTRAINT->logicConstraintRegion(), SURF);
+                 }
+@@ -628,7 +636,8 @@ void CInputManager::mouseMoveUnified(uint32_t time, bool refocus, bool mouse, st
+ 
+     m_emptyFocusCursorSet = false;
+ 
+-    Vector2D surfaceLocal = surfacePos == Vector2D(-1337, -1337) ? surfaceCoords : mouseCoords - surfacePos;
++    // HyprVX: surfacePos of window content is a world position, so the pointer must be in world coordinates too.
++    Vector2D surfaceLocal = surfacePos == Vector2D(-1337, -1337) ? surfaceCoords : (HyprVX::isWindowContent(foundSurface) ? WINDOWCOORDS : mouseCoords) - surfacePos;
+ 
+     if (pFoundWindow && pFoundWindow->m_isX11) // for x11 force scale zero
+         surfaceLocal = surfaceLocal * pFoundWindow->m_X11SurfaceScaledBy;
+@@ -656,7 +665,7 @@ void CInputManager::mouseMoveUnified(uint32_t time, bool refocus, bool mouse, st
+ 
+     if (pFoundWindow && foundSurface == pFoundWindow->wlSurface()->resource() && !m_cursorImageOverridden) {
+         const auto BOX = pFoundWindow->getWindowMainSurfaceBox();
+-        if (VECNOTINRECT(mouseCoords, BOX.x, BOX.y, BOX.x + BOX.width, BOX.y + BOX.height))
++        if (VECNOTINRECT(WINDOWCOORDS, BOX.x, BOX.y, BOX.x + BOX.width, BOX.y + BOX.height))
+             g_pHyprRenderer->setCursorFromName("left_ptr");
+         else
+             restoreCursorIconToApp();
+@@ -1012,17 +1021,21 @@ void CInputManager::onMouseWheel(IPointer::SAxisEvent e, SP<IPointer> pointer) {
+                 return;
+ 
+             if (*POFFWINDOWAXIS != 1) {
+-                const auto BOX = PWINDOW->getWindowMainSurfaceBox();
++                // HyprVX: the window box is in world coordinates; a warp goes to its screen image.
++                const auto BOX         = PWINDOW->getWindowMainSurfaceBox();
++                const auto WORLDCOORDS = HyprVX::screenToWorld(MOUSECOORDS);
+ 
+-                if (!BOX.containsPoint(MOUSECOORDS) && !PWINDOW->hasPopupAt(MOUSECOORDS)) {
++                if (!BOX.containsPoint(WORLDCOORDS) && !PWINDOW->hasPopupAt(WORLDCOORDS)) {
+                     if (*POFFWINDOWAXIS == 0)
+                         return;
+ 
+-                    const auto TEMPCURX = std::clamp(MOUSECOORDS.x, BOX.x, BOX.x + BOX.w - 1);
+-                    const auto TEMPCURY = std::clamp(MOUSECOORDS.y, BOX.y, BOX.y + BOX.h - 1);
++                    const auto TEMPCURX = std::clamp(WORLDCOORDS.x, BOX.x, BOX.x + BOX.w - 1);
++                    const auto TEMPCURY = std::clamp(WORLDCOORDS.y, BOX.y, BOX.y + BOX.h - 1);
+ 
+-                    if (*POFFWINDOWAXIS == 3)
+-                        Pointer::pointerController()->warpTo({TEMPCURX, TEMPCURY}, true);
++                    if (*POFFWINDOWAXIS == 3) {
++                        const auto PMONITOR = State::monitorState()->query().vec(MOUSECOORDS).run();
++                        Pointer::pointerController()->warpTo(PMONITOR ? HyprVX::worldToScreen(*PMONITOR, {TEMPCURX, TEMPCURY}) : Vector2D{TEMPCURX, TEMPCURY}, true);
++                    }
+ 
+                     g_pSeatManager->sendPointerMotion(e.timeMs, Vector2D{TEMPCURX, TEMPCURY} - BOX.pos());
+                     g_pSeatManager->sendPointerFrame();
