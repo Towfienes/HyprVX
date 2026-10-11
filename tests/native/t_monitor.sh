@@ -3,18 +3,35 @@
 #  1. In Drift with a non-identity camera and offsets (dev control), the scene output HVX-1 is removed
 #     (`hyprctl output remove`): the compositor stays alive (hyprctl answers, session verified).
 #  2. HVX-1 is re-added (`hyprctl output create headless HVX-1`): Drift stays OFF (Super+Escape reaches c) and the
-#     capture equals the capture before Drift (identity camera, offsets 0).
-#  3. Plugin unload while in Drift (camera and offsets set) acts as panic: compositor alive, capture = pre.
+#     capture equals a stock session that removed and re-added HVX-1 the same way (identity camera, offsets 0). The
+#     control is needed because Hyprland itself moves the floating windows on the round trip through its FALLBACK
+#     output (observed: at (140,100) -> (139,99)), which US1.3 allows ("what Hyprland itself changed").
+#  3. Plugin unload while in Drift (camera and offsets set) acts as panic: compositor alive, capture = the identity
+#     capture taken just before that Drift state.
 set -euo pipefail
 source "$(dirname -- "${BASH_SOURCE[0]}")/lib.sh"
 SIZE="${HVX_OUTPUT_SIZE:-1280x800}"
 SCALE="${HVX_OUTPUT_SCALE:-1}"
 
 hvx_init_run "$(hvx_form_label)" t_monitor
+hvx_copy_build_info stock
 result=PASS
 fail() { echo "$*" >&2; echo "$*" >> "$HVX_EVID/failures.txt"; result=FAIL; }
 alive() { # NAME
     hvx_hyprctl_form version > "$HVX_EVID/$1.version.txt" 2>&1 && hvx_nested status > "$HVX_EVID/$1.status.txt" 2>&1
+}
+readd() {
+    hvx_hyprctl_form output create headless HVX-1 > "$HVX_EVID/$1.readd.reply" 2>&1 || true
+    local deadline=$(($(date +%s) + 10))
+    until hvx_hyprctl_form -j monitors 2> /dev/null | grep -q '"name": "HVX-1"'; do
+        (($(date +%s) < deadline)) || hvx_die_blocked "$1: HVX-1 did not come back"
+        sleep 0.1
+    done
+}
+scene() {
+    hvx_client_start a 300x200
+    hvx_client_start b 300x200 --app-id hyprvx-testclient-b
+    hvx_client_start c 300x200 --app-id hyprvx-testclient-c
 }
 drift_state() {
     hvx_dispatch hyprvx:on > /dev/null 2>&1 || true
@@ -22,12 +39,27 @@ drift_state() {
     hvx_nested dev offset "$ADDR_A" 250 120 > /dev/null || hvx_die_blocked "dev offset rejected"
 }
 
+# Control: stock session, same scene, same output round trip, no Drift.
+hvx_nested start --variant stock --size "$SIZE" --scale "$SCALE" > "$HVX_EVID/stock.session.log" 2>&1 \
+    || { cat "$HVX_EVID/stock.session.log" >&2; hvx_die_blocked "stock session did not start"; }
+HVX_OWN_SESSION=1
+scene
+hvx_hyprctl stock output remove HVX-1 > "$HVX_EVID/stock.remove.reply" 2>&1 || true
+hvx_hyprctl stock output create headless HVX-1 > "$HVX_EVID/stock.readd.reply" 2>&1 || true
+deadline=$(($(date +%s) + 10))
+until hvx_hyprctl stock -j monitors 2> /dev/null | grep -q '"name": "HVX-1"'; do
+    (($(date +%s) < deadline)) || hvx_die_blocked "stock: HVX-1 did not come back"
+    sleep 0.1
+done
+hvx_hyprctl stock -j clients > "$HVX_EVID/stock-readded.clients.json"
+hvx_capture stock-readded c
+for w in a b c; do mv "$HVX_EVID/$w.jsonl" "$HVX_EVID/stock.$w.jsonl"; done
+hvx_stop >> "$HVX_EVID/stock.session.log" 2>&1 || hvx_die_blocked "stock session did not stop"
+
 hvx_start_form --policy --size "$SIZE" --scale "$SCALE" > "$HVX_EVID/session.log" 2>&1 \
     || { cat "$HVX_EVID/session.log" >&2; hvx_die_blocked "form $HVX_FORM session did not start"; }
 SESSION_DIR=$(hvx_session_dir)
-hvx_client_start a 300x200
-hvx_client_start b 300x200 --app-id hyprvx-testclient-b
-hvx_client_start c 300x200 --app-id hyprvx-testclient-c
+scene
 hvx_vkeyboard_start kb
 ADDR_A=$(hvx_window_address hyprvx-testclient)
 hvx_capture pre c
@@ -45,28 +77,24 @@ sys.exit(0 if all(m['name'] != 'HVX-1' for m in json.load(open(sys.argv[1]))) el
     || hvx_die_blocked "HVX-1 still listed after output remove (setup invalid)"
 
 # 2. re-add: Drift stays OFF, identity image
-hvx_hyprctl_form output create headless HVX-1 > "$HVX_EVID/readd.reply" 2>&1 || true
-deadline=$(($(date +%s) + 10))
-until hvx_hyprctl_form -j monitors 2> /dev/null | grep -q '"name": "HVX-1"'; do
-    (($(date +%s) < deadline)) || hvx_die_blocked "HVX-1 did not come back"
-    sleep 0.1
-done
+readd form
 hvx_hyprctl_form -j monitors > "$HVX_EVID/readded.monitors.json"
 hvx_hyprctl_form -j clients > "$HVX_EVID/readded.clients.json"
 hvx_capture readded c
-hvx_analyze readded-pre diff "$HVX_EVID/readded.png" --reference "$HVX_EVID/pre.png" --max-pixels 0 \
-    || fail "after re-adding HVX-1 the image is not the identity image before Drift"
+hvx_analyze readded-stock diff "$HVX_EVID/readded.png" --reference "$HVX_EVID/stock-readded.png" --max-pixels 0 \
+    || fail "after re-adding HVX-1 the image differs from the stock session after the same round trip"
 hvx_drift_off_probe kb c || fail "Drift on after the output came back (Super+Escape consumed)"
 alive readded || fail "compositor not alive after re-adding HVX-1"
 
 # 3. plugin unload while in Drift
+hvx_capture pre3 c
 drift_state
 hvx_capture drift2 c
-hvx_differs drift2-validity "$HVX_EVID/drift2.png" "$HVX_EVID/pre.png" || hvx_die_blocked "Drift state 2 not visible (setup invalid)"
+hvx_differs drift2-validity "$HVX_EVID/drift2.png" "$HVX_EVID/pre3.png" || hvx_die_blocked "Drift state 2 not visible (setup invalid)"
 hvx_plugin_unload > "$HVX_EVID/unload.reply" 2>&1 || fail "plugin unload failed"
 alive unloaded || fail "compositor not alive after plugin unload in Drift"
 hvx_capture unloaded c
-hvx_analyze unloaded-pre diff "$HVX_EVID/unloaded.png" --reference "$HVX_EVID/pre.png" --max-pixels 0 \
+hvx_analyze unloaded-pre3 diff "$HVX_EVID/unloaded.png" --reference "$HVX_EVID/pre3.png" --max-pixels 0 \
     || fail "plugin unload in Drift did not act as panic (image differs from identity)"
 
 hvx_stop >> "$HVX_EVID/session.log" 2>&1 || hvx_die_blocked "session did not stop"

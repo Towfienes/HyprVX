@@ -30,4 +30,14 @@ namespace HyprVXPolicy {
     void initSession(HANDLE handle);
     // Plugin unload: acts as panic (identity camera, mechanism offsets 0) before the hooks go away.
     void shutdownSession();
+    // True while any monitor is in DRIFT: the input listeners return at once when false (FR-005).
+    bool anyDrift();
+    // True while the monitor under the pointer is in DRIFT (built-in inputs, drift-control 1.0).
+    bool driftUnderPointer();
+    // hyprvx:off on the focused monitor (Super+Escape).
+    void disableFocused();
+
+    // ---- built-in inputs (Input.cpp) ----
+    void initInput();
+    void shutdownInput();
 }

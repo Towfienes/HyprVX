@@ -6,6 +6,7 @@
 
 #ifdef HYPRVX_FORM_P
 #include <src/hyprvx/MonitorCamera.hpp>
+#include <src/hyprvx/WindowOffset.hpp>
 #else
 #include "mechanism/Api.hpp"
 #endif

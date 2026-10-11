@@ -84,7 +84,7 @@ description: "Task list for Feature 002 — Multi-Window Drift MVP (Option A), C
   - a socket2 event logger `tests/native/events_log.py` (new, written for this feature);
   - `hvx_clients_snapshot`.
   The stock baseline must stay byte-identical: re-run GATE-A (`tests/native/gate_a_stock_determinism.sh`) and compare with Feature 001's baseline image `6d7f6bd6…`.
-- [ ] T015 Plugin skeleton in `platform/plugin/src/policy/` (`main.cpp`: init, version/compatibility check per research R10 reusing `platform/include/hyprvx/platform/PluginCompatibility.hpp`, `hyprctl hyprvx state`, clean unload). Build forms P and S with `scripts/build-plugin.sh`. Load each into its nested build: compositor alive, captures with Drift OFF byte-identical to the build without the plugin.
+- [x] T015 Plugin skeleton in `platform/plugin/src/policy/` (`main.cpp`: init, version/compatibility check per research R10 reusing `platform/include/hyprvx/platform/PluginCompatibility.hpp`, `hyprctl hyprvx state`, clean unload). Build forms P and S with `scripts/build-plugin.sh`. Load each into its nested build: compositor alive, captures with Drift OFF byte-identical to the build without the plugin.
 
 **Checkpoint**: unit tests green, tools and harness ready, both plugin forms load and are inert.
 

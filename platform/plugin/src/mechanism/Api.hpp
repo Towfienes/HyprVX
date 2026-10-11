@@ -6,6 +6,9 @@
 
 #include "hyprvx/core/CameraMath.hpp"
 
+#include <src/desktop/DesktopTypes.hpp>
+#include <src/helpers/math/Math.hpp>
+
 namespace Monitor {
     class CMonitor;
 }
@@ -17,4 +20,10 @@ namespace HyprVX {
     bool                         cameraIsIdentity(const Monitor::CMonitor& monitor);
     bool                         setCamera(Monitor::CMonitor& monitor, const hyprvx::cammath::CameraState& camera);
     void                         resetCamera(Monitor::CMonitor& monitor);
+
+    // World offsets (patch 0010). Until T053 form S has no offset mechanism: setWindowOffset refuses every non-zero
+    // offset (logged once), windowOffset is 0 and resetWindowOffsets does nothing.
+    bool     setWindowOffset(const PHLWINDOW& window, const Vector2D& offset);
+    Vector2D windowOffset(const PHLWINDOW& window);
+    void     resetWindowOffsets();
 }

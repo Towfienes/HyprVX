@@ -44,11 +44,19 @@ HyprVXPolicy::SBuildCheck HyprVXPolicy::checkLoad(HANDLE handle) {
     return {true, {}, {}};
 }
 
+// Research R10. Form S: the running commit is efb5099 and the build is clean upstream. Form P: the patchset id in
+// GIT_DIRTY is the one this plugin was built against; the commit hash of a patched build is the commit of its patched
+// tree (build-info source_commit), not efb5099, so it is not compared.
 HyprVXPolicy::SBuildCheck HyprVXPolicy::checkEntering(HANDLE handle) {
     const auto VERSION = HyprlandAPI::getHyprlandVersion(handle);
     const auto DIRTY   = runningDirty(VERSION);
-    const bool OK      = hyprvx::platform::pluginCommitCompatible(hyprvx::platform::SupportedHyprlandCommit, VERSION.hash) && DIRTY == EXPECTED_DIRTY;
+#ifdef HYPRVX_FORM_P
+    const bool OK = DIRTY == EXPECTED_DIRTY;
+    return {OK, std::format("patched Hyprland ({})", EXPECTED_DIRTY), describe(VERSION.hash, DIRTY)};
+#else
+    const bool OK = hyprvx::platform::pluginCommitCompatible(hyprvx::platform::SupportedHyprlandCommit, VERSION.hash) && DIRTY == EXPECTED_DIRTY;
     return {OK, describe(hyprvx::platform::SupportedHyprlandCommit, EXPECTED_DIRTY), describe(VERSION.hash, DIRTY)};
+#endif
 }
 
 std::string HyprVXPolicy::buildJSON(HANDLE handle) {
