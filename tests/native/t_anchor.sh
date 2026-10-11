@@ -47,7 +47,7 @@ done
 hvx_differs zoom-validity "$HVX_EVID/step10.png" "$HVX_EVID/identity.png" || hvx_die_blocked "hyprvx:zoom left the image unchanged"
 hvx_key kb down KEY_LEFTMETA
 for step in $(seq 11 20); do
-    printf 'scroll 0 -120\n' > "$HVX_EVID/scroll$step.cmds"
+    printf 'scroll 0 -1\n' > "$HVX_EVID/scroll$step.cmds"
     hvx_pointer_run "scroll$step.steps" vp "$HVX_EVID/scroll$step.cmds" a
     z=$(python3 -I -c "print($z * 1.1)")
     measure "$step"

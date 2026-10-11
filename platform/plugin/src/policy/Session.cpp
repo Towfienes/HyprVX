@@ -1,7 +1,7 @@
 // Drift session adapter (Feature 002, data-model.md, contracts/drift-control.md 1.0): one DriftModel for the
 // compositor (a session per monitor), the hyprvx:toggle/on/off/panic dispatchers, the entering validation (R10), the
-// mechanism sync, the monitor/window listeners, `hyprctl hyprvx state` (bookkeeping only, Constitution II) and the
-// unload path.
+// mechanism sync, the monitor/workspace/window listeners (camera per workspace R2, no switch animation in Drift R7),
+// `hyprctl hyprvx state` (bookkeeping only, Constitution II) and the unload path.
 //
 // The mechanism holds no policy state: after every transition syncMechanism() pushes what the model says, i.e. the
 // scene camera of each DRIFT monitor (identity elsewhere) and O(w) for mapped windows of a DRIFT scene (0 for every
@@ -25,6 +25,8 @@
 #include <src/output/Monitor.hpp>
 #include <src/state/MonitorQuery.hpp>
 #include <src/state/MonitorState.hpp>
+#include <src/state/WorkspaceQuery.hpp>
+#include <src/state/WorkspaceState.hpp>
 
 #include <format>
 #include <vector>
@@ -59,8 +61,8 @@ namespace {
     }
 
     // Pushes the model to the mechanism (see the file comment). A camera the mechanism rejects ends Drift on that
-    // monitor (data-model: invalid camera -> EXITING -> OFF).
-    void syncMechanism() {
+    // monitor (data-model: invalid camera -> EXITING -> OFF), which also needs the window pass.
+    void syncMechanism(bool camerasOnly = false) {
         auto& model = g_session->model;
         bool  any   = false;
         for (auto const& m : State::monitorState()->monitors()) {
@@ -79,14 +81,43 @@ namespace {
             model.invalidCamera(m->m_id);
             HyprVX::resetCamera(*m);
             model.exited(m->m_id);
+            camerasOnly = false;
         }
+        g_anyDrift = any;
+        if (camerasOnly)
+            return;
         for (auto const& w : Desktop::windowState()->windows()) {
             const auto WS     = w->m_workspace;
             const auto MON    = WS ? WS->m_monitor.lock() : nullptr;
             const auto OFFSET = model.mechanismOffset(idOf(w), WS ? WS->m_id : WORKSPACE_INVALID, MON ? MON->m_id : MONITOR_INVALID, w->m_isMapped);
             HyprVX::setWindowOffset(w, Vector2D{OFFSET.x, OFFSET.y});
         }
-        g_anyDrift = any;
+    }
+
+    // R7: a workspace switch in Drift is not animated. The switch animations are started in changeWorkspace before
+    // workspace.active is emitted (Monitor.cpp), so they are finished here, before the next frame.
+    void finishSwitchAnimation(const PHLWORKSPACE& workspace) {
+        if (!workspace)
+            return;
+        workspace->m_renderOffset->warp();
+        workspace->m_alpha->warp();
+    }
+
+    void workspaceActive(const PHLWORKSPACE& workspace) {
+        if (!workspace || workspace->m_isSpecialWorkspace)
+            return;
+        const auto MONITOR = workspace->m_monitor.lock();
+        if (!MONITOR)
+            return;
+        auto&      model    = g_session->model;
+        const auto PREVIOUS = model.sceneWorkspace(MONITOR->m_id);
+        if (model.mode(MONITOR->m_id) != drift::Mode::Drift || PREVIOUS == workspace->m_id)
+            return;
+        model.workspaceActivated(MONITOR->m_id, workspace->m_id, false);
+        finishSwitchAnimation(workspace);
+        if (PREVIOUS)
+            finishSwitchAnimation(State::workspaceState()->query().id(*PREVIOUS).run());
+        syncMechanism();
     }
 
     SDispatchResult enableOn(const PHLMONITOR& monitor) {
@@ -189,15 +220,28 @@ namespace {
     }
 }
 
+hyprvx::drift::DriftModel& HyprVXPolicy::model() {
+    return g_session->model;
+}
+
+void HyprVXPolicy::sync(bool camerasOnly) {
+    if (g_session)
+        syncMechanism(camerasOnly);
+}
+
+PHLMONITOR HyprVXPolicy::driftMonitorUnderPointer() {
+    if (!g_anyDrift || !g_session)
+        return nullptr;
+    const auto MONITOR = State::monitorState()->query().vec(g_pInputManager->getMouseCoordsInternal()).run();
+    return MONITOR && g_session->model.mode(MONITOR->m_id) == drift::Mode::Drift ? MONITOR : nullptr;
+}
+
 bool HyprVXPolicy::anyDrift() {
     return g_anyDrift;
 }
 
 bool HyprVXPolicy::driftUnderPointer() {
-    if (!g_anyDrift || !g_session)
-        return false;
-    const auto MONITOR = State::monitorState()->query().vec(g_pInputManager->getMouseCoordsInternal()).run();
-    return MONITOR && g_session->model.mode(MONITOR->m_id) == drift::Mode::Drift;
+    return driftMonitorUnderPointer() != nullptr;
 }
 
 void HyprVXPolicy::disableFocused() {
@@ -220,6 +264,15 @@ void HyprVXPolicy::initSession(HANDLE handle) {
         if (w)
             g_session->model.windowClosed(idOf(w));
     }));
+    g_session->listeners.push_back(events.workspace.active.listen([](PHLWORKSPACE ws) { workspaceActive(ws); }));
+    // A window that changes workspace keeps its offset, shown only in a Drift scene (data-model WindowOffset).
+    g_session->listeners.push_back(events.window.moveToWorkspace.listen([](PHLWINDOW w, PHLWORKSPACE) {
+        if (!w || !g_anyDrift)
+            return;
+        g_session->model.windowLeftScene(idOf(w));
+        syncMechanism();
+    }));
+    initCamera(handle);
     initInput();
     Log::logger->log(Log::INFO, "[hyprvx] Drift policy loaded (form {}); Drift is OFF", HYPRVX_FORM_NAME);
 }
@@ -230,6 +283,7 @@ void HyprVXPolicy::shutdownSession() {
     // Unload acts as panic while the mechanism is still in place: every camera identity, every offset 0 (dev offsets
     // included, mechanism-api resetWindowOffsets).
     shutdownInput();
+    shutdownCamera();
     g_session->listeners.clear();
     g_session->model.panic();
     syncMechanism();

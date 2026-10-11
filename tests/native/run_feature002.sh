@@ -4,12 +4,13 @@
 # its own evidence run; this aggregate run records every test's run-id and result in results.txt. Any FAIL makes the
 # suite FAIL; otherwise any BLOCKED makes it BLOCKED.
 #   HVX_TESTS="t_multi ..."  (default: every Feature 002 test)   HVX_FORMS="P S"   HVX_SCALES="1 1.25"
+# t_multi_policy is t_multi.sh with HVX_MULTI_CAMERA=policy (cameras through the Drift controls, T040).
 # From fish: env HYPRVX_AGENT=claude bash tests/native/run_feature002.sh
 set -uo pipefail
 here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$here/lib.sh"
 set +e  # lib.sh enables errexit; a failing test must be recorded, not end the suite
-DEFAULT_TESTS="t_plugin_inert t_multi t_input_mw t_stale_mw t_x11 t_resize t_drift_off t_panic_drift t_idemp t_monitor t_anchor t_pan_drift
+DEFAULT_TESTS="t_plugin_inert t_multi t_multi_policy t_input_mw t_stale_mw t_x11 t_resize t_drift_off t_panic_drift t_idemp t_monitor t_anchor t_pan_drift
 t_ws_camera t_ws_anim t_keys t_scroll t_fullscreen t_move t_drag_abort t_spawn"
 TESTS=(${HVX_TESTS:-$DEFAULT_TESTS})
 FORMS=(${HVX_FORMS:-P S})
@@ -22,7 +23,9 @@ for form in "${FORMS[@]}"; do
         for t in "${TESTS[@]}"; do
             log="$HVX_EVID/${t}_form${form}_scale${scale}.log"
             size=$(python3 -I -c "import sys; s = float(sys.argv[1]); print('%dx%d' % (round(1280 * s), round(800 * s)))" "$scale")
-            HVX_FORM="$form" HVX_OUTPUT_SCALE="$scale" HVX_OUTPUT_SIZE="$size" "$here/$t.sh" > "$log" 2>&1
+            script=$t extra=()
+            [[ $t == t_multi_policy ]] && { script=t_multi; extra=(HVX_MULTI_CAMERA=policy); }
+            env "${extra[@]}" HVX_FORM="$form" HVX_OUTPUT_SCALE="$scale" HVX_OUTPUT_SIZE="$size" "$here/$script.sh" > "$log" 2>&1
             code=$?
             run=$(grep -o 'run=[0-9A-Za-z_.-]*' "$log" | tail -1 | cut -d= -f2)
             case $code in 0) r=PASS ;; 2) r=BLOCKED; blocked=1 ;; *) r=FAIL; failed=1 ;; esac

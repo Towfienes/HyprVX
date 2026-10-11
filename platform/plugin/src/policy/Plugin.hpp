@@ -4,6 +4,8 @@
 // The pure policy is hyprvx::drift::DriftModel (core); this adapter maps it to Hyprland objects, pushes cameras and
 // offsets to the mechanism (Mechanism.hpp) and owns the Drift controls (contracts/drift-control.md 1.0).
 
+#include "hyprvx/core/DriftModel.hpp"
+
 #include <src/plugins/PluginAPI.hpp>
 
 #include <string>
@@ -20,8 +22,8 @@ namespace HyprVXPolicy {
     // At load: form S needs the plugin API hash of its headers and refuses a patched build (its mechanism would be
     // hooked twice); form P is bound to the patched binary by its undefined mechanism symbols.
     SBuildCheck checkLoad(HANDLE handle);
-    // ENTERING: the running Hyprland commit is efb5099 and, in form P, its patchset id (GIT_DIRTY hyprvx-<id>) is the
-    // one this plugin was built against; in form S it is a clean upstream build.
+    // ENTERING (R10): form P, the patchset id in GIT_DIRTY (hyprvx-<id>) is the one this plugin was built against; form
+    // S, the running commit is efb5099 and the build is clean upstream.
     SBuildCheck checkEntering(HANDLE handle);
     // {"form":…,"patchset":…,"hyprland":…} for `hyprctl hyprvx state`.
     std::string buildJSON(HANDLE handle);
@@ -36,6 +38,21 @@ namespace HyprVXPolicy {
     bool driftUnderPointer();
     // hyprvx:off on the focused monitor (Super+Escape).
     void disableFocused();
+    // The session's model; valid between initSession and shutdownSession.
+    hyprvx::drift::DriftModel& model();
+    // Pushes the model to the mechanism: cameras of every monitor and, unless camerasOnly, every window's offset.
+    void sync(bool camerasOnly = false);
+    // The monitor under the pointer when it is in DRIFT, else null.
+    PHLMONITOR driftMonitorUnderPointer();
+
+    // ---- camera controls (Camera.cpp) ----
+    // hyprvx:pan/zoom/reset and plugin:hyprvx:zoom_step.
+    void initCamera(HANDLE handle);
+    void shutdownCamera();
+    // Zoom of the monitor's scene camera by factor, anchored at a screen point (global logical); false if refused.
+    bool zoomAt(const PHLMONITOR& monitor, const Vector2D& anchor, double factor);
+    // plugin:hyprvx:zoom_step (> 1; 1.1 if the configured value is not).
+    double zoomStep();
 
     // ---- built-in inputs (Input.cpp) ----
     void initInput();
