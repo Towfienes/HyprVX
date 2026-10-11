@@ -1,0 +1,21 @@
+{
+  "run_id": "20261011-224600-suite-d1fdff7-feature002",
+  "test": "Feature 002 native suite: t_drift_off t_panic_drift t_idemp t_monitor in forms P at scales 1 1.25",
+  "result": "PASS",
+  "agent": "claude",
+  "git_sha": "d1fdff72339164c7cbd4fee6a7b6785e0cee4ad2",
+  "note": "per-test runs listed in results.txt",
+  "artifacts": [
+    "preflight.log",
+    "results.txt",
+    "t_drift_off_formP_scale1.25.log",
+    "t_drift_off_formP_scale1.log",
+    "t_idemp_formP_scale1.25.log",
+    "t_idemp_formP_scale1.log",
+    "t_monitor_formP_scale1.25.log",
+    "t_monitor_formP_scale1.log",
+    "t_panic_drift_formP_scale1.25.log",
+    "t_panic_drift_formP_scale1.log"
+  ],
+  "not_run": []
+}

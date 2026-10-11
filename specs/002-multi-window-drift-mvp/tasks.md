@@ -124,21 +124,21 @@ description: "Task list for Feature 002 — Multi-Window Drift MVP (Option A), C
 
 ### Tests
 
-- [ ] T026 [P] [US1] Write `tests/native/t_drift_off.sh` (T-DRIFT-OFF, ×3): stock capture of the scene; then in the patched build, enter Drift, set a camera and offsets (dispatchers and dev offsets), leave with `hyprvx:off` and with Super+Escape (vkeyboard); compare the capture with stock, compare `hyprctl clients`, check socket2 for `movewindow*`; re-enter and check that the windows are back at their world positions and the camera is restored (US1.4)
-- [ ] T027 [P] [US1] Write `tests/native/t_panic_drift.sh` (T-PANIC-DRIFT, 10/10): panic from Drift, the first capture after the reply equals stock (FR-002 measurement)
-- [ ] T028 [P] [US1] Write `tests/native/t_idemp.sh` (T-IDEMP): `on` twice, `off` twice, panic while OFF; captures unchanged after the first call; `hyprvx:on` on a special workspace keeps Drift OFF
-- [ ] T029 [P] [US1] Write `tests/native/t_monitor.sh` (T-MONITOR): remove the scene output while in Drift (`hyprctl output remove` in the nested session); compositor alive, Drift OFF; re-add, Drift stays OFF; plus plugin unload while in Drift acting as panic
+- [x] T026 [P] [US1] Write `tests/native/t_drift_off.sh` (T-DRIFT-OFF, ×3): stock capture of the scene; then in the patched build, enter Drift, set a camera and offsets (dispatchers and dev offsets), leave with `hyprvx:off` and with Super+Escape (vkeyboard); compare the capture with stock, compare `hyprctl clients`, check socket2 for `movewindow*`; re-enter and check that the windows are back at their world positions and the camera is restored (US1.4)
+- [x] T027 [P] [US1] Write `tests/native/t_panic_drift.sh` (T-PANIC-DRIFT, 10/10): panic from Drift, the first capture after the reply equals stock (FR-002 measurement)
+- [x] T028 [P] [US1] Write `tests/native/t_idemp.sh` (T-IDEMP): `on` twice, `off` twice, panic while OFF; captures unchanged after the first call; `hyprvx:on` on a special workspace keeps Drift OFF
+- [x] T029 [P] [US1] Write `tests/native/t_monitor.sh` (T-MONITOR): remove the scene output while in Drift (`hyprctl output remove` in the nested session); compositor alive, Drift OFF; re-add, Drift stays OFF; plus plugin unload while in Drift acting as panic
 
 ### Implementation
 
-- [ ] T030 [US1] Implement the state machine adapter in `platform/plugin/src/policy/Session.cpp`:
+- [x] T030 [US1] Implement the state machine adapter in `platform/plugin/src/policy/Session.cpp`:
   - `DriftModel` per monitor;
   - entering validation (R10) with a notification naming the expected and running build;
   - `hyprvx:toggle`/`on`/`off`/`panic` dispatchers (`contracts/drift-control.md`);
   - on enter, push the scene's camera and offsets to the mechanism;
   - on exit, identity camera and offset 0 for every window, stored state kept;
   - listeners on `monitor.removed` and plugin unload.
-- [ ] T031 [US1] Implement Super+Escape in `platform/plugin/src/policy/Input.cpp` (keyboard bus listener, cancels only that key press in DRIFT; returns immediately when OFF)
+- [x] T031 [US1] Implement Super+Escape in `platform/plugin/src/policy/Input.cpp` (keyboard bus listener, cancels only that key press in DRIFT; returns immediately when OFF)
 - [ ] T032 [US1] Run T026–T029 in form P; debug until V-08..V-11 PASS
 
 **Checkpoint**: Drift can be entered and left safely (MVP).
