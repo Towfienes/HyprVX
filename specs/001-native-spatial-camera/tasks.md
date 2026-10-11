@@ -216,8 +216,8 @@ Note: "Phase N" headings in this file are Spec Kit task phases; "master-plan Pha
 
 ## Phase 8: Delivery spike (master plan §A item 4; DV3-01)
 
-- [ ] T066 Reproduce seams 0002–0009 with `createFunctionHook` in a nested-only plugin under `platform/plugin-spike/` built against the stock-from-source prefix; (owner: claude)
-- [ ] T067 Run the identical Sprint 1 + US3 suite on stock-from-source + plugin; write `specs/001-native-spatial-camera/delivery-decision.md` comparing results, stability and maintenance cost (V-21) (owner: claude)
+- [x] T066 Reproduce seams 0002–0009 with `createFunctionHook` in a nested-only plugin under `platform/plugin-spike/` built against the stock-from-source prefix; (owner: claude)
+- [x] T067 Run the identical Sprint 1 + US3 suite on stock-from-source + plugin; write `specs/001-native-spatial-camera/delivery-decision.md` comparing results, stability and maintenance cost (V-21) (owner: claude)
 - [ ] T068 Clean-room review of the `delivery-decision.md` evidence and a re-run of the plugin suite from fresh build directories (owner: claude)
 
 ---
