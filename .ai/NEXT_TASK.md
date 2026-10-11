@@ -19,11 +19,14 @@
   data model, contracts (drift-control 1.0, mechanism-api 1.0, transform 1.2, test-tooling 1.4), quickstart,
   checklists and `tasks.md` (T001–T062) are written; `/speckit-analyze` found 1 CRITICAL (license record of copied
   functions) and 3 MEDIUM gaps, all fixed in `tasks.md` (`8f1ac97`).
-- `tasks.md` approved by the user (2026-10-11); `/speckit-implement` ran T001–T061 (Claude only). Final code `420efff`;
-  see `.ai/CURRENT_STATE.md` "Feature 002 at the T062 gate".
-- **Next: STOP at T062 for the user's approval of the Feature 002 gate**: review the T-SCENARIO image set (V-25,
-  `specs/002-multi-window-drift-mvp/checklists/verification.md`) and the open items. Only after approval: merge into
-  `v3/spec-foundation` or start a later feature. No push. Native runs need the host GPU profile Integrated.
+- `tasks.md` approved by the user (2026-10-11); `/speckit-implement` ran T001–T061 (Claude only). Final code `420efff`.
+- **Feature 002 gate T062 approved by the user on 2026-10-12** (V-25 signed). Merged into `v3/spec-foundation`
+  (`dd4f9b9`, post-merge checks PASS); see `.ai/CURRENT_STATE.md` "Feature 002 merged". No push.
+- **Next (Master Plan §H/§K): Feature 003 `specs/003-trackpad-native-ux/` (Phase 4, trackpad UX)**: `/speckit-specify`
+  → plan → checklists → `tasks.md`, then STOP for the user's approval of `tasks.md` before `/speckit-implement`.
+- Antigravity experiment (user, 2026-10-12): independent clone `/home/towfienes/Projects/HyprVX-v3-agy`, branch
+  `v3/agy-experiment`, push disabled; see `.ai/CURRENT_STATE.md` "Antigravity experiment". Claude stays the
+  integrator; Antigravity only gets small, approved Feature 003 tasks.
 - V-20 / SC-005: PASS, signed by the user (Towfienes) on 2026-10-11 in `checklists/verification.md`.
 
 ## Sprint 1 goal

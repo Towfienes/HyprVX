@@ -443,3 +443,25 @@ Production safety: host Hyprland and Caelestia untouched; no plugin loaded; no p
   Caelestia NOT RUN in nested; step 10 (pin) and snap are Phase 5.
 - Production safety: V-26 audit `20261012-032253-audit-7f12c15-v26` PASS (1114 nested sessions); host Hyprland,
   Caelestia and GPU config untouched.
+
+## Feature 002 merged (2026-10-12)
+
+- The user signed V-25 and approved the Feature 002 gate (T062). Merged with `--no-ff` into `v3/spec-foundation`
+  (`dd4f9b9`); merged tree == feature tree `9725b924`. Post-merge: ctest 326/326, analyzer, build-script tests, identity
+  refusal and lint (`20261012-061638-static-dd4f9b9-f002_static`) PASS; 1101/1101 evidence indexes match their archives.
+- Kept as is: Caelestia NOT RUN in nested; performance not measured (VI deferred); scenario stand-in clients; the open
+  items listed in "Feature 002 at the T062 gate". No plugin installed into the host; host Hyprland, Caelestia and
+  GPU config untouched; `dev` = `15f75b0`; nothing pushed.
+- Next: Feature 003 (Phase 4, trackpad UX) through Spec Kit; `tasks.md` needs the user's approval.
+
+## Antigravity experiment (2026-10-12)
+
+- User-requested trial of task delegation to Antigravity (`agy` CLI). It does not change the Master Plan, DV3 decisions,
+  architecture or gates; Claude Code stays the orchestrator, integrator and acceptance owner (DV3-15 otherwise holds).
+- Setup follows the least-privilege model of §O3: independent clone `/home/towfienes/Projects/HyprVX-v3-agy`
+  (`git clone --no-hardlinks`, no shared `.git`), branch `v3/agy-experiment`, push URL `DISABLED`.
+- Antigravity never edits this worktree or the shared repo. It may only implement a small, independent group of
+  Feature 003 tasks after `tasks.md` is approved; it hands off by commit + diff + test output + evidence. Claude
+  fetches from outside the clone (never runs git inside it), reviews, rebuilds and re-runs tests before integrating.
+- Known prerequisite: the tooling accepts only `HYPRVX_AGENT=claude|codex`; a separate lane for native runs by
+  Antigravity needs a small tooling change, to be planned inside Feature 003 `tasks.md` if a delegated task needs it.
