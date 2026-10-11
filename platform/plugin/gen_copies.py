@@ -1,6 +1,6 @@
-"""Generate platform/plugin-spike/src/copied/*.cpp from the patched draft tree (T066 spike).
+"""Generate platform/plugin/src/mechanism/copied/*.cpp from the patched draft tree (T066 spike; moved for Feature 002 T002).
 
-Usage: python3 -I platform/plugin-spike/gen_copies.py platform/plugin-spike/src/copied
+Usage: python3 -I platform/plugin/gen_copies.py platform/plugin/src/mechanism/copied
 
 Each output file mirrors one upstream translation unit: its includes and using-directives, a spike subclass of the
 upstream class whose member functions are the patched function bodies (verbatim apart from the renames listed in the
@@ -179,7 +179,7 @@ for path, base, spike, names, helpers in SPECS:
         "// HyprVX:: -> HyprVXSpike::, and the SRenderModifData::hyprvxCamera test -> HyprVXSpike::isCameraModif().",
         "// Prologues from gen_copies.py PROLOGUES: " + (", ".join(n for n in names if n in PROLOGUES) or "none") + ".",
         "// Upstream code: Hyprland, BSD-3-Clause (docs/THIRD_PARTY.md). Do not edit by hand; regenerate with",
-        "// python3 -I platform/plugin-spike/gen_copies.py platform/plugin-spike/src/copied",
+        "// python3 -I platform/plugin/gen_copies.py platform/plugin/src/mechanism/copied",
         '#include "../SpikeAccess.hpp"',
         "",
         *includes,

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Delivery spike stability checks (T067, V-21 input). Requires HVX_SPIKE_PLUGIN (scripts/build-plugin-spike.sh output).
+# Delivery spike stability checks (T067, V-21 input). Requires HVX_SPIKE_PLUGIN (output of the Feature 001 scripts/build-plugin-spike.sh,
+# replaced in Feature 002 by scripts/build-plugin.sh --form S --dev).
 #  A. Load refusal: the plugin loaded into another Hyprland build (the V2 prefix) must be refused and the compositor
 #     must stay alive and verified.
 #  B. Unload under a camera: with the camera at z = 0.5 the plugin is unloaded; the compositor must stay alive and the

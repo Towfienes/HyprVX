@@ -12,7 +12,7 @@ import unittest
 from unittest.mock import Mock, call, patch
 
 SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / sys.argv.pop(1)
-DRY_RUN_ARGS = ["--variant", "v2"] if SCRIPT.name == "apply-patches.sh" else []
+DRY_RUN_ARGS = {"apply-patches.sh": ["--variant", "v2"], "build-plugin.sh": ["--form", "P"]}.get(SCRIPT.name, [])
 spec = importlib.util.spec_from_file_location("hyprvx_build", SCRIPT.parent.parent / "tools/hyprvx_build.py")
 build = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(build)
@@ -58,6 +58,37 @@ class BuildScriptTest(unittest.TestCase):
                         self.assertIn("patchset_id=bc05d46c42b0", result.stdout)
                         self.assertNotIn("PROVENANCE.md", result.stdout)
                         self.assertNotIn("SHA256SUMS", result.stdout)
+
+    @unittest.skipUnless(SCRIPT.name == "build-plugin.sh", "plugin build script only")
+    def test_plugin_arguments_are_validated(self):
+        env = os.environ | {"HYPRVX_AGENT": "codex"}
+        for args in ([], ["--form"], ["--form", "X"], ["--form", "p"], ["--form", "P", "--bogus"]):
+            with self.subTest(args=args):
+                result = subprocess.run(["bash", str(SCRIPT), *args, "--dry-run"], env=env, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 2, result.stdout)
+                self.assertIn("Usage: build-plugin.sh", result.stderr)
+        result = subprocess.run(["bash", str(SCRIPT), "--form", "P", "--dev", "--dry-run"], env=env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("--dev applies to form S only", result.stderr)
+
+    @unittest.skipUnless(SCRIPT.name == "build-plugin.sh", "plugin build script only")
+    def test_plugin_dry_run_plans_each_form(self):
+        env = os.environ | {"HYPRVX_AGENT": "codex"}
+        cases = {("P",): ("/prefix/", "plugin/P/hyprvx-drift-P.so", "-DHYPRVX_PLUGIN_DEV=OFF"),
+                 ("S",): ("/prefix/stock", "plugin/S/hyprvx-drift-S.so", "-DHYPRVX_PLUGIN_DEV=OFF"),
+                 ("S", "--dev"): ("/prefix/stock", "plugin/S-dev/hyprvx-drift-S.so", "-DHYPRVX_PLUGIN_DEV=ON")}
+        for args, (prefix, output, dev) in cases.items():
+            with self.subTest(args=args):
+                result = subprocess.run(["bash", str(SCRIPT), "--form", *args, "--dry-run"], env=env, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(prefix, result.stdout)
+                self.assertIn(output, result.stdout)
+                self.assertIn(dev, result.stdout)
+                self.assertIn(f"-DHYPRVX_PLUGIN_FORM={args[0]}", result.stdout)
+                self.assertIn("MemoryMax=6G", result.stdout)
+                self.assertIn("heavy.lock", result.stdout)
+                self.assertIn("MemAvailable >= 6.5 GiB", result.stdout)
+                self.assertIn("-j4", result.stdout)
 
     @unittest.skipUnless(SCRIPT.name == "build-hyprland.sh", "Hyprland resource guard only")
     def test_low_memory_stops_before_lock_or_build(self):
