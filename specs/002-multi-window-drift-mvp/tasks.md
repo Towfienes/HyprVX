@@ -139,7 +139,7 @@ description: "Task list for Feature 002 — Multi-Window Drift MVP (Option A), C
   - on exit, identity camera and offset 0 for every window, stored state kept;
   - listeners on `monitor.removed` and plugin unload.
 - [x] T031 [US1] Implement Super+Escape in `platform/plugin/src/policy/Input.cpp` (keyboard bus listener, cancels only that key press in DRIFT; returns immediately when OFF)
-- [ ] T032 [US1] Run T026–T029 in form P; debug until V-08..V-11 PASS
+- [x] T032 [US1] Run T026–T029 in form P; debug until V-08..V-11 PASS
 
 **Checkpoint**: Drift can be entered and left safely (MVP).
 
@@ -180,7 +180,7 @@ description: "Task list for Feature 002 — Multi-Window Drift MVP (Option A), C
 ### Implementation
 
 - [x] T044 [US3] Implement override-redirect offset inheritance (R9) on window open in `platform/plugin/src/policy/Windows.cpp`; logged when it falls back to 0
-- [ ] T045 [US3] Run T041–T043, T017 and T019 in form P; debug until V-05, V-07, V-16..V-18 PASS
+- [x] T045 [US3] Run T041–T043, T017 and T019 in form P; debug until V-05, V-07, V-16..V-18 PASS
 
 ---
 
@@ -191,13 +191,13 @@ description: "Task list for Feature 002 — Multi-Window Drift MVP (Option A), C
 
 ### Tests
 
-- [ ] T046 [P] [US4] Write `tests/native/t_move.sh` (T-MOVE): drags of d at z ∈ {0.5, 1, 2}; bbox moves by d ± 1 px, `O` changes by `worldDelta`, `hyprctl clients` `at`/`size` unchanged, no `movewindow*`; the user's `bindm` move never runs in Drift
-- [ ] T047 [P] [US4] Write `tests/native/t_drag_abort.sh` (T-DRAG-ABORT): panic, `hyprvx:off`, client quit and workspace change during a drag; compositor alive, no stuck grab (the next click reaches a client)
+- [x] T046 [P] [US4] Write `tests/native/t_move.sh` (T-MOVE): drags of d at z ∈ {0.5, 1, 2}; bbox moves by d ± 1 px, `O` changes by `worldDelta`, `hyprctl clients` `at`/`size` unchanged, no `movewindow*`; the user's `bindm` move never runs in Drift
+- [x] T047 [P] [US4] Write `tests/native/t_drag_abort.sh` (T-DRAG-ABORT): panic, `hyprvx:off`, client quit and workspace change during a drag; compositor alive, no stuck grab (the next click reaches a client)
 
 ### Implementation
 
-- [ ] T048 [US4] Implement the move drag in `platform/plugin/src/policy/Input.cpp` and `Windows.cpp` (Super + left button on a window, `O += worldDelta(C, Δ)` through `DriftModel`, cancelled before keybinds, ended on every `data-model.md` drag end condition)
-- [ ] T049 [US4] Run T046, T047 and T020 in form P; debug until V-19..V-21 PASS
+- [x] T048 [US4] Implement the move drag in `platform/plugin/src/policy/Input.cpp` and `Windows.cpp` (Super + left button on a window, `O += worldDelta(C, Δ)` through `DriftModel`, cancelled before keybinds, ended on every `data-model.md` drag end condition)
+- [x] T049 [US4] Run T046, T047 and T020 in form P; debug until V-19..V-21 PASS
 
 ---
 
