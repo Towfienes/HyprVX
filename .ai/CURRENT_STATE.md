@@ -410,3 +410,13 @@ Production safety: host Hyprland and Caelestia untouched; no plugin loaded; no p
 - Kept: V-08 PARTIAL, frames presented NOT MEASURED, NOT RUN items listed in the T071 integration-log row.
 - Not done (needs user approval): merging `v3/001-native-spatial-camera` into `v3/spec-foundation`, the U0 spike,
   Feature 002 specification.
+
+## Feature 001 merged; U0 spike done (2026-10-11)
+
+- Feature 001 merged into `v3/spec-foundation` (`6931c04`, `--no-ff`, user-approved); post-merge checks PASS. Not pushed.
+- U0 unified-world spike (DV3-12) finished: report `docs/v3/U0_FEASIBILITY_REPORT.md`. U3 feasible with five seams
+  (render, per-window camera hint, hit-test, commit damage, suspended state); 7/8 questions PASS, Q7 (workspace
+  animation while drifting) FAIL with sub-pixel shifts. Runs `20261011-152554-patched-c15c101-u0_spike` (BLOCKED,
+  found the commit-damage seam) and `20261011-153555-patched-8ef32a4-u0_spike` (FAIL 7/8).
+- Spike code stays on the throwaway branches `v3/u0-spike` (repo) and `u0-spike` (draft tree); never merged. Keep both
+  branches: the evidence `git_sha` values point at them.
