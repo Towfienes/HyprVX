@@ -203,8 +203,8 @@ description: "Task list for Feature 002 — Multi-Window Drift MVP (Option A), C
 
 ## Phase 8: User Story 5 — New windows appear where I am looking (P3)
 
-- [ ] T050 [P] [US5] Write `tests/native/t_spawn.sh` (T-SPAWN): a window mapped in Drift under a panned, zoomed camera is centred in the viewport ± 2 px; mapped with Drift OFF, it is placed as stock
-- [ ] T051 [US5] Implement spawn placement (R6) in `platform/plugin/src/policy/Windows.cpp`. Choose the earliest window event that has `L(w)` and draws no frame before the offset is set, and record the choice with file:line in `integration-log.md`. Run T050 in form P until V-22 PASS.
+- [x] T050 [P] [US5] Write `tests/native/t_spawn.sh` (T-SPAWN): a window mapped in Drift under a panned, zoomed camera is centred in the viewport ± 2 px; mapped with Drift OFF, it is placed as stock
+- [x] T051 [US5] Implement spawn placement (R6) in `platform/plugin/src/policy/Windows.cpp`. Choose the earliest window event that has `L(w)` and draws no frame before the offset is set, and record the choice with file:line in `integration-log.md`. Run T050 in form P until V-22 PASS.
 
 ---
 
