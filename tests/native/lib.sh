@@ -235,6 +235,34 @@ hvx_x11_ready() {
     hvx_ready "$wayland"
 }
 
+# hvx_super_escape KB: Super+Escape through vkeyboard KB (LEFTMETA down, ESC tap, LEFTMETA up).
+hvx_super_escape() {
+    hvx_key "$1" down KEY_LEFTMETA
+    hvx_key "$1" tap KEY_ESC
+    hvx_key "$1" up KEY_LEFTMETA
+}
+# hvx_escape_count CLIENT: Escape presses (evdev 1) the client received, from its keyboard log.
+hvx_escape_count() {
+    grep -c '"ev": "key", "key": 1, "state": "pressed"' "$HVX_EVID/$1.jsonl" || true
+}
+# hvx_drift_off_probe KB CLIENT: evidence that Drift is OFF on the focused monitor. Super+Escape is consumed only in
+# DRIFT (drift-control 1.0), so with Drift OFF the keyboard-focused CLIENT receives the Escape press. Returns 1 if the
+# press did not arrive (consumed: Drift was on). Side effect in DRIFT: Drift turns off.
+hvx_drift_off_probe() {
+    local before
+    before=$(hvx_escape_count "$2")
+    hvx_super_escape "$1"
+    hvx_ready "$2"
+    (($(hvx_escape_count "$2") == before + 1))
+}
+# hvx_differs NAME A B: setup validity, image A differs from image B (else a comparison with B is vacuous). Returns 0
+# only for an analyzer FAIL of the 0-pixel diff; PASS (identical) and BLOCKED return 1.
+hvx_differs() {
+    local rc=0
+    hvx_analyze "$1" diff "$2" --reference "$3" --max-pixels 0 || rc=$?
+    ((rc == 1))
+}
+
 # hvx_events_start: socket2 event log of the verified session in events.log (tests/native/events_log.py).
 hvx_events_start() {
     : > "$HVX_EVID/events.log"
