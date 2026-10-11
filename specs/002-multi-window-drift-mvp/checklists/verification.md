@@ -31,7 +31,43 @@ Native tests take `HVX_FORM=P|S`; until Phase 9 they run in form P (or with the 
 | V-22 | L5 | T-SPAWN: mapped in Drift centred ± 2 px; mapped when OFF as stock | PASS | `~/.local/share/hyprvx/evidence/claude/20261011-232622-suite-7cb9e3f-feature002/` (form P, scales 1 and 1.25; `…-t_spawn`: mapped in Drift under zoom 0.5 + pan, centred in the viewport within 2 px, `hyprctl clients` at unchanged; mapped OFF at its stock box) |
 | V-23 | L5 | Form P/S parity: every Feature 002 capture byte-identical between forms, scales 1 and 1.25 | PASS | form S suite `~/.local/share/hyprvx/evidence/claude/20261011-234811-suite-6000372-feature002/` (42/42 PASS, scales 1 and 1.25) vs form P suite `~/.local/share/hyprvx/evidence/claude/20261011-232622-suite-7cb9e3f-feature002/`: 532/532 captures byte-identical, 0 differ, 0 gaps; 14 excluded with reasons (t_ws_anim mid-animation control frame ×2; t_plugin_inert per-plugin images ×12, each judged 0 px against its run's reference.png, references identical across forms); report `tests/native/compare_forms.py` output kept in the T054 log row; final commit, both forms in one suite incl. t_scenario: `~/.local/share/hyprvx/evidence/claude/20261012-023154-suite-420efff-feature002/` 556/556 identical P vs S |
 | V-24 | L5 | Feature 001 regression (Sprint 1 + Phase 2 suites) with the plugin loaded and Drift OFF, both forms | PASS | final commit: form P `~/.local/share/hyprvx/evidence/claude/20261012-025143-regP-420efff-sprint1/`, `~/.local/share/hyprvx/evidence/claude/20261012-025540-regP-420efff-phase2/`; form S `~/.local/share/hyprvx/evidence/claude/20261012-025639-regS-420efff-sprint1/`, `~/.local/share/hyprvx/evidence/claude/20261012-030040-regS-420efff-phase2/` (scales 1 and 1.25; per-test runs in each results.txt; earlier T056 runs at 4775297) |
-| V-25 | — | T-SCENARIO image set, both forms: human review and signature (SC-008) | NOT RUN | — |
-| V-26 | L4 | Host-safety audit of every Feature 002 nested session | NOT RUN | — |
+| V-25 | — | T-SCENARIO image set, both forms: human review and signature (SC-008) | NOT AUTOMATABLE (awaiting the user's review) | image set assembled in the section "T-SCENARIO image set for human review" below (T059; 4 runs, final commit) |
+| V-26 | L4 | Host-safety audit of every Feature 002 nested session | PASS | `~/.local/share/hyprvx/evidence/claude/20261012-032253-audit-7f12c15-v26/` (1114 nested sessions since 2026-10-11 19:00: 0 with the host signature, 0 non-private runtime dirs, 0 foreign binaries, 0 foreign children; ~/.config/hypr and ~/.config/caelestia: 0 files changed; plugin load/unload only through hvx_nested) |
 | V-27 | L1 | Reproducibility: clean-room rebuild (patched + both plugin forms), same results | PASS | builds `~/.local/share/hyprvx/evidence/claude/20261012-015130-patched-2deb797-r1buildA/` and `~/.local/share/hyprvx/evidence/claude/20261012-023141-patched-420efff-r1buildB/` (fresh worktrees, CCACHE_DISABLE=1, 0 warnings; plugins bit-identical; Hyprland differs only by the git-am commit, same tree 55316a2b); suites `~/.local/share/hyprvx/evidence/claude/20261012-013047-suite-2deb797-feature002/` vs `~/.local/share/hyprvx/evidence/claude/20261012-023154-suite-420efff-feature002/`: 556/556 captures identical in each form (`compare_forms.py --form-p F --form-s F`); details in `r1-source-verification.md` |
 | V-28 | L1 | `scripts/check-single-transform.sh` PASS on 0001–0013 and the policy | PASS | `~/.local/share/hyprvx/evidence/claude/20261012-032136-static-420efff-f002_static/` (final commit: self-test; 13 patches; 19 policy + form S mechanism sources as all-added diffs; planted `p.x * camera.zoom` reported, so not vacuous) |
+
+## T-SCENARIO image set for human review (T059, V-25)
+
+Final commit `420efff`, suite `20261012-023154-suite-420efff-feature002`. Stand-ins: client `a` = VS Code, `b` = Firefox,
+`c` = a third window (hyprvx-testclient windows with corner markers, not the real applications). Step 10 (pin to the
+viewport) is Phase 5 of the roadmap and outside this feature (spec.md, Out of scope); `stock.png` is the stock-session
+control for step 12. Runs (archive `~/.local/share/hyprvx/evidence/claude/<run-id>/`, every `SHA256SUMS` verified):
+
+- form P, scale 1: `20261012-023629-formP-420efff-t_scenario`
+- form P, scale 1.25: `20261012-024129-formP-420efff-t_scenario`
+- form S, scale 1: `20261012-024622-formS-420efff-t_scenario`
+- form S, scale 1.25: `20261012-025130-formS-420efff-t_scenario`
+
+sha256 (first 16 hex digits; full values in each run's `SHA256SUMS`). At scale 1 and at scale 1.25 every image is
+byte-identical between forms P and S (V-23).
+
+| Step | Image | What it should show | P, 1 | P, 1.25 | S, 1 | S, 1.25 |
+|---|---|---|---|---|---|---|
+| 01 | `step01-work.png` | work in VS Code (a clicked) | `f17c23b665b50d46` | `ea5a5a7fd3424fab` | `f17c23b665b50d46` | `ea5a5a7fd3424fab` |
+| 02 | `step02-drift-on.png` | hyprvx:on | `f17c23b665b50d46` | `ea5a5a7fd3424fab` | `f17c23b665b50d46` | `ea5a5a7fd3424fab` |
+| 03 | `step03-zoom-out.png` | hyprvx:zoom 0.5 at (640,400) | `13caf6e1ba71c06b` | `fd1652e392555397` | `13caf6e1ba71c06b` | `fd1652e392555397` |
+| 04 | `step04-overview.png` | overview: a, b, c visible | `13caf6e1ba71c06b` | `fd1652e392555397` | `13caf6e1ba71c06b` | `fd1652e392555397` |
+| 05 | `step05-pan-drag.png` | Super + canvas drag by (-200,-50) | `97c4d9f987b5bc87` | `9fbfd965bcdf8289` | `97c4d9f987b5bc87` | `9fbfd965bcdf8289` |
+| 06 | `step06-approach.png` | hyprvx:pan -100 -50: Firefox at (500,380) | `de8add4c8a0cd8aa` | `8bde176ad9bcfcea` | `de8add4c8a0cd8aa` | `8bde176ad9bcfcea` |
+| 07 | `step07-zoom-in.png` | 3 Super+wheel detents at (575,430): z 0.6655000000000002 | `eb17006bfc55d2d1` | `9560e1b65d5c4fe1` | `eb17006bfc55d2d1` | `9560e1b65d5c4fe1` |
+| 08 | `step08-work.png` | click, KEY_A, wheel reached Firefox | `eb17006bfc55d2d1` | `9560e1b65d5c4fe1` | `eb17006bfc55d2d1` | `9560e1b65d5c4fe1` |
+| 09 | `step09-move.png` | Super + drag Firefox by (-150,-100) | `ec37a3fc91b6d96d` | `6e099d8db9e2f960` | `ec37a3fc91b6d96d` | `6e099d8db9e2f960` |
+| 11 | `step11-drift-off.png` | Super+Escape | `f17c23b665b50d46` | `ea5a5a7fd3424fab` | `f17c23b665b50d46` | `ea5a5a7fd3424fab` |
+| 12 | `step12-ordinary.png` | ordinary Hyprland: capture = stock, clients unchanged | `f17c23b665b50d46` | `ea5a5a7fd3424fab` | `f17c23b665b50d46` | `ea5a5a7fd3424fab` |
+| — | `stock.png` | stock session after the same actions (control for step 12) | `f17c23b665b50d46` | `ea5a5a7fd3424fab` | `f17c23b665b50d46` | `ea5a5a7fd3424fab` |
+
+Equal hashes are expected, not a capture fault: 01 = 02 (Drift ON at the identity camera draws nothing new); 03 = 04
+(the overview is the zoomed-out state); 07 = 08 (the stand-in clients do not redraw on input; step 8 is checked by
+their event logs); 11 = 12 = `stock.png` = 01 (leaving Drift restores exactly the stock picture).
+
+Reviewer: confirm each image shows its step (SC-008) and sign here: ______ (date) ______
