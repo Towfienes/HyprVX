@@ -12,7 +12,7 @@
   V-04 two clean rebuilds with byte-identical captures. T045 cost measured (informational).
 - **Next: T053 G1.** Present the results and STOP. Phase 2 (T054–T071, including `tools/vpointer`) and U0 start only
   after the user approves G1.
-- Waiting on the user: V-20 / SC-005 human review of the image set in `checklists/verification.md`.
+- V-20 / SC-005: PASS, signed by the user (Towfienes) on 2026-10-11 in `checklists/verification.md`.
 
 ## Sprint 1 goal
 

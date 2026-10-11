@@ -372,7 +372,7 @@ Production safety: host Hyprland and Caelestia untouched; no plugin loaded; no p
   dev control behind `-DHYPRVX_DEV=ON`. Two defects found and fixed by native tests during T040 (border interior,
   fractional-edge round-out).
 - Verification: V-01..V-07, V-09..V-15, V-22..V-25 PASS; V-04 two clean rebuilds, 346/346 captures byte-identical;
-  V-08 PARTIAL (RC2 not reproduced on V2); V-20 waits for the user's review; V-16..V-19, V-21 are Phase 2 (NOT RUN).
+  V-08 PARTIAL (RC2 not reproduced on V2); V-20 PASS (user review, 2026-10-11); V-16..V-19, V-21 are Phase 2 (NOT RUN).
 - T045 (informational): no stock/patched CPU difference visible at the 10 ms tick for redraw or idle; about 2 ms of
   compositor CPU per non-identity camera change; frames presented not measured.
 - Production safety: host Hyprland 0.56.2 and Caelestia untouched (V-22 audit repeated at G1 over 201 nested sessions, `20261011-095853-audit-b15784b-v22`); every native run was nested with a

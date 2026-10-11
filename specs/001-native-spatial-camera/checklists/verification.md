@@ -27,7 +27,7 @@ A dispatcher `ok` is never an artifact.
 | V-17 | L5b | Click focuses the drawn window; empty canvas gets no motion | NOT RUN | |
 | V-18 | L5 | Popup drawn attached and hit-testable when zoomed | NOT RUN | |
 | V-19 | L5 | Popup mapped outside all monitors: no crash | NOT RUN | |
-| V-20 | — | Human review of the image set (no clipping/stair-step/detached deco) | NOT AUTOMATABLE | reviewer + date |
+| V-20 | — | Human review of the image set (no clipping/stair-step/detached deco) | PASS (human review; NOT AUTOMATABLE) | Reviewer Towfienes (project owner), 2026-10-11; image set and notes in "V-20 image set for human review" below (archived PNGs, `sha256sum -c` OK) |
 | V-21 | — | Delivery spike report (hooks vs patch) written | NOT RUN | `delivery-decision.md` |
 | V-22 | — | Host untouched: no host hyprctl/plugin/config change during the run | PASS | `~/.local/share/hyprvx/evidence/claude/20261011-053517-audit-4411e95-v22/` (95 nested sessions, none with the host signature, all private runtime dirs, agent-prefix binaries only; host hypr/caelestia config unchanged); repeated at G1: `~/.local/share/hyprvx/evidence/claude/20261011-095853-audit-b15784b-v22/` (201 sessions, same results) |
 | V-23 | L5 | GATE-A: stock vs stock ×3 pixel-identical with the shared nested config (precondition for V-09) | PASS | `~/.local/share/hyprvx/evidence/claude/20261011-030116-stock-401d74b/` (3 identical PNGs sha256 6d7f6bd6…; diff 0 px) |
@@ -79,4 +79,14 @@ window, layer surfaces moving with the camera.
 | 11 | A random camera before panic (T-OFF) | `20261011-062742-patched-2bfe8a4-t_off/case1-camera.png` |
 | 12 | Negative control: V2-as-is, surface cut at the old window edge (RC1) | `20261011-032522-v2-02a59d1/v2_pan_right.png` |
 
-Reviewer: ______  Date: ______  Result (PASS/FAIL + notes): ______
+Also reviewed, in place of #11: `20261011-062742-patched-2bfe8a4-t_off/case7-camera.png` (camera P=(35.6,-172.5)
+z=1.364). #11 (`case1-camera.png`) stays in the archive unchanged but shows no content: its camera
+P=(-90,-460) z=1.435 places the window below the output (y ≈ 803), which is correct but gives nothing to inspect.
+
+Reviewer: Towfienes (project owner)  Date: 2026-10-11  Result: **PASS**. Notes: no clipping, stair-step or
+detached-decoration artifact found in the V3 images; #12 shows the expected V2 RC1 cut. Caption corrections made
+before review: #7 displays 200×80 px (the 400×160 logical window at z = 0.5, moved from (540,360) to (840,360));
+#8 is cut only by the bottom output edge (right border at x ≈ 1260 is visible). An independent advisory pre-review
+by another model (GPT-6 Astra High) found no V3 image defect sufficient to reject V-20. Scope: static nested captures only; input,
+performance and real motion are not covered by this review. V-08 stays PARTIAL (RC2 not reproduced); frames
+presented stay NOT MEASURED.
