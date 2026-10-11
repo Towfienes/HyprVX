@@ -55,3 +55,12 @@ hint in the pass. These are not exercised natively in Sprint 1 (source evidence,
 | `tests/native/lib.sh` | unique run-ids; stop own session on exit | colliding run directories; a BLOCKED test left a session running |
 
 No tolerance or threshold was changed.
+
+## Clean-room re-run (read after the sections above were committed at `4411e95`)
+
+| Item | Result |
+|---|---|
+| Worktree | `v3-dev` recreated by `scripts/apply-patches.sh --variant patched --reset`; upstream commit `83707fe8` (0005 on `efb5099`) |
+| Build | fresh build directory, `CCACHE_DISABLE=1`; run `20261011-064306-patched-5e28970-r1build`, patchset `47b6baa12904`, binary sha256 `7d1c4bcb…` (earlier build `18cc2003…`: the embedded upstream commit hash and date differ, the patchset does not) |
+| Suite | `20261011-074421-patched-03c469e-sprint1`: 16/16 PASS at scales 1 and 1.25, every per-test run on binary `7d1c4bcb…` (stock `927f6f64…` for T-ID), `sha256sum -c` OK for all 17 archives |
+| Comparison | same verdict for every test as `20261011-061805-patched-2bfe8a4-sprint1`; nothing to reproduce |
