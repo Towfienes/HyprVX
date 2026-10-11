@@ -59,6 +59,8 @@ hvx_start() {
     hvx_nested start "${args[@]}" "${extra[@]}" && HVX_OWN_SESSION=1 || return 1
     if ((spike)); then
         sha256sum "$HVX_SPIKE_PLUGIN" > "$HVX_EVID/plugin.sha256"
+        [[ -f $(dirname -- "$HVX_SPIKE_PLUGIN")/build-info.json ]] \
+            && cp "$(dirname -- "$HVX_SPIKE_PLUGIN")/build-info.json" "$HVX_EVID/build-info-spike-plugin.json"
         local reply
         reply=$(hvx_nested run -- "$HOME/.cache/hyprvx/$HYPRVX_AGENT/prefix/stock/bin/hyprctl" plugin load "$HVX_SPIKE_PLUGIN")
         [[ $reply == ok ]] || { echo "spike plugin load failed: $reply" >&2; return 1; }
