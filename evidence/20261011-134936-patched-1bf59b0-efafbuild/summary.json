@@ -1,0 +1,15 @@
+{
+  "run_id": "20261011-134936-patched-1bf59b0-efafbuild",
+  "test": "patched build efaf0ea2cf21 (patches 0001-0009, 12:11, ccache; binary used by T065 and the T067 comparison)",
+  "result": "PASS",
+  "agent": "claude",
+  "git_sha": "1bf59b055b86e4d190d01a2eac269609cafe659a",
+  "note": "archived before the T069 clean rebuild replaces the prefix binary",
+  "artifacts": [
+    "build-info.json",
+    "build.log",
+    "hyprland-version.txt",
+    "preflight.log"
+  ],
+  "not_run": []
+}
