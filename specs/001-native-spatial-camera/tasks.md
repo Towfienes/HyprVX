@@ -194,21 +194,21 @@ Note: "Phase N" headings in this file are Spec Kit task phases; "master-plan Pha
 
 ### Tests for User Story 3
 
-- [ ] T054 [US3] Vendor `wlr-virtual-pointer-unstable-v1.xml` under `tools/vpointer/protocols/` and implement `tools/vpointer/` (`zwlr_virtual_pointer_v1`, absolute motion and buttons, connects only to the nested `WAYLAND_DISPLAY` given by `scripts/nested.sh`); starts only after T053 and user approval, like every Phase 2 task (owner: claude)
-- [ ] T055 [US3] Record the license of the vendored virtual-pointer protocol XML in `docs/THIRD_PARTY.md` (Constitution IX) before T054 is integrated, and bump `specs/001-native-spatial-camera/contracts/test-tooling.md` to v1.1 with the testclient `--popup`/`--subsurface` modes and the `hyprvx-vpointer` CLI before T056/T057 start (owner: claude)
-- [ ] T056 [P] [US3] Add an `xdg_popup` mode (`--popup` at a fixed parent-relative offset, popup logs its own JSONL events) and a `wl_subsurface` mode (`--subsurface` with distinct marker colors) to `tools/testclient/`, per `contracts/test-tooling.md` v1.1 from T055 (owner: claude)
-- [ ] T057 [P] [US3] Write `tests/native/t_pointer.sh`: z = 0.25 plus pan, ≥ 20 sampled points per camera state, `enter`/`motion` local = `surfaceLocal(S)` ± 1 (US3.1, V-16) (owner: claude)
-- [ ] T058 [P] [US3] Write `tests/native/t_focus.sh`: click focuses the window drawn under S; motion over empty canvas reaches no window (US3.2–3.3, V-17) (owner: claude)
-- [ ] T059 [P] [US3] Write `tests/native/t_popup.sh`: popup and subsurface drawn attached to their parent, transformed and clipped to transformed bounds (FR-003), and hit-testable when zoomed (US3.4, V-18); popup mapped outside every monitor does not crash the nested compositor (V-19) (owner: claude)
-- [ ] T060 [P] [US3] Write `tests/native/t_drag_scope.sh`: while non-identity, a held-button drag inside the client reports `surfaceLocal` coordinates; Super+LMB move and border resize drags do not change the window's logical geometry (`scripts/nested.sh run hyprctl clients -j` before/after, never the host instance) (FR-012) (owner: claude)
+- [x] T054 [US3] Vendor `wlr-virtual-pointer-unstable-v1.xml` under `tools/vpointer/protocols/` and implement `tools/vpointer/` (`zwlr_virtual_pointer_v1`, absolute motion and buttons, connects only to the nested `WAYLAND_DISPLAY` given by `scripts/nested.sh`); starts only after T053 and user approval, like every Phase 2 task (owner: claude)
+- [x] T055 [US3] Record the license of the vendored virtual-pointer protocol XML in `docs/THIRD_PARTY.md` (Constitution IX) before T054 is integrated, and bump `specs/001-native-spatial-camera/contracts/test-tooling.md` to v1.1 with the testclient `--popup`/`--subsurface` modes and the `hyprvx-vpointer` CLI before T056/T057 start (owner: claude)
+- [x] T056 [P] [US3] Add an `xdg_popup` mode (`--popup` at a fixed parent-relative offset, popup logs its own JSONL events) and a `wl_subsurface` mode (`--subsurface` with distinct marker colors) to `tools/testclient/`, per `contracts/test-tooling.md` v1.1 from T055 (owner: claude)
+- [x] T057 [P] [US3] Write `tests/native/t_pointer.sh`: z = 0.25 plus pan, ≥ 20 sampled points per camera state, `enter`/`motion` local = `surfaceLocal(S)` ± 1 (US3.1, V-16) (owner: claude)
+- [x] T058 [P] [US3] Write `tests/native/t_focus.sh`: click focuses the window drawn under S; motion over empty canvas reaches no window (US3.2–3.3, V-17) (owner: claude)
+- [x] T059 [P] [US3] Write `tests/native/t_popup.sh`: popup and subsurface drawn attached to their parent, transformed and clipped to transformed bounds (FR-003), and hit-testable when zoomed (US3.4, V-18); popup mapped outside every monitor does not crash the nested compositor (V-19) (owner: claude)
+- [x] T060 [P] [US3] Write `tests/native/t_drag_scope.sh`: while non-identity, a held-button drag inside the client reports `surfaceLocal` coordinates; Super+LMB move and border resize drags do not change the window's logical geometry (`scripts/nested.sh run hyprctl clients -j` before/after, never the host instance) (FR-012) (owner: claude)
 
 ### Implementation for User Story 3
 
-- [ ] T061 [US3] Author `patches/hyprland/0006-*.patch` hit-test: `windowAt` selects the monitor by screen position, then `inverse`; `windowSurfaceAt` and `surfaceLocalAt` via `surfaceLocal` (FR-007) (owner: claude)
-- [ ] T062 [US3] Author `patches/hyprland/0007-*.patch` seat-local paths: fallback local, held-button motion, pointer constraints and warps via `forward`; IME, layer and grab surfaces never transformed (research R2 input defects) (owner: claude)
-- [ ] T063 [US3] Author `patches/hyprland/0008-*.patch`: decoration/corner hit selection via `inverse`; block and log compositor move/resize drags while non-identity (FR-012, DV3-11) (owner: claude)
-- [ ] T064 [US3] Author `patches/hyprland/0009-*.patch` popups: `CPopup::reposition` constraint in world terms; null-monitor guard in `CPopup::onMap` (spec edge case) (owner: claude)
-- [ ] T065 [US3] Run `scripts/check-single-transform.sh`, rebuild, run US3 tests plus the full Sprint 1 suite (regression); debug until V-16..V-19 PASS (owner: claude)
+- [x] T061 [US3] Author `patches/hyprland/0006-*.patch` hit-test: `windowAt` selects the monitor by screen position, then `inverse`; `windowSurfaceAt` and `surfaceLocalAt` via `surfaceLocal` (FR-007) (owner: claude)
+- [x] T062 [US3] Author `patches/hyprland/0007-*.patch` seat-local paths: fallback local, held-button motion, pointer constraints and warps via `forward`; IME, layer and grab surfaces never transformed (research R2 input defects) (owner: claude)
+- [x] T063 [US3] Author `patches/hyprland/0008-*.patch`: decoration/corner hit selection via `inverse`; block and log compositor move/resize drags while non-identity (FR-012, DV3-11) (owner: claude)
+- [x] T064 [US3] Author `patches/hyprland/0009-*.patch` popups: `CPopup::reposition` constraint in world terms; null-monitor guard in `CPopup::onMap` (spec edge case) (owner: claude)
+- [x] T065 [US3] Run `scripts/check-single-transform.sh`, rebuild, run US3 tests plus the full Sprint 1 suite (regression); debug until V-16..V-19 PASS (owner: claude)
 
 **Checkpoint**: one real window correct in pixels and input.
 

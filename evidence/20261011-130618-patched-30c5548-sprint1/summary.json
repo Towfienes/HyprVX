@@ -1,0 +1,29 @@
+{
+  "run_id": "20261011-130618-patched-30c5548-sprint1",
+  "test": "Sprint 1 native suite at scales 1 1.25 (V-15)",
+  "result": "PASS",
+  "agent": "claude",
+  "git_sha": "30c5548a6fb60f30c612e2a9d0e87aa486da4b66",
+  "note": "per-test runs listed in results.txt",
+  "artifacts": [
+    "preflight.log",
+    "results.txt",
+    "t_id_scale1.25.log",
+    "t_id_scale1.log",
+    "t_invalid_scale1.25.log",
+    "t_invalid_scale1.log",
+    "t_layer_scale1.25.log",
+    "t_layer_scale1.log",
+    "t_off_scale1.25.log",
+    "t_off_scale1.log",
+    "t_pan_scale1.25.log",
+    "t_pan_scale1.log",
+    "t_stale_scale1.25.log",
+    "t_stale_scale1.log",
+    "t_stale_static_scale1.25.log",
+    "t_stale_static_scale1.log",
+    "t_zoom_scale1.25.log",
+    "t_zoom_scale1.log"
+  ],
+  "not_run": []
+}

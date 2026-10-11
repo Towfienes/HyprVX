@@ -1,0 +1,28 @@
+{
+  "run_id": "20261011-130951-patched-30c5548-t_layer",
+  "test": "T-LAYER layer untransformed, border encloses transformed surface (V-14)",
+  "result": "PASS",
+  "agent": "claude",
+  "git_sha": "30c5548a6fb60f30c612e2a9d0e87aa486da4b66",
+  "note": "layer box 980,620,240,140; output 1600x1000 scale 1.25",
+  "artifacts": [
+    "build-info-patched.json",
+    "cam_-400_-300_0.25.check",
+    "cam_-400_-300_0.25.png",
+    "cam_-400_-300_0.25.state.json",
+    "cam_0_0_0.5.check",
+    "cam_0_0_0.5.png",
+    "cam_0_0_0.5.state.json",
+    "cam_100_50_1.5.check",
+    "cam_100_50_1.5.png",
+    "cam_100_50_1.5.state.json",
+    "identity.json",
+    "identity.png",
+    "identity.state.json",
+    "layer.jsonl",
+    "preflight.log",
+    "session.log",
+    "window.jsonl"
+  ],
+  "not_run": []
+}
