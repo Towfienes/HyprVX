@@ -238,7 +238,7 @@ description: "Task list for Feature 002 — Multi-Window Drift MVP (Option A), C
 - [x] T059 Assemble the T-SCENARIO image set (both forms) with paths, run-ids and sha256 in `checklists/verification.md` for the user's review (V-25, NOT AUTOMATABLE)
 - [x] T060 Update `checklists/verification.md` (V-01..V-28 with archive paths and `sha256sum -c` results), `integration-log.md`, `.ai/CURRENT_STATE.md` and `.ai/NEXT_TASK.md` with honest statuses; validate `quickstart.md` by running it and correct any drift; constitution re-check of the delivered code in `plan.md`
 - [x] T061 Merge-readiness review: every commit since `f2c8a9a` reviewed, every PASS backed by archived evidence, `git rev-parse dev == 15f75b0`, nothing pushed, U0 code absent from this branch
-- [ ] T062 **Feature 002 gate**: present the evidence, the scenario review and the open items. STOP for the user's approval before merging into `v3/spec-foundation` or starting any later feature.
+- [X] T062 **Feature 002 gate**: present the evidence, the scenario review and the open items. STOP for the user's approval before merging into `v3/spec-foundation` or starting any later feature.
 
 ---
 
