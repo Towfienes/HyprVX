@@ -446,11 +446,13 @@ def stop(_):
     for child in data.get("children", []):
         if alive(child["pid"], child["start"]):
             os.kill(child["pid"], signal.SIGTERM)
-    keep_logs(data)
     os.kill(data["compositor_pid"], signal.SIGTERM)
     deadline = time.monotonic() + 10
     while time.monotonic() < deadline and alive(data["compositor_pid"], data["process_start"]):
         time.sleep(0.1)
+    # The compositor writes its log file in blocks; copied while it runs, the last lines may still be buffered. It
+    # flushes on exit, so the log is kept after it has exited (or, if it did not exit, as far as it was written).
+    keep_logs(data)
     if alive(data["compositor_pid"], data["process_start"]):
         raise Failed("nested compositor did not exit; session kept for 'stop' or 'recover'")
     retire_marker(data)
