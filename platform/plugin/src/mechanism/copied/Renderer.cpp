@@ -1,9 +1,10 @@
-// Generated for the HyprVX delivery spike (T066) from the patched draft tree (hyprland-draft 43b8c24e = Hyprland
-// efb5099 + patches 0001-0009), src/render/Renderer.cpp. Bodies are verbatim apart from: the class renamed to the spike subclass,
+// Generated for the HyprVX plugin form S (Feature 002 T052; delivery spike T066) from the patched draft tree
+// (hyprland-draft bf59c232 = Hyprland efb5099 + patches 0001-0013), src/render/Renderer.cpp. Bodies are verbatim apart from: the class renamed to the spike subclass,
 // HyprVX:: -> HyprVXSpike::, and the SRenderModifData::hyprvxCamera test -> HyprVXSpike::isCameraModif().
 // Prologues from gen_copies.py PROLOGUES: none.
+// Copy-only (not hooked; called by a wrapper as HyprVXSpike::copied_<name>): renderWorkspaceWindows.
 // Upstream code: Hyprland, BSD-3-Clause (docs/THIRD_PARTY.md). Do not edit by hand; regenerate with
-// python3 -I platform/plugin-spike/gen_copies.py platform/plugin-spike/src/copied
+// python3 -I platform/plugin/gen_copies.py platform/plugin/src/mechanism/copied
 #include "../SpikeAccess.hpp"
 
 #include <src/render/Renderer.hpp>
@@ -89,6 +90,7 @@ using namespace Render;
 
 struct SpikeRenderer : public Render::IHyprRenderer {
         void damageSurface(SP<CWLSurfaceResource> pSurface, double x, double y, double scale);
+        void renderWorkspaceWindows(PHLMONITOR pMonitor, PHLWORKSPACE pWorkspace, const Time::steady_tp& time);
 
     static void hk_damageSurface(Render::IHyprRenderer* self, SP<CWLSurfaceResource> pSurface, double x, double y, double scale) {
         static_cast<SpikeRenderer*>(self)->damageSurface(pSurface, x, y, scale);
@@ -105,9 +107,14 @@ void SpikeRenderer::damageSurface(SP<CWLSurfaceResource> pSurface, double x, dou
         return;
     }
 
+    // HyprVX (Feature 002 research R8): window content is drawn at its owner window's world offset
+    const auto HYPRVXOFFSET = HyprVXSpike::appliedContentOffset(pSurface);
+
     // hack: schedule frame events
     if (!WLSURF->resource()->m_current.callbacks.empty() && pSurface->m_hlSurface) {
-        const auto BOX = pSurface->m_hlSurface->getSurfaceBoxGlobal();
+        auto BOX = pSurface->m_hlSurface->getSurfaceBoxGlobal();
+        if (BOX)
+            BOX->translate(HYPRVXOFFSET);
         if (BOX && !BOX->empty()) {
             for (auto const& m : State::monitorState()->monitors()) {
                 if (!m->m_output)
@@ -126,7 +133,7 @@ void SpikeRenderer::damageSurface(SP<CWLSurfaceResource> pSurface, double x, dou
     if (scale != 1.0)
         damageBox.scale(scale);
 
-    damageBox.translate({x, y});
+    damageBox.translate({x + HYPRVXOFFSET.x, y + HYPRVXOFFSET.y});
 
     const auto EXTENTS = damageBox.getExtents();
 
@@ -153,6 +160,114 @@ void SpikeRenderer::damageSurface(SP<CWLSurfaceResource> pSurface, double x, dou
     if (*PLOGDAMAGE)
         Log::logger->log(Log::DEBUG, "Damage: Surface (extents): xy: {}, {} wh: {}, {}", damageBox.pixman()->extents.x1, damageBox.pixman()->extents.y1,
                          damageBox.pixman()->extents.x2 - damageBox.pixman()->extents.x1, damageBox.pixman()->extents.y2 - damageBox.pixman()->extents.y1);
+}
+void SpikeRenderer::renderWorkspaceWindows(PHLMONITOR pMonitor, PHLWORKSPACE pWorkspace, const Time::steady_tp& time) {
+    PHLWINDOW lastWindow;
+
+    // HyprVX (Feature 002 research R1): a window with a world offset is drawn under its own offset camera hint, then the
+    // pass hint returns. Nothing is added for a window without an offset (FR-003).
+    const auto renderSceneWindow = [&](PHLWINDOW w, eRenderPassMode mode) {
+        const auto OFFSET = HyprVXSpike::windowPass().active ? HyprVXSpike::appliedOffset(*w) : Vector2D{};
+        if LIKELY (OFFSET == Vector2D{}) {
+            renderWindow(w, pMonitor, time, true, mode);
+            return;
+        }
+        HyprVXSpike::notePassElements(*pMonitor, 2);
+        m_renderPass.add(makeUnique<CRendererHintsPassElement>(CRendererHintsPassElement::SData{HyprVXSpike::windowRenderModif(*pMonitor, OFFSET)}));
+        renderWindow(w, pMonitor, time, true, mode);
+        m_renderPass.add(makeUnique<CRendererHintsPassElement>(CRendererHintsPassElement::SData{HyprVXSpike::passRenderModif(*pMonitor)}));
+    };
+
+    Event::bus()->m_events.render.stage.emit(RENDER_PRE_WINDOWS);
+
+    std::vector<PHLWINDOWREF> windows;
+    windows.reserve(Desktop::windowState()->windows().size());
+
+    for (auto const& w : Desktop::windowState()->windows()) {
+        const bool isNotRenderable = w->isHidden() || !w->m_isMapped;
+
+        if (isNotRenderable)
+            continue;
+
+        if (!shouldRenderWindow(w, pMonitor))
+            continue;
+
+        windows.emplace_back(w);
+    }
+
+    // Non-floating main
+    for (auto& w : windows) {
+        if (w->m_isFloating)
+            continue; // floating are in the second pass
+
+        // some things may force us to ignore the special/not special disparity
+        const bool IGNORE_SPECIAL_CHECK = w->m_monitorMovedFrom != -1 && (w->m_workspace && !w->m_workspace->isVisible());
+
+        if (!IGNORE_SPECIAL_CHECK && pWorkspace->m_isSpecialWorkspace != w->onSpecialWorkspace())
+            continue;
+
+        // render active window after all others of this pass
+        if (w == Desktop::focusState()->window()) {
+            lastWindow = w.lock();
+            continue;
+        }
+
+        // render the bad boy
+        renderSceneWindow(w.lock(), RENDER_PASS_MAIN);
+        w.reset();
+    }
+
+    if (lastWindow)
+        renderSceneWindow(lastWindow, RENDER_PASS_MAIN);
+
+    lastWindow.reset();
+
+    renderFadeouts(pMonitor, Desktop::FADEOUT_PLANE_WINDOW_TILED, pWorkspace);
+
+    // Non-floating popup
+    for (auto& w : windows) {
+        if (!w)
+            continue;
+
+        if (w->m_isFloating)
+            continue; // floating are in the second pass
+
+        // some things may force us to ignore the special/not special disparity
+        const bool IGNORE_SPECIAL_CHECK = w->m_monitorMovedFrom != -1 && (w->m_workspace && !w->m_workspace->isVisible());
+
+        if (!IGNORE_SPECIAL_CHECK && pWorkspace->m_isSpecialWorkspace != w->onSpecialWorkspace())
+            continue;
+
+        // render the bad boy
+        renderSceneWindow(w.lock(), RENDER_PASS_POPUP);
+        w.reset();
+    }
+
+    // floating on top
+    for (auto& w : windows) {
+        if (!w)
+            continue;
+
+        if (!w->m_isFloating || w->m_pinned)
+            continue;
+
+        // some things may force us to ignore the special/not special disparity
+        const bool IGNORE_SPECIAL_CHECK = w->m_monitorMovedFrom != -1 && (w->m_workspace && !w->m_workspace->isVisible());
+
+        if (!IGNORE_SPECIAL_CHECK && pWorkspace->m_isSpecialWorkspace != w->onSpecialWorkspace())
+            continue;
+
+        if (pWorkspace->m_isSpecialWorkspace && w->m_monitor != pWorkspace->m_monitor)
+            continue; // special on another are rendered as a part of the base pass
+
+        // render the bad boy
+        renderSceneWindow(w.lock(), RENDER_PASS_ALL);
+    }
+    renderFadeouts(pMonitor, Desktop::FADEOUT_PLANE_WINDOW_FLOATING, pWorkspace);
+}
+
+void HyprVXSpike::copied_renderWorkspaceWindows(Render::IHyprRenderer* self, PHLMONITOR pMonitor, PHLWORKSPACE pWorkspace, const Time::steady_tp& time) {
+    static_cast<SpikeRenderer*>(self)->renderWorkspaceWindows(pMonitor, pWorkspace, time);
 }
 
 void HyprVXSpike::addCopiedRendererHooks(std::vector<SHookSpec>& specs) {

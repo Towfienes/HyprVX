@@ -5,10 +5,16 @@
 
 #include "SpikeAccess.hpp"
 
+#include <src/desktop/DesktopTypes.hpp>
+#include <src/helpers/time/Time.hpp>
 #include <src/plugins/PluginAPI.hpp>
 
 #include <string>
 #include <vector>
+
+namespace Render {
+    class IHyprRenderer;
+}
 
 namespace HyprVXSpike {
     struct SHookSpec {
@@ -35,6 +41,9 @@ namespace HyprVXSpike {
     void addCopiedInputManagerHooks(std::vector<SHookSpec>& specs);
     void addCopiedDragControllerHooks(std::vector<SHookSpec>& specs);
     void addCopiedPopupHooks(std::vector<SHookSpec>& specs);
+
+    // Copy-only functions (gen_copies.py): the patched body, called by a wrapper in place of the original.
+    void copied_renderWorkspaceWindows(Render::IHyprRenderer* self, PHLMONITOR pMonitor, PHLWORKSPACE pWorkspace, const Time::steady_tp& time);
 
     void registerDevControl();
 

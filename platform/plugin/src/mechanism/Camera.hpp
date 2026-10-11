@@ -56,3 +56,6 @@ namespace HyprVXSpike {
     Vector2D                 worldToScreen(const Monitor::CMonitor& monitor, const Vector2D& world);
     bool                     isWindowContent(const SP<CWLSurfaceResource>& surface);
 }
+
+// World offsets and the window pass (Feature 002, patches 0010-0012), used by the generated copies.
+#include "WindowOffset.hpp"

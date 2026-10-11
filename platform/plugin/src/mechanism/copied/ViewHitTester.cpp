@@ -1,9 +1,10 @@
-// Generated for the HyprVX delivery spike (T066) from the patched draft tree (hyprland-draft 43b8c24e = Hyprland
-// efb5099 + patches 0001-0009), src/desktop/state/ViewHitTester.cpp. Bodies are verbatim apart from: the class renamed to the spike subclass,
+// Generated for the HyprVX plugin form S (Feature 002 T052; delivery spike T066) from the patched draft tree
+// (hyprland-draft bf59c232 = Hyprland efb5099 + patches 0001-0013), src/desktop/state/ViewHitTester.cpp. Bodies are verbatim apart from: the class renamed to the spike subclass,
 // HyprVX:: -> HyprVXSpike::, and the SRenderModifData::hyprvxCamera test -> HyprVXSpike::isCameraModif().
 // Prologues from gen_copies.py PROLOGUES: none.
+// Copy-only (not hooked; called by a wrapper as HyprVXSpike::copied_<name>): none.
 // Upstream code: Hyprland, BSD-3-Clause (docs/THIRD_PARTY.md). Do not edit by hand; regenerate with
-// python3 -I platform/plugin-spike/gen_copies.py platform/plugin-spike/src/copied
+// python3 -I platform/plugin/gen_copies.py platform/plugin/src/mechanism/copied
 #include "../SpikeAccess.hpp"
 
 #include <src/desktop/state/ViewHitTester.hpp>
@@ -57,6 +58,8 @@ PHLWINDOW SpikeViewHitTester::windowAt(const Vector2D& screenPos, uint16_t prope
 
     // HyprVX: the monitor is chosen by the screen position; windows are tested in world coordinates (FR-007).
     const auto pos = HyprVXSpike::screenToWorld(*PMONITOR, screenPos);
+    // HyprVX (Feature 002 research R8): each window is tested at its world box L + O(w), i.e. at pos - O(w) in L space
+    const auto posFor = [&pos](const PHLWINDOW& w) { return pos - HyprVXSpike::appliedOffset(*w); };
 
     static auto PRESIZEONBORDER       = CConfigValue<Config::INTEGER>("general:resize_on_border");
     static auto PBORDERSIZE           = CConfigValue<Config::INTEGER>("general:border_size");
@@ -87,11 +90,11 @@ PHLWINDOW SpikeViewHitTester::windowAt(const Vector2D& screenPos, uint16_t prope
                 CBox       box = BB.copy().expand(!w->isX11OverrideRedirect() ? BORDER_GRAB_AREA : 0);
                 if (HITBOX_SHRINK > 0 && w != LASTFOCUSED)
                     box = box.copy().expand(-HITBOX_SHRINK);
-                if (box.containsPoint(pos))
+                if (box.containsPoint(posFor(w)))
                     return w;
 
                 if (!w->m_isX11) {
-                    if (w->hasPopupAt(pos))
+                    if (w->hasPopupAt(posFor(w)))
                         return w;
                 }
             }
@@ -130,7 +133,7 @@ PHLWINDOW SpikeViewHitTester::windowAt(const Vector2D& screenPos, uint16_t prope
                     CBox       box = BB.copy().expand(!w->isX11OverrideRedirect() ? BORDER_GRAB_AREA : 0);
                     if (HITBOX_SHRINK > 0 && w != LASTFOCUSED)
                         box = box.copy().expand(-HITBOX_SHRINK);
-                    if (box.containsPoint(pos)) {
+                    if (box.containsPoint(posFor(w))) {
                         if (w->m_isX11 && w->isX11OverrideRedirect() && !w->m_xwaylandSurface->wantsFocus()) {
                             // Override Redirect
                             return focusState()->window(); // we kinda trick everything here.
@@ -141,7 +144,7 @@ PHLWINDOW SpikeViewHitTester::windowAt(const Vector2D& screenPos, uint16_t prope
                     }
 
                     if (!w->m_isX11) {
-                        if (w->hasPopupAt(pos))
+                        if (w->hasPopupAt(posFor(w)))
                             return w;
                     }
                 }
@@ -170,7 +173,7 @@ PHLWINDOW SpikeViewHitTester::windowAt(const Vector2D& screenPos, uint16_t prope
                 return nullptr;
 
             // for maximized windows, don't return a window if we are not directly on it.
-            if (!Fullscreen::controller()->isFullscreen(FS_WINDOW, Fullscreen::FSMODE_MAXIMIZED) || FS_WINDOW->getWindowBoxUnified(properties).containsPoint(pos))
+            if (!Fullscreen::controller()->isFullscreen(FS_WINDOW, Fullscreen::FSMODE_MAXIMIZED) || FS_WINDOW->getWindowBoxUnified(properties).containsPoint(posFor(FS_WINDOW)))
                 return Fullscreen::controller()->getFullscreenWindow(PWORKSPACE);
             else
                 return nullptr;
@@ -193,7 +196,7 @@ PHLWINDOW SpikeViewHitTester::windowAt(const Vector2D& screenPos, uint16_t prope
 
             if (!w->m_isX11 && !w->m_isFloating && w->m_isMapped && w->workspaceID() == WSPID && w->acceptsInput() && !w->m_X11ShouldntFocus &&
                 !w->m_ruleApplicator->noFocus().valueOrDefault() && w != ignoreWindow && !isShadowedByModal(w)) {
-                if (w->hasPopupAt(pos))
+                if (w->hasPopupAt(posFor(w)))
                     return w;
             }
         }
@@ -259,7 +262,7 @@ PHLWINDOW SpikeViewHitTester::windowAt(const Vector2D& screenPos, uint16_t prope
                 }
                 if (HITBOX_SHRINK > 0 && w != LASTFOCUSED)
                     box = box.copy().expand(-HITBOX_SHRINK);
-                if (box.containsPoint(pos))
+                if (box.containsPoint(posFor(w)))
                     return w;
             }
         }
@@ -284,7 +287,8 @@ SP<CWLSurfaceResource> SpikeViewHitTester::windowSurfaceAt(const Vector2D& scree
     if (!validMapped(window))
         return nullptr;
 
-    const auto pos = HyprVXSpike::screenToWorld(screenPos); // HyprVX: surface-local through the camera (FR-007)
+    // HyprVX: surface-local through the camera (FR-007), in the window's L space (Feature 002, pos - O(w))
+    const auto pos = HyprVXSpike::screenToWorld(screenPos) - HyprVXSpike::appliedOffset(*window);
 
     RASSERT(!window->m_isX11, "Cannot call windowSurfaceAt on an X11 window!");
 
@@ -309,7 +313,8 @@ Vector2D SpikeViewHitTester::surfaceLocalAt(const Vector2D& screenPos, PHLWINDOW
     if (!validMapped(window))
         return {};
 
-    const auto pos = HyprVXSpike::screenToWorld(screenPos); // HyprVX: surface-local through the camera (FR-007)
+    // HyprVX: surface-local through the camera (FR-007), in the window's L space (Feature 002, pos - O(w))
+    const auto pos = HyprVXSpike::screenToWorld(screenPos) - HyprVXSpike::appliedOffset(*window);
 
     if (window->m_isX11)
         return pos - window->position(Desktop::View::IGeometric::GEOMETRIC_GOAL);
@@ -335,6 +340,7 @@ Vector2D SpikeViewHitTester::surfaceLocalAt(const Vector2D& screenPos, PHLWINDOW
 
     return pos - window->position(Desktop::View::IGeometric::GEOMETRIC_GOAL) - std::get<1>(iterData) + Vector2D{geom.x, geom.y};
 }
+
 
 void HyprVXSpike::addCopiedViewHitTesterHooks(std::vector<SHookSpec>& specs) {
     specs.push_back({"windowAt", "Desktop::CViewHitTester::windowAt(Hyprutils::Math::Vector2D const&, unsigned short, Hyprutils::Memory::CSharedPointer<Desktop::View::CWindow>) const", reinterpret_cast<void*>(&SpikeViewHitTester::hk_windowAt), nullptr});

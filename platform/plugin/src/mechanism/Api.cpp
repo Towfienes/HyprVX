@@ -5,7 +5,6 @@
 #include "Api.hpp"
 #include "Camera.hpp"
 
-#include <src/debug/log/Logger.hpp>
 
 hyprvx::cammath::Vec HyprVX::monitorOrigin(const Monitor::CMonitor& monitor) {
     return HyprVXSpike::monitorOrigin(monitor);
@@ -27,19 +26,15 @@ void HyprVX::resetCamera(Monitor::CMonitor& monitor) {
     HyprVXSpike::resetCamera(monitor);
 }
 
-// Offsets in form S are T053; until then a non-zero offset is refused, never silently dropped.
-bool HyprVX::setWindowOffset(const PHLWINDOW&, const Vector2D& offset) {
-    if (offset == Vector2D{})
-        return true;
-    static bool logged = false;
-    if (!logged)
-        Log::logger->log(Log::ERR, "[hyprvx] form S: window offsets are not implemented yet (T053); offset refused");
-    logged = true;
-    return false;
+// World offsets (Feature 002 T053): the plugin's port of patch 0010 (WindowOffset.cpp).
+bool HyprVX::setWindowOffset(const PHLWINDOW& window, const Vector2D& offset) {
+    return HyprVXSpike::setWindowOffset(window, offset);
 }
 
-Vector2D HyprVX::windowOffset(const PHLWINDOW&) {
-    return {};
+Vector2D HyprVX::windowOffset(const PHLWINDOW& window) {
+    return HyprVXSpike::windowOffset(window);
 }
 
-void HyprVX::resetWindowOffsets() {}
+void HyprVX::resetWindowOffsets() {
+    HyprVXSpike::resetWindowOffsets();
+}

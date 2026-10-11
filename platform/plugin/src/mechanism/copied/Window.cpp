@@ -1,9 +1,10 @@
-// Generated for the HyprVX delivery spike (T066) from the patched draft tree (hyprland-draft 43b8c24e = Hyprland
-// efb5099 + patches 0001-0009), src/desktop/view/Window.cpp. Bodies are verbatim apart from: the class renamed to the spike subclass,
+// Generated for the HyprVX plugin form S (Feature 002 T052; delivery spike T066) from the patched draft tree
+// (hyprland-draft bf59c232 = Hyprland efb5099 + patches 0001-0013), src/desktop/view/Window.cpp. Bodies are verbatim apart from: the class renamed to the spike subclass,
 // HyprVX:: -> HyprVXSpike::, and the SRenderModifData::hyprvxCamera test -> HyprVXSpike::isCameraModif().
 // Prologues from gen_copies.py PROLOGUES: warpCursor.
+// Copy-only (not hooked; called by a wrapper as HyprVXSpike::copied_<name>): none.
 // Upstream code: Hyprland, BSD-3-Clause (docs/THIRD_PARTY.md). Do not edit by hand; regenerate with
-// python3 -I platform/plugin-spike/gen_copies.py platform/plugin-spike/src/copied
+// python3 -I platform/plugin/gen_copies.py platform/plugin/src/mechanism/copied
 #include "../SpikeAccess.hpp"
 
 #include <algorithm>
@@ -104,8 +105,9 @@ struct SpikeWindow : public Desktop::View::CWindow {
 };
 
 bool SpikeWindow::checkInputOnDecos(const eInputType type, const Vector2D& screenCoords, std::any data) {
-    // HyprVX: decoration boxes and popups are window content, selected at the world point (FR-012).
-    const auto mouseCoords = HyprVXSpike::screenToWorld(screenCoords);
+    // HyprVX: decoration boxes and popups are window content, selected at the world point (FR-012), in the window's L
+    // space (Feature 002: minus its world offset).
+    const auto mouseCoords = HyprVXSpike::screenToWorld(screenCoords) - HyprVXSpike::appliedOffset(*this);
 
     if (type != INPUT_TYPE_DRAG_END && hasPopupAt(mouseCoords))
         return false;
@@ -129,6 +131,9 @@ bool SpikeWindow::visibleOnMonitor(PHLMONITOR pMonitor) {
     if (m_isFloating)
         wbox = getFullWindowBoundingBox();
 
+    // HyprVX (Feature 002 research R8): culled at the world box L + O(w)
+    wbox.translate(HyprVXSpike::appliedOffset(*this));
+
     // HyprVX (FR-006): under a camera the monitor shows its visible world rect instead of its logical rect
     if UNLIKELY (const auto CAMERA = HyprVXSpike::activeCamera(*pMonitor); CAMERA) {
         const auto VISIBLE = hyprvx::cammath::visibleWorldRect(*CAMERA, {pMonitor->m_size.x, pMonitor->m_size.y});
@@ -140,7 +145,8 @@ bool SpikeWindow::visibleOnMonitor(PHLMONITOR pMonitor) {
 void SpikeWindow::warpCursor(bool force) {
     // HyprVX spike prologue (gen_copies.py PROLOGUES)
     if (const auto PMON = m_monitor.lock(); PMON && m_relativeCursorCoordsOnLastWarp.x > 0 && m_relativeCursorCoordsOnLastWarp.y > 0)
-        m_relativeCursorCoordsOnLastWarp = HyprVXSpike::screenToWorld(*PMON, m_relativeCursorCoordsOnLastWarp + layoutBox().pos()) - layoutBox().pos();
+        m_relativeCursorCoordsOnLastWarp =
+            HyprVXSpike::screenToWorld(*PMON, m_relativeCursorCoordsOnLastWarp + layoutBox().pos()) - HyprVXSpike::appliedOffset(*this) - layoutBox().pos();
     static auto PERSISTENTWARPS        = CConfigValue<Config::INTEGER>("cursor:persistent_warps");
     const auto  coords                 = m_relativeCursorCoordsOnLastWarp;
     m_relativeCursorCoordsOnLastWarp.x = -1; // reset m_vRelativeCursorCoordsOnLastWarp
@@ -148,13 +154,16 @@ void SpikeWindow::warpCursor(bool force) {
     const auto BOX      = layoutBox();
     const auto PMONITOR = m_monitor.lock();
     // HyprVX: warp to where the window is drawn (cammath::forward); unchanged without a camera.
-    const auto toScreen = [&PMONITOR](const Vector2D& world) { return PMONITOR ? HyprVXSpike::worldToScreen(*PMONITOR, world) : world; };
+    // Feature 002: the window is drawn at its world box L + O(w).
+    const auto OFFSET   = HyprVXSpike::appliedOffset(*this);
+    const auto toScreen = [&PMONITOR, &OFFSET](const Vector2D& world) { return PMONITOR ? HyprVXSpike::worldToScreen(*PMONITOR, world + OFFSET) : world + OFFSET; };
 
     if (*PERSISTENTWARPS && coords.x > 0 && coords.y > 0 && coords < BOX.size()) // don't warp cursor outside the window
         Pointer::pointerController()->warpTo(toScreen(BOX.pos() + coords), force);
     else
         Pointer::pointerController()->warpTo(toScreen(middle()), force);
 }
+
 
 void HyprVXSpike::addCopiedWindowHooks(std::vector<SHookSpec>& specs) {
     specs.push_back({"checkInputOnDecos", "Desktop::View::CWindow::checkInputOnDecos(eInputType, Hyprutils::Math::Vector2D const&, std::any)", reinterpret_cast<void*>(&SpikeWindow::hk_checkInputOnDecos), nullptr});

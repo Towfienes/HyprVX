@@ -1,9 +1,10 @@
-// Generated for the HyprVX delivery spike (T066) from the patched draft tree (hyprland-draft 43b8c24e = Hyprland
-// efb5099 + patches 0001-0009), src/desktop/view/Popup.cpp. Bodies are verbatim apart from: the class renamed to the spike subclass,
+// Generated for the HyprVX plugin form S (Feature 002 T052; delivery spike T066) from the patched draft tree
+// (hyprland-draft bf59c232 = Hyprland efb5099 + patches 0001-0013), src/desktop/view/Popup.cpp. Bodies are verbatim apart from: the class renamed to the spike subclass,
 // HyprVX:: -> HyprVXSpike::, and the SRenderModifData::hyprvxCamera test -> HyprVXSpike::isCameraModif().
 // Prologues from gen_copies.py PROLOGUES: none.
+// Copy-only (not hooked; called by a wrapper as HyprVXSpike::copied_<name>): none.
 // Upstream code: Hyprland, BSD-3-Clause (docs/THIRD_PARTY.md). Do not edit by hand; regenerate with
-// python3 -I platform/plugin-spike/gen_copies.py platform/plugin-spike/src/copied
+// python3 -I platform/plugin/gen_copies.py platform/plugin/src/mechanism/copied
 #include "../SpikeAccess.hpp"
 
 #include <src/desktop/view/Popup.hpp>
@@ -93,11 +94,15 @@ void SpikePopup::reposition() {
 
     // HyprVX: while the owner window's monitor has an active camera, the parent is placed in world coordinates and the
     // popup is constrained to the world rectangle shown in the monitor's usable area (cammath::inverseBox).
+    // Feature 002: a window drawn at L + O(w) is constrained in its L space, so the rectangle moves by -O(w).
     if (const auto OWNERMONITOR = m_windowOwner ? m_windowOwner->m_monitor.lock() : nullptr; OWNERMONITOR) {
-        if (const auto CAMERA = HyprVXSpike::activeCamera(*OWNERMONITOR); CAMERA) {
+        const auto CAMERA = HyprVXSpike::activeCamera(*OWNERMONITOR);
+        const auto OFFSET = HyprVXSpike::appliedOffset(*m_windowOwner);
+        if (CAMERA || OFFSET != Vector2D{}) {
+            const auto M     = HyprVXSpike::monitorOrigin(*OWNERMONITOR);
             const auto AREA  = OWNERMONITOR->logicalBoxMinusReserved();
-            const auto WORLD = hyprvx::cammath::inverseBox(*CAMERA, HyprVXSpike::monitorOrigin(*OWNERMONITOR), {{AREA.x, AREA.y}, {AREA.w, AREA.h}});
-            m_resource->applyPositioning(CBox{WORLD.pos.x, WORLD.pos.y, WORLD.size.x, WORLD.size.y}, COORDS);
+            const auto WORLD = hyprvx::cammath::inverseBox(CAMERA.value_or(hyprvx::cammath::identityFor(M)), M, {{AREA.x, AREA.y}, {AREA.w, AREA.h}});
+            m_resource->applyPositioning(CBox{WORLD.pos.x - OFFSET.x, WORLD.pos.y - OFFSET.y, WORLD.size.x, WORLD.size.y}, COORDS);
             return;
         }
     }
@@ -109,6 +114,7 @@ void SpikePopup::reposition() {
 
     m_resource->applyPositioning(m_windowOwner ? PMONITOR->logicalBoxMinusReserved() : PMONITOR->logicalBox(), COORDS);
 }
+
 
 void HyprVXSpike::addCopiedPopupHooks(std::vector<SHookSpec>& specs) {
     specs.push_back({"onMap", "Desktop::View::CPopup::onMap()", reinterpret_cast<void*>(&SpikePopup::hk_onMap), nullptr});

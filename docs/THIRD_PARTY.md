@@ -74,9 +74,26 @@ Do not copy source code based only on assumptions about its license.
   hooks can replace them in a nested-only experiment. Each generated file names its upstream source. The plugin is a
   delivery-mechanism spike (`specs/001-native-spatial-camera/delivery-decision.md`), not a shipped artifact.
 - Path since Feature 002 T002 (2026-10-11): moved with `git mv` to `platform/plugin/src/mechanism/copied/*.cpp`
-  (generator `platform/plugin/gen_copies.py`), as the form S mechanism of the `hyprvx-drift` plugin. Still
-  nested-only; the copies are regenerated from the patch series 0001–0013 and this entry is completed with the full
-  list of copied functions in Feature 002 T052. Feature 001 documents cite the old path at their own commits.
+  (generator `platform/plugin/gen_copies.py`), as the form S mechanism of the `hyprvx-drift` plugin. Feature 001
+  documents cite the old path at their own commits.
+- Feature 002 T052 (2026-10-11): regenerated from the patch series 0001–0013 (Claude draft tree `bf59c232`). Status:
+  the copies are the mechanism of plugin form S, the delivery form chosen in DV3-16 (stock Hyprland + `hyprvx-drift`
+  with mechanism hooks); form S is built and tested nested-only until the Feature 002 gate, and a distributed build
+  keeps the Hyprland copyright and license notice. Copied verbatim (renames in each file header), 20 member functions
+  and 5 file-static helpers:
+  - `src/render/ElementRenderer.cpp`: `IElementRenderer::drawSurface`;
+  - `src/render/OpenGL.cpp`: `CHyprOpenGLImpl::renderBorder` (2 overloads); helpers `globalFeatures`, `getDecoFeatures`;
+  - `src/render/Renderer.cpp`: `IHyprRenderer::damageSurface`, `IHyprRenderer::renderWorkspaceWindows` (copy-only,
+    called by a wrapper);
+  - `src/desktop/view/Window.cpp`: `CWindow::checkInputOnDecos`, `CWindow::visibleOnMonitor`, `CWindow::warpCursor`;
+  - `src/desktop/state/ViewHitTester.cpp`: `CViewHitTester::windowAt`, `windowSurfaceAt`, `surfaceLocalAt`;
+  - `src/managers/input/InputManager.cpp`: `CInputManager::mouseMoveUnified`, `processMouseDownNormal`,
+    `onMouseWheel`, `sendMotionEventsToFocused`;
+  - `src/layout/supplementary/DragController.cpp`: `CDragStateController::dragBegin`, `updateDragWindow`, `mouseMove`;
+    helpers `isResizeMode`, `cursorForResizeEdge`, `setXDGResizingState`;
+  - `src/desktop/view/Popup.cpp`: `CPopup::onMap`, `CPopup::reposition`.
+  New since Feature 001: `renderWorkspaceWindows`, `updateDragWindow`, `mouseMove` (17 → 20 member functions).
+  `platform/plugin/src/mechanism/WindowOffset.cpp` ports HyprVX's own patch 0010 code (not Hyprland code).
 - Compatibility: permissive; any distribution would keep the Hyprland copyright and license notice.
 
 ## HyprVX files under an explicit license

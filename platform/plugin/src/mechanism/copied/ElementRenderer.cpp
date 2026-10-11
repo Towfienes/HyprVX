@@ -1,9 +1,10 @@
-// Generated for the HyprVX delivery spike (T066) from the patched draft tree (hyprland-draft 43b8c24e = Hyprland
-// efb5099 + patches 0001-0009), src/render/ElementRenderer.cpp. Bodies are verbatim apart from: the class renamed to the spike subclass,
+// Generated for the HyprVX plugin form S (Feature 002 T052; delivery spike T066) from the patched draft tree
+// (hyprland-draft bf59c232 = Hyprland efb5099 + patches 0001-0013), src/render/ElementRenderer.cpp. Bodies are verbatim apart from: the class renamed to the spike subclass,
 // HyprVX:: -> HyprVXSpike::, and the SRenderModifData::hyprvxCamera test -> HyprVXSpike::isCameraModif().
 // Prologues from gen_copies.py PROLOGUES: drawSurface.
+// Copy-only (not hooked; called by a wrapper as HyprVXSpike::copied_<name>): none.
 // Upstream code: Hyprland, BSD-3-Clause (docs/THIRD_PARTY.md). Do not edit by hand; regenerate with
-// python3 -I platform/plugin-spike/gen_copies.py platform/plugin-spike/src/copied
+// python3 -I platform/plugin/gen_copies.py platform/plugin/src/mechanism/copied
 #include "../SpikeAccess.hpp"
 
 #include <src/render/ElementRenderer.hpp>
@@ -247,6 +248,7 @@ void IElementRenderer::preDrawSurface(WP<CSurfacePassElement> element, const CRe
     g_pHyprRenderer->popMonitorTransformEnabled();
     m_renderData.currentWindow.reset();
 }
+
 
 void HyprVXSpike::addCopiedElementRendererHooks(std::vector<SHookSpec>& specs) {
     specs.push_back({"drawSurface", "Render::IElementRenderer::drawSurface(Hyprutils::Memory::CWeakPointer<CSurfacePassElement>, Hyprutils::Math::CRegion const&)", reinterpret_cast<void*>(&SpikeElementRenderer::hk_drawSurface), nullptr});

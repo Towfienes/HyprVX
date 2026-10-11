@@ -1,11 +1,14 @@
-"""Generate platform/plugin/src/mechanism/copied/*.cpp from the patched draft tree (T066 spike; moved for Feature 002 T002).
+"""Generate platform/plugin/src/mechanism/copied/*.cpp from the patched draft tree (T066 spike; moved for Feature 002 T002;
+regenerated from patches 0001-0013 for Feature 002 T052).
 
 Usage: python3 -I platform/plugin/gen_copies.py platform/plugin/src/mechanism/copied
 
 Each output file mirrors one upstream translation unit: its includes and using-directives, a spike subclass of the
 upstream class whose member functions are the patched function bodies (verbatim apart from the renames listed in the
 file header), trampolines that createFunctionHook can point at, and a registration function with the exact demangled
-signature of each hooked symbol in the stock binary.
+signature of each hooked symbol in the stock binary. A function listed as copy-only is not hooked: the file exports
+HyprVXSpike::copied_<name>(self, ...) instead, which a hand-written wrapper (RenderHooks.cpp) calls in place of the
+original.
 """
 import os
 import re
@@ -17,20 +20,25 @@ STOCK_BIN = os.path.expanduser("~/.cache/hyprvx/claude/prefix/stock/bin/Hyprland
 PREFIX_INCLUDE = os.path.expanduser("~/.cache/hyprvx/claude/prefix/stock/include/hyprland")
 OUT = sys.argv[1]
 DRAFT_COMMIT = subprocess.run(["git", "-C", DRAFT, "rev-parse", "--short=8", "HEAD"], capture_output=True, text=True).stdout.strip()
+PATCH_COUNT = int(subprocess.run(["git", "-C", DRAFT, "rev-list", "--count", "efb50993780079460b0cbed1363e2166a2de1d9f..HEAD"],
+                                 capture_output=True, text=True).stdout.strip())
 NM = subprocess.run(["nm", "-DC", "--defined-only", STOCK_BIN], capture_output=True, text=True).stdout.splitlines()
 DEMANGLED = [l.split(" ", 2)[2] for l in NM if " T " in l]
 
-# file, base class (qualified), spike class, functions (unqualified names; overloads all taken), extra static helpers
+# file, base class (qualified), spike class, functions (unqualified names; overloads all taken), extra static helpers,
+# copy-only functions (optional)
 SPECS = [
     ("src/render/ElementRenderer.cpp", "Render::IElementRenderer", "SpikeElementRenderer", ["drawSurface"], []),
     ("src/render/OpenGL.cpp", "Render::GL::CHyprOpenGLImpl", "SpikeOpenGL", ["renderBorder"], ["globalFeatures", "getDecoFeatures"]),
-    ("src/render/Renderer.cpp", "Render::IHyprRenderer", "SpikeRenderer", ["damageSurface"], []),
+    # renderWorkspaceWindows (0010 per-window offset hint) is copy-only: the wrapper in RenderHooks.cpp keeps the pass
+    # camera hint around it and calls the copy instead of the original.
+    ("src/render/Renderer.cpp", "Render::IHyprRenderer", "SpikeRenderer", ["damageSurface", "renderWorkspaceWindows"], [], ["renderWorkspaceWindows"]),
     ("src/desktop/view/Window.cpp", "Desktop::View::CWindow", "SpikeWindow", ["checkInputOnDecos", "visibleOnMonitor", "warpCursor"], []),
     ("src/desktop/state/ViewHitTester.cpp", "Desktop::CViewHitTester", "SpikeViewHitTester", ["windowAt", "windowSurfaceAt", "surfaceLocalAt"], []),
     ("src/managers/input/InputManager.cpp", "CInputManager", "SpikeInputManager",
      ["mouseMoveUnified", "processMouseDownNormal", "onMouseWheel", "sendMotionEventsToFocused"], []),
-    ("src/layout/supplementary/DragController.cpp", "Layout::Supplementary::CDragStateController", "SpikeDragController", ["dragBegin"],
-     ["isResizeMode", "cursorForResizeEdge", "setXDGResizingState"]),
+    ("src/layout/supplementary/DragController.cpp", "Layout::Supplementary::CDragStateController", "SpikeDragController",
+     ["dragBegin", "updateDragWindow", "mouseMove"], ["isResizeMode", "cursorForResizeEdge", "setXDGResizingState"]),
     ("src/desktop/view/Popup.cpp", "Desktop::View::CPopup", "SpikePopup", ["onMap", "reposition"], []),
 ]
 
@@ -44,10 +52,11 @@ PROLOGUES = {
         g_pHyprRenderer->m_renderData.renderModif.applyToBox(g_pHyprRenderer->m_renderData.clipBox);
         g_pHyprRenderer->m_renderData.clipBox = HyprVXSpike::roundOutBox(g_pHyprRenderer->m_renderData.clipBox);
     }""",
-    # 0007 updateRelativeCursorCoords is a static function (not in the dynamic symbol table, so not hookable). Stock stores
-    # screen - window position; convert it to world - window position as the patch stores it.
+    # 0007/0011 updateRelativeCursorCoords is a static function (not in the dynamic symbol table, so not hookable). Stock
+    # stores screen - window position; convert it to world - O(w) - window position as the patch stores it.
     "warpCursor": """    if (const auto PMON = m_monitor.lock(); PMON && m_relativeCursorCoordsOnLastWarp.x > 0 && m_relativeCursorCoordsOnLastWarp.y > 0)
-        m_relativeCursorCoordsOnLastWarp = HyprVXSpike::screenToWorld(*PMON, m_relativeCursorCoordsOnLastWarp + layoutBox().pos()) - layoutBox().pos();""",
+        m_relativeCursorCoordsOnLastWarp =
+            HyprVXSpike::screenToWorld(*PMON, m_relativeCursorCoordsOnLastWarp + layoutBox().pos()) - HyprVXSpike::appliedOffset(*this) - layoutBox().pos();""",
 }
 
 
@@ -132,7 +141,8 @@ def demangled_for(base, name, nparams, const):
     return good[0]
 
 
-for path, base, spike, names, helpers in SPECS:
+for path, base, spike, names, helpers, *rest in SPECS:
+    copy_only = set(rest[0]) if rest else set()
     lines = open(DRAFT + path).read().split("\n")
     srcdir = os.path.dirname(path)
     cls = base.split("::")[-1]
@@ -144,7 +154,7 @@ for path, base, spike, names, helpers in SPECS:
         preamble.append(l)
     includes = [c for c in (convert_include(l, srcdir) for l in preamble) if c is not None]
     usings = [l for l in lines if l.startswith("using namespace")]
-    decls, defs, tramps, regs = [], [], [], []
+    decls, defs, tramps, regs, exports = [], [], [], [], []
     for name in names:
         found = list(functions(lines, cls, name))
         if not found:
@@ -167,6 +177,9 @@ for path, base, spike, names, helpers in SPECS:
             hk = f"hk_{name}{idx if len(found) > 1 else ''}"
             selftype = f"{'const ' if const else ''}{base}*"
             call = f"static_cast<{'const ' if const else ''}{spike}*>(self)->{name}({', '.join(pnames)})"
+            if name in copy_only:
+                exports.append(f"{ret} HyprVXSpike::copied_{name}({selftype} self{', ' if plist else ''}{', '.join(plist)}) {{\n    {'return ' if ret != 'void' else ''}{call};\n}}")
+                continue
             # Trampolines are static members so that nested types in the parameter list (e.g. SBorderRenderData) resolve.
             tramps.append(f"    static {ret} {hk}({selftype} self{', ' if plist else ''}{', '.join(plist)}) {{\n        {'return ' if ret != 'void' else ''}{call};\n    }}")
             regs.append(f'    specs.push_back({{"{name}", "{demangled_for(base, name, len(plist), const)}", reinterpret_cast<void*>(&{spike}::{hk}), nullptr}});')
@@ -174,10 +187,11 @@ for path, base, spike, names, helpers in SPECS:
         defs.insert(0, "\n".join(static_helper(lines, h)))
     unit = os.path.splitext(os.path.basename(path))[0]
     out = [
-        f"// Generated for the HyprVX delivery spike (T066) from the patched draft tree (hyprland-draft {DRAFT_COMMIT} = Hyprland",
-        f"// efb5099 + patches 0001-0009), {path}. Bodies are verbatim apart from: the class renamed to the spike subclass,",
+        f"// Generated for the HyprVX plugin form S (Feature 002 T052; delivery spike T066) from the patched draft tree",
+        f"// (hyprland-draft {DRAFT_COMMIT} = Hyprland efb5099 + patches 0001-{PATCH_COUNT:04d}), {path}. Bodies are verbatim apart from: the class renamed to the spike subclass,",
         "// HyprVX:: -> HyprVXSpike::, and the SRenderModifData::hyprvxCamera test -> HyprVXSpike::isCameraModif().",
         "// Prologues from gen_copies.py PROLOGUES: " + (", ".join(n for n in names if n in PROLOGUES) or "none") + ".",
+        "// Copy-only (not hooked; called by a wrapper as HyprVXSpike::copied_<name>): " + (", ".join(sorted(copy_only)) or "none") + ".",
         "// Upstream code: Hyprland, BSD-3-Clause (docs/THIRD_PARTY.md). Do not edit by hand; regenerate with",
         "// python3 -I platform/plugin/gen_copies.py platform/plugin/src/mechanism/copied",
         '#include "../SpikeAccess.hpp"',
@@ -197,6 +211,8 @@ for path, base, spike, names, helpers in SPECS:
         "",
         *defs,
         "",
+        *exports,
+        "",
         f"void HyprVXSpike::addCopied{unit}Hooks(std::vector<SHookSpec>& specs) {{",
         *regs,
         "}",
@@ -204,4 +220,4 @@ for path, base, spike, names, helpers in SPECS:
     ]
     os.makedirs(OUT, exist_ok=True)
     open(os.path.join(OUT, unit + ".cpp"), "w").write("\n".join(out))
-    print(f"{unit}.cpp: {sum(len(d.splitlines()) for d in defs)} copied lines, {len(regs)} hooks")
+    print(f"{unit}.cpp: {sum(len(d.splitlines()) for d in defs)} copied lines, {len(regs)} hooks, {len(exports)} copy-only")

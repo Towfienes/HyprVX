@@ -1,9 +1,10 @@
-// Generated for the HyprVX delivery spike (T066) from the patched draft tree (hyprland-draft 43b8c24e = Hyprland
-// efb5099 + patches 0001-0009), src/managers/input/InputManager.cpp. Bodies are verbatim apart from: the class renamed to the spike subclass,
+// Generated for the HyprVX plugin form S (Feature 002 T052; delivery spike T066) from the patched draft tree
+// (hyprland-draft bf59c232 = Hyprland efb5099 + patches 0001-0013), src/managers/input/InputManager.cpp. Bodies are verbatim apart from: the class renamed to the spike subclass,
 // HyprVX:: -> HyprVXSpike::, and the SRenderModifData::hyprvxCamera test -> HyprVXSpike::isCameraModif().
 // Prologues from gen_copies.py PROLOGUES: none.
+// Copy-only (not hooked; called by a wrapper as HyprVXSpike::copied_<name>): none.
 // Upstream code: Hyprland, BSD-3-Clause (docs/THIRD_PARTY.md). Do not edit by hand; regenerate with
-// python3 -I platform/plugin-spike/gen_copies.py platform/plugin-spike/src/copied
+// python3 -I platform/plugin/gen_copies.py platform/plugin/src/mechanism/copied
 #include "../SpikeAccess.hpp"
 
 #include <src/managers/input/InputManager.hpp>
@@ -168,7 +169,9 @@ void SpikeInputManager::mouseMoveUnified(uint32_t time, bool refocus, bool mouse
 
         // HyprVX: a window-content constraint region is in world coordinates; the cursor goes to its screen image.
         const bool WORLD        = HyprVXSpike::isWindowContent(surf->resource());
-        const auto CLOSEST      = rg.closestPoint(WORLD ? WINDOWCOORDS : mouseCoords);
+        // HyprVX (Feature 002): the region is in the owner window's L space; it is drawn at L + O(w)
+        const auto OFFSET       = WORLD ? HyprVXSpike::appliedContentOffset(surf->resource()) : Vector2D{};
+        const auto CLOSEST      = rg.closestPoint(WORLD ? WINDOWCOORDS - OFFSET : mouseCoords);
         const auto BOX          = surf->getSurfaceBoxGlobal();
         const auto WINDOW       = Desktop::View::CWindow::fromView(surf->view());
         const auto CLOSESTLOCAL = (CLOSEST - (BOX.has_value() ? BOX->pos() : Vector2D{})) * (WINDOW ? WINDOW->m_X11SurfaceScaledBy : 1.0);
@@ -176,7 +179,7 @@ void SpikeInputManager::mouseMoveUnified(uint32_t time, bool refocus, bool mouse
         if (g_pSeatManager->m_state.pointerFocus != surf->resource())
             g_pSeatManager->setPointerFocus(surf->resource(), CLOSESTLOCAL);
 
-        Pointer::pointerController()->warpTo(WORLD ? HyprVXSpike::worldToScreen(*PMONITOR, CLOSEST) : CLOSEST, true);
+        Pointer::pointerController()->warpTo(WORLD ? HyprVXSpike::worldToScreen(*PMONITOR, CLOSEST + OFFSET) : CLOSEST, true);
         g_pSeatManager->sendPointerMotion(time, CLOSESTLOCAL);
         PROTO::relativePointer->sendRelativeMotion(sc<uint64_t>(time) * 1000, {}, {});
     };
@@ -190,7 +193,8 @@ void SpikeInputManager::mouseMoveUnified(uint32_t time, bool refocus, bool mouse
             if (CONSTRAINT) {
                 if (CONSTRAINT->isLocked()) {
                     const auto HINT = CONSTRAINT->logicPositionHint();
-                    Pointer::pointerController()->warpTo(HyprVXSpike::isWindowContent(SURF->resource()) ? HyprVXSpike::worldToScreen(*PMONITOR, HINT) : HINT, true);
+                    Pointer::pointerController()->warpTo(
+                        HyprVXSpike::isWindowContent(SURF->resource()) ? HyprVXSpike::worldToScreen(*PMONITOR, HINT + HyprVXSpike::appliedContentOffset(SURF->resource())) : HINT, true);
                 } else {
                     confineToRegion(CONSTRAINT->logicConstraintRegion(), SURF);
                 }
@@ -502,7 +506,10 @@ void SpikeInputManager::mouseMoveUnified(uint32_t time, bool refocus, bool mouse
     m_emptyFocusCursorSet = false;
 
     // HyprVX: surfacePos of window content is a world position, so the pointer must be in world coordinates too.
-    Vector2D surfaceLocal = surfacePos == Vector2D(-1337, -1337) ? surfaceCoords : (HyprVXSpike::isWindowContent(foundSurface) ? WINDOWCOORDS : mouseCoords) - surfacePos;
+    // HyprVX (Feature 002): and in the owner window's L space (minus its world offset O(w)).
+    Vector2D surfaceLocal = surfacePos == Vector2D(-1337, -1337) ?
+        surfaceCoords :
+        (HyprVXSpike::isWindowContent(foundSurface) ? WINDOWCOORDS - HyprVXSpike::appliedContentOffset(foundSurface) : mouseCoords) - surfacePos;
 
     if (pFoundWindow && pFoundWindow->m_isX11) // for x11 force scale zero
         surfaceLocal = surfaceLocal * pFoundWindow->m_X11SurfaceScaledBy;
@@ -529,8 +536,9 @@ void SpikeInputManager::mouseMoveUnified(uint32_t time, bool refocus, bool mouse
     }
 
     if (pFoundWindow && foundSurface == pFoundWindow->wlSurface()->resource() && !m_cursorImageOverridden) {
-        const auto BOX = pFoundWindow->getWindowMainSurfaceBox();
-        if (VECNOTINRECT(WINDOWCOORDS, BOX.x, BOX.y, BOX.x + BOX.width, BOX.y + BOX.height))
+        const auto BOX   = pFoundWindow->getWindowMainSurfaceBox();
+        const auto LOCAL = WINDOWCOORDS - HyprVXSpike::appliedOffset(*pFoundWindow); // HyprVX: L space of the window
+        if (VECNOTINRECT(LOCAL, BOX.x, BOX.y, BOX.x + BOX.width, BOX.y + BOX.height))
             g_pHyprRenderer->setCursorFromName("left_ptr");
         else
             restoreCursorIconToApp();
@@ -540,7 +548,7 @@ void SpikeInputManager::mouseMoveUnified(uint32_t time, bool refocus, bool mouse
         // change cursor icon if hovering over border
         // HyprVX: no resize icon while a camera applies (border resize is blocked, FR-012).
         if (*PRESIZEONBORDER && *PRESIZECURSORICON && !HyprVXSpike::activeCamera(*PMONITOR)) {
-            if (!Fullscreen::controller()->isFullscreen(pFoundWindow) && !pFoundWindow->hasPopupAt(WINDOWCOORDS))
+            if (!Fullscreen::controller()->isFullscreen(pFoundWindow) && !pFoundWindow->hasPopupAt(WINDOWCOORDS - HyprVXSpike::appliedOffset(*pFoundWindow)))
                 setCursorIconOnBorder(pFoundWindow);
             else if (m_borderIconDirection != BORDERICON_NONE) {
                 m_borderIconDirection = BORDERICON_NONE;
@@ -635,8 +643,9 @@ void SpikeInputManager::processMouseDownNormal(const IPointer::SButtonEvent& e, 
 
     const auto mouseCoords = g_pInputManager->getMouseCoordsInternal();
     const auto w           = Desktop::viewState()->hitTest().windowAt(mouseCoords, Desktop::View::ALLOW_FLOATING | Desktop::View::RESERVED_EXTENTS | Desktop::View::INPUT_EXTENTS);
-    // HyprVX: window geometry is in world coordinates (border selection by the inverse transform, FR-012).
-    const auto worldCoords = HyprVXSpike::screenToWorld(mouseCoords);
+    // HyprVX: window geometry is in world coordinates (border selection by the inverse transform, FR-012), in the
+    // window's L space (Feature 002: minus its world offset).
+    const auto worldCoords = HyprVXSpike::screenToWorld(mouseCoords) - (w ? HyprVXSpike::appliedOffset(*w) : Vector2D{});
 
     if (w && !m_lastFocusOnLS && !g_pSessionLockManager->isSessionLocked() && w->checkInputOnDecos(INPUT_TYPE_BUTTON, mouseCoords, e))
         return;
@@ -749,7 +758,8 @@ void SpikeInputManager::onMouseWheel(IPointer::SAxisEvent e, SP<IPointer> pointe
             if (*POFFWINDOWAXIS != 1) {
                 // HyprVX: the window box is in world coordinates; a warp goes to its screen image.
                 const auto BOX         = PWINDOW->getWindowMainSurfaceBox();
-                const auto WORLDCOORDS = HyprVXSpike::screenToWorld(MOUSECOORDS);
+                const auto OFFSET      = HyprVXSpike::appliedOffset(*PWINDOW); // Feature 002: L space of the window
+                const auto WORLDCOORDS = HyprVXSpike::screenToWorld(MOUSECOORDS) - OFFSET;
 
                 if (!BOX.containsPoint(WORLDCOORDS) && !PWINDOW->hasPopupAt(WORLDCOORDS)) {
                     if (*POFFWINDOWAXIS == 0)
@@ -760,7 +770,7 @@ void SpikeInputManager::onMouseWheel(IPointer::SAxisEvent e, SP<IPointer> pointe
 
                     if (*POFFWINDOWAXIS == 3) {
                         const auto PMONITOR = State::monitorState()->query().vec(MOUSECOORDS).run();
-                        Pointer::pointerController()->warpTo(PMONITOR ? HyprVXSpike::worldToScreen(*PMONITOR, {TEMPCURX, TEMPCURY}) : Vector2D{TEMPCURX, TEMPCURY}, true);
+                        Pointer::pointerController()->warpTo(PMONITOR ? HyprVXSpike::worldToScreen(*PMONITOR, Vector2D{TEMPCURX, TEMPCURY} + OFFSET) : Vector2D{TEMPCURX, TEMPCURY} + OFFSET, true);
                     }
 
                     g_pSeatManager->sendPointerMotion(e.timeMs, Vector2D{TEMPCURX, TEMPCURY} - BOX.pos());
@@ -867,8 +877,9 @@ void SpikeInputManager::sendMotionEventsToFocused() {
 
     // HyprVX: the box of window content is in world coordinates.
     const auto POINTER = getMouseCoordsInternal().floor();
-    g_pSeatManager->setPointerFocus(SURF, (HyprVXSpike::isWindowContent(SURF) ? HyprVXSpike::screenToWorld(POINTER) : POINTER) - BOX->pos());
+    g_pSeatManager->setPointerFocus(SURF, (HyprVXSpike::isWindowContent(SURF) ? HyprVXSpike::screenToWorld(POINTER) - HyprVXSpike::appliedContentOffset(SURF) : POINTER) - BOX->pos());
 }
+
 
 void HyprVXSpike::addCopiedInputManagerHooks(std::vector<SHookSpec>& specs) {
     specs.push_back({"mouseMoveUnified", "CInputManager::mouseMoveUnified(unsigned int, bool, bool, std::optional<Hyprutils::Math::Vector2D>)", reinterpret_cast<void*>(&SpikeInputManager::hk_mouseMoveUnified), nullptr});

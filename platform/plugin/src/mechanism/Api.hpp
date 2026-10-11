@@ -21,8 +21,7 @@ namespace HyprVX {
     bool                         setCamera(Monitor::CMonitor& monitor, const hyprvx::cammath::CameraState& camera);
     void                         resetCamera(Monitor::CMonitor& monitor);
 
-    // World offsets (patch 0010). Until T053 form S has no offset mechanism: setWindowOffset refuses every non-zero
-    // offset (logged once), windowOffset is 0 and resetWindowOffsets does nothing.
+    // World offsets (patch 0010; form S: mechanism/WindowOffset.cpp, same rules).
     bool     setWindowOffset(const PHLWINDOW& window, const Vector2D& offset);
     Vector2D windowOffset(const PHLWINDOW& window);
     void     resetWindowOffsets();
