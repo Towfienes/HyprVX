@@ -210,15 +210,15 @@ description: "Task list for Feature 002 — Multi-Window Drift MVP (Option A), C
 
 ## Phase 9: Delivery form S (DV3-16)
 
-- [ ] T052 Regenerate the copied functions with `platform/plugin/gen_copies.py` from the patched draft tree (0001–0013), list every new hook target with its demangled signature, and confirm each has a dynamic symbol in the stock binary. A target without a symbol is a stop condition (recorded, then designed around) before T053. Update the copied-functions entry of `docs/THIRD_PARTY.md` with the full list of copied functions and helpers, their count, and the plugin's status as the DV3-16 delivery form (Constitution IX).
-- [ ] T053 Implement the mechanism API with offsets in `platform/plugin/src/mechanism/` (offset map keyed by window, same rules as `contracts/mechanism-api.md`) and build form S with `scripts/build-plugin.sh --form S`
-- [ ] T054 Run every Feature 002 test (T016–T050) in form S at scales 1 and 1.25; compare every capture with form P byte for byte (V-23); run the stability checks (refused by a mismatched build, unload while in Drift)
+- [x] T052 Regenerate the copied functions with `platform/plugin/gen_copies.py` from the patched draft tree (0001–0013), list every new hook target with its demangled signature, and confirm each has a dynamic symbol in the stock binary. A target without a symbol is a stop condition (recorded, then designed around) before T053. Update the copied-functions entry of `docs/THIRD_PARTY.md` with the full list of copied functions and helpers, their count, and the plugin's status as the DV3-16 delivery form (Constitution IX).
+- [x] T053 Implement the mechanism API with offsets in `platform/plugin/src/mechanism/` (offset map keyed by window, same rules as `contracts/mechanism-api.md`) and build form S with `scripts/build-plugin.sh --form S`
+- [x] T054 Run every Feature 002 test (T016–T050) in form S at scales 1 and 1.25; compare every capture with form P byte for byte (V-23); run the stability checks (refused by a mismatched build, unload while in Drift)
 
 ---
 
 ## Phase 10: Feature 002 gate
 
-- [ ] T055 [P] Write `tests/native/t_scenario.sh` (T-SCENARIO, SC-008). It scripts the 12-step scenario with test clients standing in for VS Code and Firefox:
+- [x] T055 [P] Write `tests/native/t_scenario.sh` (T-SCENARIO, SC-008). It scripts the 12-step scenario with test clients standing in for VS Code and Firefox:
   - steps 3, 5 and 7 by `hyprvx:zoom`, `hyprvx:pan` and Super + wheel/drag;
   - step 8 by click, keys and scroll;
   - step 9 as move;

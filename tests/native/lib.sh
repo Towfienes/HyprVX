@@ -20,6 +20,16 @@ hvx_die_blocked() {
     exit 2
 }
 
+# HVX_REGRESSION_FORM=P|S (Feature 002 T056, V-24): Feature 001 tests that start the "patched" variant run with the
+# Drift policy plugin loaded and Drift OFF. P: the patched build + plugin/P. S: the stock build + plugin/S-dev (through
+# the HVX_SPIKE_PLUGIN path below). The run-id variant is regP or regS.
+case ${HVX_REGRESSION_FORM:-} in
+    "") ;;
+    P) ;;
+    S) HVX_SPIKE_PLUGIN="${HVX_SPIKE_PLUGIN:-$HOME/.cache/hyprvx/${HYPRVX_AGENT:-claude}/plugin/S-dev/hyprvx-drift-S.so}" ;;
+    *) echo "HVX_REGRESSION_FORM must be P or S" >&2; exit 2 ;;
+esac
+
 # hvx_init_run VARIANT TEST: sets HVX_RUN_ID, HVX_EVID, HVX_TEST.
 hvx_init_run() {
     local sha
@@ -27,7 +37,11 @@ hvx_init_run() {
     HVX_TEST="$2"
     # The test name keeps run-ids unique when tests start within the same second (e.g. run_sprint1).
     local variant=$1
-    [[ -n ${HVX_SPIKE_PLUGIN:-} && $variant == patched ]] && variant=spike
+    if [[ -n ${HVX_REGRESSION_FORM:-} && $variant == patched ]]; then
+        variant=reg$HVX_REGRESSION_FORM
+    elif [[ -n ${HVX_SPIKE_PLUGIN:-} && $variant == patched ]]; then
+        variant=spike
+    fi
     HVX_RUN_ID="$(date +%Y%m%d-%H%M%S)-$variant-$sha-$2${HVX_PATCHED_PREFIX:+-negctl-$HVX_PATCHED_PREFIX}"
     HVX_EVID="$HOME/.cache/hyprvx/$HYPRVX_AGENT/evidence/$HVX_RUN_ID"
     mkdir -p "$HVX_EVID"
@@ -64,6 +78,9 @@ hvx_start() {
         local reply
         reply=$(hvx_nested run -- "$HOME/.cache/hyprvx/$HYPRVX_AGENT/prefix/stock/bin/hyprctl" plugin load "$HVX_SPIKE_PLUGIN")
         [[ $reply == ok ]] || { echo "spike plugin load failed: $reply" >&2; return 1; }
+    fi
+    if [[ ${HVX_REGRESSION_FORM:-} == P && " $* " == *" --variant patched "* ]]; then
+        hvx_plugin_load "$HOME/.cache/hyprvx/$HYPRVX_AGENT/plugin/P/hyprvx-drift-P.so" || { echo "policy plugin P did not load" >&2; return 1; }
     fi
 }
 hvx_stop() {

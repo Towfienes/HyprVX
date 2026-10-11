@@ -8,6 +8,9 @@ For every (test, scale) present in both suites, every capture (*.png) that both 
 byte-identical (sha256). Excluded, with the reason recorded in the output:
   - t_ws_anim control-early.png: a frame in the middle of a workspace animation with Drift OFF, so its content
     depends on the capture time, not on the delivery form.
+  - t_plugin_inert p<N>-<plugin>-*.png: named after the plugin under test (form P loads P, form S loads S and S-dev), so
+    the two runs have no common name; each is judged 0 px against reference.png of its own run, and the two
+    reference.png are compared here, which makes them equal across forms by transitivity.
 A capture present in only one of the two runs, or a (test, scale) whose run is missing or not PASS in either suite, is
 listed as a gap. Exit 0 when nothing differs and there are no gaps, 1 otherwise, 2 on bad input.
 """
@@ -61,6 +64,10 @@ def main():
         for name in sorted(names_p | names_s):
             if (test, name) in EXCLUDED:
                 report["excluded"].append({"test": test, "scale": scale, "image": name, "reason": EXCLUDED[(test, name)]})
+                continue
+            if test == "t_plugin_inert" and name != "reference.png":
+                report["excluded"].append({"test": test, "scale": scale, "image": name,
+                                           "reason": "per-plugin image, judged against reference.png of its own run"})
                 continue
             if name not in names_p or name not in names_s:
                 report["gaps"].append({"test": test, "scale": scale, "image": name, "only_in": "P" if name in names_p else "S"})
