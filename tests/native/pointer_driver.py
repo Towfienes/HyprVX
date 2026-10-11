@@ -26,8 +26,9 @@ class Blocked(Exception):
 
 
 def read_lines(path):
+    # Complete records only: the writer may be in the middle of its last line (no newline yet).
     with open(path, encoding="utf-8") as f:
-        return [json.loads(line) for line in f if line.strip()]
+        return [json.loads(line) for line in f if line.endswith("\n") and line.strip()]
 
 
 def wait_for(predicate, timeout, what):
