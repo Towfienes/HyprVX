@@ -43,8 +43,8 @@ description: "Task list for Feature 002 — Multi-Window Drift MVP (Option A), C
 
 ## Phase 1: Setup
 
-- [ ] T001 Create `specs/002-multi-window-drift-mvp/integration-log.md` (append-only, same columns as Feature 001's) and `specs/002-multi-window-drift-mvp/checklists/verification.md` with rows V-01..V-28 mapped to the tests of `contracts/test-tooling.md` §9, the unit tests, the human review (V-25) and the audits, all `NOT RUN`
-- [ ] T002 Move the spike's mechanism sources with `git mv platform/plugin-spike/src platform/plugin/src/mechanism` and `git mv platform/plugin-spike/gen_copies.py platform/plugin/gen_copies.py`. Keep the spike's CMake logic as the form S part of the new `platform/plugin/CMakeLists.txt` (option `HYPRVX_PLUGIN_FORM=P|S`). Record the move in `integration-log.md` (Feature 001 documents cite the spike paths at their own commits)
+- [ ] T001 Create `specs/002-multi-window-drift-mvp/integration-log.md` (append-only, same columns as Feature 001's) and `specs/002-multi-window-drift-mvp/checklists/verification.md` with rows V-01..V-28, all `NOT RUN`, mapped as: V-01 transform 1.2 unit tests; V-02 `DriftModel` unit tests; V-03 identity refusal of the new tools and harness commands; V-04 T-MULTI; V-05 T-INPUT-MW; V-06 T-STALE-MW; V-07 T-X11; V-08 T-DRIFT-OFF; V-09 T-PANIC-DRIFT; V-10 T-IDEMP; V-11 T-MONITOR; V-12 T-ANCHOR; V-13 T-PAN; V-14 T-WS-CAMERA; V-15 T-WS-ANIM; V-16 T-KEYS; V-17 T-SCROLL; V-18 T-FULLSCREEN; V-19 T-MOVE; V-20 T-RESIZE; V-21 T-DRAG-ABORT; V-22 T-SPAWN; V-23 form P/S parity; V-24 Feature 001 regression with the plugin loaded; V-25 scenario human review; V-26 host-safety audit; V-27 reproducibility; V-28 single-transform lint
+- [ ] T002 Move the spike's mechanism sources with `git mv platform/plugin-spike/src platform/plugin/src/mechanism` and `git mv platform/plugin-spike/gen_copies.py platform/plugin/gen_copies.py`. Keep the spike's CMake logic as the form S part of the new `platform/plugin/CMakeLists.txt` (option `HYPRVX_PLUGIN_FORM=P|S`). Record the move in `integration-log.md` (Feature 001 documents cite the spike paths at their own commits) and update the copied-functions entry of `docs/THIRD_PARTY.md` (new path; still nested-only until T052) (Constitution IX)
 - [ ] T003 Write `scripts/build-plugin.sh --form P|S`: fresh build dir under `~/.cache/hyprvx/claude/build/`, the heavy lock, MemAvailable check, `systemd-run --user --scope -p MemoryMax=6G`, and output `~/.cache/hyprvx/claude/plugin/<form>/hyprvx-drift-<form>.so` plus `build-info.json` (`form`, `prefix_id`, `plugin_sha256`, `sources_sha256`, `git_sha`, compiler); it replaces `scripts/build-plugin-spike.sh`, and `tools/tests/test_build_scripts.py` gets cases for argument validation and the dry run
 - [ ] T004 [P] Vendor `protocols/virtual-keyboard-unstable-v1.xml` from Hyprland `efb5099` into `tools/vkeyboard/protocols/` and record its license in `docs/THIRD_PARTY.md` (Constitution IX)
 
@@ -94,8 +94,8 @@ description: "Task list for Feature 002 — Multi-Window Drift MVP (Option A), C
 
 ### Tests (written before the patches are judged; dev offsets via `hyprvx-dev offset`)
 
-- [ ] T016 [P] [US2] Write `tests/native/t_multi.sh` (T-MULTI): three floating clients with distinct dev offsets at z ∈ {0.25, 0.5, 1, 2}, each bbox ± 2 px of `forwardBox(L + O)`, scales 1 and 1.25
-- [ ] T017 [P] [US3] Write `tests/native/t_input_mw.sh` (T-INPUT-MW): pointer local ± 1 on offset windows, their popup and subsurface, ≥ 20 points per state; click focus; no event on empty canvas
+- [ ] T016 [P] [US2] Write `tests/native/t_multi.sh` (T-MULTI): three floating clients with distinct dev offsets at z ∈ {0.25, 0.5, 1, 2}, each bbox ± 2 px of `forwardBox(L + O)`, scales 1 and 1.25; plus a `--layer TOP` client that stays byte-identical in its region while camera and offsets change (FR-013 with offsets)
+- [ ] T017 [P] [US3] Write `tests/native/t_input_mw.sh` (T-INPUT-MW): pointer local ± 1 on offset windows, their popup and subsurface, ≥ 20 points per state; click focus; no event on empty canvas; a pointer constraint held by a client stays in force across a camera/offset change (spec edge case; recorded NOT RUN with the reason if the test client cannot hold one)
 - [ ] T018 [P] [US2] Write `tests/native/t_stale_mw.sh` (T-STALE-MW): 50 random camera/offset states, three windows, partial-damage vs forced full-damage capture identical
 - [ ] T019 [P] [US3] Write `tests/native/t_x11.sh` (T-X11): X11 window with a dev offset, bbox ± 2 px and pointer local ± 1 at scales 1 and 1.25; its override-redirect menu with the same dev offset drawn attached and receiving input (policy inheritance is tested in T042)
 - [ ] T020 [P] [US4] Write `tests/native/t_resize.sh` (T-RESIZE) mechanism part: with a non-identity camera, a floating border drag (and Hyprland's resize bind) resizes by `worldDelta` ± 1, a tiled border drag changes nothing and logs once
@@ -210,7 +210,7 @@ description: "Task list for Feature 002 — Multi-Window Drift MVP (Option A), C
 
 ## Phase 9: Delivery form S (DV3-16)
 
-- [ ] T052 Regenerate the copied functions with `platform/plugin/gen_copies.py` from the patched draft tree (0001–0013), list every new hook target with its demangled signature, and confirm each has a dynamic symbol in the stock binary. A target without a symbol is a stop condition (recorded, then designed around) before T053.
+- [ ] T052 Regenerate the copied functions with `platform/plugin/gen_copies.py` from the patched draft tree (0001–0013), list every new hook target with its demangled signature, and confirm each has a dynamic symbol in the stock binary. A target without a symbol is a stop condition (recorded, then designed around) before T053. Update the copied-functions entry of `docs/THIRD_PARTY.md` with the full list of copied functions and helpers, their count, and the plugin's status as the DV3-16 delivery form (Constitution IX).
 - [ ] T053 Implement the mechanism API with offsets in `platform/plugin/src/mechanism/` (offset map keyed by window, same rules as `contracts/mechanism-api.md`) and build form S with `scripts/build-plugin.sh --form S`
 - [ ] T054 Run every Feature 002 test (T016–T050) in form S at scales 1 and 1.25; compare every capture with form P byte for byte (V-23); run the stability checks (refused by a mismatched build, unload while in Drift)
 
@@ -231,6 +231,7 @@ description: "Task list for Feature 002 — Multi-Window Drift MVP (Option A), C
   - Constitution IV: no inline camera arithmetic in 0010–0013 or the policy;
   - Constitution V: no write of workspace, `L`, tiling or layout outside the floating resize;
   - FR-013: layer, lock, IME and cursor never offset;
+  - FR-016: the dev control is absent from form S and from a non-dev build (symbol check on the binaries, and `hyprvx-dev` rejected);
   - every test changed after code existed, with its reason.
   Then do a second clean build for reproducibility (V-27).
 - [ ] T058 [P] V-26 host-safety audit of every nested session of this feature (no host signature, private runtime dirs, agent-prefix binaries only, host `hypr`/`caelestia` config unchanged), and V-28 lint record
