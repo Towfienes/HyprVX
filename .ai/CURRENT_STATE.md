@@ -465,3 +465,13 @@ Production safety: host Hyprland and Caelestia untouched; no plugin loaded; no p
   fetches from outside the clone (never runs git inside it), reviews, rebuilds and re-runs tests before integrating.
 - Known prerequisite: the tooling accepts only `HYPRVX_AGENT=claude|codex`; a separate lane for native runs by
   Antigravity needs a small tooling change, to be planned inside Feature 003 `tasks.md` if a delegated task needs it.
+- Orientation (2026-10-12, Antigravity conversation `019ed250`, artifacts under `~/.gemini/antigravity-cli/brain/`):
+  read the required documents and restated roles, hard limits, handoff trailers and §O5 correctly; reproduced lint
+  (13 patches), analyzer 11/11, ctest 326/326 and the build-script tests; no change to tracked files, no push, no
+  native run, nothing written to Claude's cache or evidence (checked from outside the clone). Deviations: it built
+  `build-v3` (gitignored) although the prompt said read-only/no build; it did not answer the four requested questions
+  (camera equation and invariants, task → evidence flow, BLOCKED cases, Phase 4 scope), so its grasp of the
+  transform contract is unverified; it ran the build-script tests with `HYPRVX_AGENT=claude` (tests only, no cache
+  writes). The clone's `.git/config` gained `push.autoSetupRemote = true` at 06:26:26, 10 s after an `agy` CLI start
+  and not from any command in its transcript; push stays blocked (`pushurl = DISABLED`, `pre-push` hook unchanged).
+  Verdict: ready for one small, unit-test-only task with an explicit work order; first handoff reviewed line by line.
