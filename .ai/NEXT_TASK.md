@@ -10,8 +10,11 @@
 - Gates: GATE-A PASS (V-23), GATE-N PASS with H (V-24; RC1 detected, RC2 not reproduced, V-08 PARTIAL), T-ID PASS,
   suite 16/16 at scales 1 and 1.25 three times (`…-2bfe8a4-sprint1`, R1 `…-03c469e-sprint1`, `…-197511e-sprint1`),
   V-04 two clean rebuilds with byte-identical captures. T045 cost measured (informational).
-- **G1 approved by the user on 2026-10-11 (T053 ticked).** Next: master-plan Phase 2 from T054/T055, Claude only,
-  up to the Feature 001 gate T071 (STOP there for user approval; U0 and Feature 002 stay blocked).
+- **G1 approved by the user on 2026-10-11 (T053 ticked).** Phase 2 T054–T069 are done (patches 0006–0009, US3
+  8/8, delivery spike, Phase 2 R1); see `.ai/CURRENT_STATE.md` "Phase 2 status at the Feature 001 gate".
+- **Next: T071 Feature 001 gate — STOP for user approval.** Pending user actions: V-20 review of the Phase 2 image
+  set (`checklists/verification.md`, closes T070) and the delivery decision (`delivery-decision.md`). U0 and
+  Feature 002 stay blocked until then. Native runs need the host GPU profile Integrated (AMD only).
 - V-20 / SC-005: PASS, signed by the user (Towfienes) on 2026-10-11 in `checklists/verification.md`.
 
 ## Sprint 1 goal

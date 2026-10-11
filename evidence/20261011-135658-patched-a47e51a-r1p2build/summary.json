@@ -1,0 +1,15 @@
+{
+  "run_id": "20261011-135658-patched-a47e51a-r1p2build",
+  "test": "T069 clean-room patched build efaf0ea2cf21 (CCACHE_DISABLE=1, apply-patches --reset)",
+  "result": "PASS",
+  "agent": "claude",
+  "git_sha": "a47e51ac2b1b82b630aaa4d1707eaf23cfc3cf1d",
+  "note": "binary a157e6a8; repo a47e51a",
+  "artifacts": [
+    "build-info.json",
+    "build.log",
+    "hyprland-version.txt",
+    "preflight.log"
+  ],
+  "not_run": []
+}

@@ -218,13 +218,13 @@ Note: "Phase N" headings in this file are Spec Kit task phases; "master-plan Pha
 
 - [x] T066 Reproduce seams 0002–0009 with `createFunctionHook` in a nested-only plugin under `platform/plugin-spike/` built against the stock-from-source prefix; (owner: claude)
 - [x] T067 Run the identical Sprint 1 + US3 suite on stock-from-source + plugin; write `specs/001-native-spatial-camera/delivery-decision.md` comparing results, stability and maintenance cost (V-21) (owner: claude)
-- [ ] T068 Clean-room review of the `delivery-decision.md` evidence and a re-run of the plugin suite from fresh build directories (owner: claude)
+- [x] T068 Clean-room review of the `delivery-decision.md` evidence and a re-run of the plugin suite from fresh build directories (owner: claude)
 
 ---
 
 ## Phase 9: Feature 001 gate
 
-- [ ] T069 R1 for Phase 2: clean-room rebuild and full-suite re-run (Sprint 1 + US3 + spike) on the final commit, with a source-verification report on 0006–0009 as in T044 (owner: claude)
+- [x] T069 R1 for Phase 2: clean-room rebuild and full-suite re-run (Sprint 1 + US3 + spike) on the final commit, with a source-verification report on 0006–0009 as in T044 (owner: claude)
 - [ ] T070 Update `checklists/verification.md` (all V-xx), `integration-log.md`, `.ai/CURRENT_STATE.md`, `.ai/NEXT_TASK.md`; human review V-20 for the Phase 2 image set (owner: claude)
 - [ ] T071 **Feature 001 gate**: present L4 + L5 + L5b evidence and the delivery decision; STOP for user approval before merging into `v3/spec-foundation`, Feature 002 or the U0 spike (owner: claude)
 

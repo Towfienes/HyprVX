@@ -70,3 +70,20 @@ the plugin becomes the production artifact, three items need a decision or work:
 
 If those costs are judged too high, the documented alternative is the patched Hyprland side by side. The patch series
 stays the source of truth in both cases, because the plugin's copied functions are generated from it.
+
+## Clean-room review and re-run (T068)
+
+- Every run-id cited above was re-checked from the read-only archive: all pass `sha256sum -c` and every member run
+  of each suite passes too; the spike runs record only the stock binary `927f6f64` and plugin `fcfaf0fc03e5`, the
+  patched runs only `103c24b2` (and `927f6f64` for T-ID's stock half).
+- Recounted from the archives and from git at `1bf59b0`: Sprint 1 captures 346/346 identical, 639 hand-written plugin
+  lines, 2394 generated lines, 24 hooks; all as stated.
+- Fresh build directory: `scripts/build-plugin-spike.sh` again produced `fcfaf0fc03e5…` byte for byte.
+- Re-run with that plugin, after the T069 clean rebuild of the patched variant (`a157e6a8`):
+  Sprint 1 16/16 PASS `20261011-140220-spike-a47e51a-sprint1` (346/346 identical to the rebuilt patched build);
+  stability PASS `20261011-140723-spike-a47e51a-spike_stability`; US3 8/8 PASS
+  `20261011-140925-spike-c836666-phase2` (28/28 identical to the rebuilt patched build and to the earlier spike run).
+- The first US3 re-run was BLOCKED by a pointer-driver race on a partially written JSONL line (affects either
+  build; fixed in `c836666`, no criterion changed). See `r1-phase2-source-verification.md`.
+
+The review found no claim in this document that the archives contradict.

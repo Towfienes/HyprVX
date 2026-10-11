@@ -60,3 +60,30 @@ No tolerance or threshold was changed. GATE-A was re-run after each test-config 
 to the Sprint 1 baseline (stock1.png `6d7f6bd6…`).
 
 ## Clean-room re-run (read after the sections above were committed)
+
+The sections above were committed at `a47e51a` before any re-run result was read.
+
+- Build: `scripts/apply-patches.sh --variant patched --reset` (patchset `efaf0ea2cf21`) and
+  `CCACHE_DISABLE=1 scripts/build-hyprland.sh --variant patched`: exit 0, 0 warnings, binary `a157e6a8…`
+  (`20261011-135658-patched-a47e51a-r1p2build`). The earlier ccache build (`103c24b2…`) is archived as
+  `20261011-134936-patched-1bf59b0-efafbuild`; the two binaries differ only through the commit hash and date that
+  `git am` writes into `version.h` (as in T046).
+- Plugin: `scripts/build-plugin-spike.sh` in a fresh build directory reproduced `fcfaf0fc03e5…` byte for byte.
+- Sprint 1 regression on the rebuilt binary: 16/16 PASS `20261011-135720-patched-a47e51a-sprint1`; 346/346 captures
+  byte-identical to `20261011-130618-patched-30c5548-sprint1`.
+- US3 on the rebuilt binary: 8/8 PASS `20261011-140824-patched-c836666-phase2`; 28/28 captures byte-identical to
+  `20261011-134322-patched-af8c079-phase2`.
+- Spike on stock + fresh plugin: Sprint 1 16/16 PASS `20261011-140220-spike-a47e51a-sprint1` (346/346 identical to
+  the rebuilt patched captures); stability PASS `20261011-140723-spike-a47e51a-spike_stability`.
+- Spike US3, first attempt `20261011-140629-spike-a47e51a-phase2`: **BLOCKED** (t_pointer and t_popup at scale 1).
+  Cause: `tests/native/pointer_driver.py` parsed the client's JSONL while the client was still writing its last line
+  (`JSONDecodeError`), a harness race for either build. Fixed in `c836666` (complete records only); no criterion
+  changed. Re-run: patched 8/8 PASS `…-140824-patched-c836666-phase2`, spike 8/8 PASS
+  `20261011-140925-spike-c836666-phase2`, 28/28 captures identical between them and to the earlier spike run.
+- Every archive above passes `sha256sum -c`; patched runs record binary `a157e6a8`, spike runs record stock
+  `927f6f64` and plugin `fcfaf0fc03e5`.
+- Non-native checks at `c836666`: ctest 297/297; analyzer tests 11/11; build-script tests 3/5/18 (per script, with
+  `HYPRVX_AGENT` set); identity refusal PASS; single-transform lint PASS (9 patches) and self-test PASS; `bash -n`
+  and `py_compile` clean.
+
+Result: the clean-room re-run reproduces every Phase 2 result. No discrepancy with the source review above.
