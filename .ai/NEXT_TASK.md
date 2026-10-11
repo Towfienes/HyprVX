@@ -1,6 +1,6 @@
 # HyprVX Next Task
 
-## V3 status (2026-10-11, Claude-only since DV3-15)
+## V3 status (2026-10-12, Claude-only since DV3-15)
 
 `specs/001-native-spatial-camera/tasks.md` was approved at `966e6b6`. Claude Code is the only implementation agent
 (DV3-15); the Codex lane and work orders are retired and the Codex clone is a read-only historical reference.
@@ -19,8 +19,11 @@
   data model, contracts (drift-control 1.0, mechanism-api 1.0, transform 1.2, test-tooling 1.4), quickstart,
   checklists and `tasks.md` (T001–T062) are written; `/speckit-analyze` found 1 CRITICAL (license record of copied
   functions) and 3 MEDIUM gaps, all fixed in `tasks.md` (`8f1ac97`).
-- **Next: STOP for the user's approval of `specs/002-multi-window-drift-mvp/tasks.md`** (Spec Kit: implementation only
-  after tasks approval). Then `/speckit-implement` from T001. No push. Native runs need the host GPU profile Integrated.
+- `tasks.md` approved by the user (2026-10-11); `/speckit-implement` ran T001–T061 (Claude only). Final code `420efff`;
+  see `.ai/CURRENT_STATE.md` "Feature 002 at the T062 gate".
+- **Next: STOP at T062 for the user's approval of the Feature 002 gate**: review the T-SCENARIO image set (V-25,
+  `specs/002-multi-window-drift-mvp/checklists/verification.md`) and the open items. Only after approval: merge into
+  `v3/spec-foundation` or start a later feature. No push. Native runs need the host GPU profile Integrated.
 - V-20 / SC-005: PASS, signed by the user (Towfienes) on 2026-10-11 in `checklists/verification.md`.
 
 ## Sprint 1 goal

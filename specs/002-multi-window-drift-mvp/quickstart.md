@@ -21,7 +21,11 @@ set -x HYPRVX_AGENT claude
 bash scripts/apply-patches.sh --variant patched --reset; and bash scripts/build-hyprland.sh --variant patched
 bash scripts/build-plugin.sh --form P    # policy plugin against the patched prefix
 bash scripts/build-plugin.sh --form S    # policy + mechanism hooks against the stock prefix
+bash scripts/build-plugin.sh --form S --dev            # form S with the dev control, used by the nested tests
+bash scripts/build-hyprland.sh --variant patched-nodev # patched build without the dev control (FR-016, t_fr016)
 ```
+
+For the R1 clean-room rebuild (T057) run the same commands from a fresh `git worktree` with `env CCACHE_DISABLE=1`.
 
 Expected: `build-info.json` in the patched prefix with the new patchset id, and two plugins, each with its own
 `build-info.json` recording the plugin sha256 and its source hash.
@@ -31,8 +35,12 @@ Expected: `build-info.json` in the patched prefix with the new patchset id, and 
 ```fish
 bash scripts/check-single-transform.sh --self-test; and bash scripts/check-single-transform.sh
 python3 -I tools/tests/test_analyze_frame.py
-bash tests/native/harness/test_identity_refusal.sh
+for s in fetch-hyprland.sh build-hyprland.sh build-plugin.sh apply-patches.sh; python3 -I tools/tests/test_build_scripts.py $s; end
+bash tests/native/static_evidence.sh   # archived V-03 (identity refusal, with the tool paths) and V-28 (lint, incl. policy)
 ```
+
+`tests/native/harness/test_identity_refusal.sh` needs the vkeyboard and x11client paths as arguments; without them it
+reports those cases NOT RUN and FAILS, so use `static_evidence.sh`, which builds the tools and passes them.
 
 ## 4. Try Drift Mode by hand (nested only)
 
@@ -53,10 +61,16 @@ pointer, and after `hyprvx:off` the view is the stock view again.
 ## 5. Native suites
 
 ```fish
-bash tests/native/run_feature002.sh          # §9 tests, forms P and S, scales 1 and 1.25
-bash tests/native/run_sprint1.sh; and bash tests/native/run_phase2.sh   # Feature 001 regression, plugin loaded, Drift OFF
-bash tests/native/t_scenario.sh              # 12-step scenario captures for human review (SC-008)
+bash tests/native/run_feature002.sh          # §9 tests incl. t_scenario, forms P and S, scales 1 and 1.25
+for f in P S; env HVX_REGRESSION_FORM=$f bash tests/native/run_sprint1.sh; env HVX_REGRESSION_FORM=$f bash tests/native/run_phase2.sh; end
+                                             # Feature 001 regression with plugin $f loaded and Drift OFF (V-24)
+bash tests/native/t_fr016.sh                 # dev control absent from form S and patched-nodev (FR-016)
+bash tests/native/host_safety_audit.sh       # V-26, read-only, after the last nested session
+python3 -I tests/native/compare_forms.py --suite-p <suite> --suite-s <suite> --out /tmp/parity.json   # V-23
 ```
+
+Without `HVX_REGRESSION_FORM`, `run_sprint1.sh` and `run_phase2.sh` run the patched build with no plugin (the Feature 001
+suites as they were), which is not the V-24 check.
 
 Expected: every test PASS with archived evidence (`~/.local/share/hyprvx/evidence/claude/<run-id>/`, `sha256sum -c`
 OK). The scenario image set goes to `checklists/verification.md` for the user's review.

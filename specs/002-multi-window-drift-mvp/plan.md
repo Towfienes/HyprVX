@@ -68,6 +68,21 @@ Design-time assessment; runtime evidence goes to `checklists/verification.md`.
 | IX License | PASS | Virtual-keyboard XML (MIT, from Hyprland `protocols/`) is recorded in `docs/THIRD_PARTY.md`. Copied Hyprland functions in form S stay BSD-3 (recorded in Feature 001). No DriftWM code |
 | X Reproducible | PASS | Pinned upstream plus the ordered series 0001–0013; plugins built in fresh directories with `build-info.json` (compiler, headers prefix id, source hash) |
 
+### Re-check of the delivered code (T060, 2026-10-12, final commit `420efff`)
+
+| Principle | Status | Evidence on the delivered code |
+|---|---|---|
+| I Host safety | PASS | V-26 audit `20261012-032253-audit-7f12c15-v26`: 1114 nested sessions, none with the host signature, private runtime dirs, agent-prefix binaries only, host `hypr`/`caelestia` unchanged; V-03 refusals (`20261012-032136-static-420efff-f002_static`). Known limit: x11client completes the X handshake before its SO_PEERCRED check (xcb), after the environment and DISPLAY checks; it draws only |
+| II Evidence | PASS | Every PASS in `checklists/verification.md` cites an archive; 22 cited archives and 366 per-test runs pass `sha256sum -c`; SC-008 (V-25) awaits the user's review and signature |
+| III Normal equivalence | PASS | T-DRIFT-OFF, T-PANIC-DRIFT, T-PLUGIN-INERT and V-24 on the final commit in both forms; source review `r1-source-verification.md` (a) |
+| IV Single transform | PASS | V-28 lint on 0001–0013 and the 19 policy/form S sources (not vacuous); the core `current.zoom * factor` lint hit is a zoom target passed to `anchorZoom`, not an equation (R1 finding 3) |
+| V Reversibility | PASS | No write of workspace, `L`, tiling or layout outside Hyprland's floating resize (R1 (c)); T-MOVE: no `movewindow*`, `L` unchanged |
+| VI Performance | PASS (measurement deferred) | Listeners return at once with Drift OFF; no polling or per-frame IPC. Not measured in this feature: the damage union adds each damaged box at every offset window's offset (conservative, cost grows with the number of offset windows) |
+| VII Caelestia | PASS (layers) / NOT RUN (Caelestia) | Layer, lock, IME and cursor never offset (R1 (d), T-MULTI layer region identical); Caelestia itself not run in nested |
+| VIII Reuse | PASS | As planned; form S reuses the patched bodies through `gen_copies.py` |
+| IX License | PASS | `docs/THIRD_PARTY.md` records the virtual-keyboard XML and the 20 member functions + 5 helpers copied into form S |
+| X Reproducible | PASS | V-27: two clean-room builds of the final code; plugins bit-identical, Hyprland differs only by the `git am` commit (same tree), captures 556/556 identical per form |
+
 ## Project Structure
 
 ### Documentation (this feature)

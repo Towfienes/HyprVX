@@ -420,3 +420,26 @@ Production safety: host Hyprland and Caelestia untouched; no plugin loaded; no p
   found the commit-damage seam) and `20261011-153555-patched-8ef32a4-u0_spike` (FAIL 7/8).
 - Spike code stays on the throwaway branches `v3/u0-spike` (repo) and `u0-spike` (draft tree); never merged. Keep both
   branches: the evidence `git_sha` values point at them.
+
+## Feature 002 at the T062 gate (2026-10-12)
+
+- Branch `v3/002-multi-window-drift-mvp`, final code `420efff` (docs after it). `tasks.md` T001–T061 done with archived
+  evidence; T062 (the Feature 002 gate) waits for the user. Not merged, not pushed; `dev` still at `15f75b0`.
+- Delivered: CameraMath 1.2 (`offsetCamera`, `worldDelta`), `DriftModel` (core), patches 0010–0013 (patchset
+  `d291f743b864`: world offsets in render/cull/damage, hit-test/input, floating resize through the camera, dev control
+  1.2), the `hyprvx-drift` policy plugin in form P (patched build) and form S (stock + mechanism hooks, DV3-16),
+  vkeyboard/x11client test tools, `scripts/build-plugin.sh`, build variant `patched-nodev`.
+- Verification (`specs/002-multi-window-drift-mvp/checklists/verification.md`): V-01..V-24, V-26..V-28 PASS; V-25
+  (T-SCENARIO image set, SC-008) NOT AUTOMATABLE, awaiting the user's review and signature. Final suite
+  `20261012-023154-suite-420efff-feature002` (22 tests × forms P, S × scales 1, 1.25 = 88 PASS); P vs S 556/556 captures
+  identical; Feature 001 regression with each plugin loaded PASS; V-27 two clean-room builds reproducible.
+- Found and fixed during T057 (R1): policy hyprctl prefix match answered `hyprvx-dev` on non-dev builds (`2deb797`,
+  FR-016); `t_fr016` static method (`6dce348`); timing-dependent resize drags in `t_resize`/`t_drag_scope` (`420efff`).
+  Failed and blocked runs are kept in the archive and the integration log.
+- Open items for the gate: a camera or offset change during a compositor floating resize makes the anchor jump (not in
+  any scenario); damage union cost grows with the number of offset windows (performance not measured, VI deferred);
+  x11client checks its X peer after the xcb handshake; form S has no camera hint for special-workspace windows drawn
+  inline (carried from Feature 001; never a Drift scene); scenario uses stand-in clients, not VS Code/Firefox;
+  Caelestia NOT RUN in nested; step 10 (pin) and snap are Phase 5.
+- Production safety: V-26 audit `20261012-032253-audit-7f12c15-v26` PASS (1114 nested sessions); host Hyprland,
+  Caelestia and GPU config untouched.

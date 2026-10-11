@@ -5,6 +5,9 @@ retained archive `~/.local/share/hyprvx/evidence/claude/<run-id>/` whose `SHA256
 (`contracts/test-tooling.md` 1.4, base 1.3 §8). A dispatcher `ok` or `hyprctl hyprvx state` is never an artifact.
 Native tests take `HVX_FORM=P|S`; until Phase 9 they run in form P (or with the dev control on the patched build).
 
+Re-verified at T060 (2026-10-12): the 22 archives cited below and the 366 per-test runs listed in their `results.txt`
+all pass `sha256sum -c`.
+
 | ID | Level | Check | Status | Artifact |
 |---|---|---|---|---|
 | V-01 | L2 | Transform 1.2 unit tests: invariants 8–10 (seeded, ≥ 10⁴ cases) plus all 1.1 invariants | PASS | `~/.local/share/hyprvx/evidence/claude/20261011-192636-unit-488cd21-f002_unit/` (fresh build of a copy; ctest 326/326; CameraMath + DriftModel 39/39 for seeds default and 987654321; mutants 2/2 killed for 1.2: offsetCamera sign, worldDelta multiply) |
