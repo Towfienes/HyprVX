@@ -69,20 +69,23 @@ sys.exit(1 if reasons else 0)
 PY
 
 # 2. Compositor move drag (side button 275) and 3. border resize drag (BTN_LEFT in the right border grab area: drawn
-# right edge x = 470, (474,200) -> world (948,400), 8 px right of the edge, inside border 2 + grab 15).
+# right edge x = 470, (474,300) -> world (948,600), 8 px right of the edge, inside border 2 + grab 15; below the
+# window centre y = 400, so stock picks the bottom-right corner: LayoutManager.hpp cornerFromBox).
 before=$(geometry before)
 printf 'move 270 200\ndown 275\nmove 370 260\nmove 470 320\nup 275\n' | steps move_drag
 after_move=$(geometry after_move)
-printf 'move 474 200\ndown\nmove 520 240\nmove 560 280\nup\n' | steps resize_drag
+printf 'move 474 300\ndown\nmove 520 340\nmove 560 380\nup\n' | steps resize_drag
 after_resize=$(geometry after_resize)
 printf '%s\n%s\n%s\n' "$before" "$after_move" "$after_resize" > "$HVX_EVID/geometry.txt"
 [[ $before != missing && $before == "$after_move" ]] || { echo "move drag changed the geometry while non-identity" >&2; result=FAIL; }
-# Resize by d = (560 - 474) screen px = 172 world units at z = 0.5 (worldDelta), right edge only.
+# Bottom-right corner resize by d = (560 - 474, 380 - 300) = (86, 80) screen px = (172, 160) world units at z = 0.5
+# (worldDelta); the top-left corner stays.
 python3 -I - "$after_move" "$after_resize" "$TOL" > "$HVX_EVID/resize.check" << 'PY' || { echo "border resize did not follow the camera" >&2; result=FAIL; }
 import json, sys
 a, b, tol = json.loads(sys.argv[1]), json.loads(sys.argv[2]), float(sys.argv[3])
-ok = a["at"] == b["at"] and abs(b["size"][0] - (a["size"][0] + 172)) <= tol and b["size"][1] == a["size"][1]
-print(json.dumps({"before": a, "after": b, "expect_width": a["size"][0] + 172, "ok": ok}))
+want = [a["size"][0] + 172, a["size"][1] + 160]
+ok = a["at"] == b["at"] and all(abs(b["size"][i] - want[i]) <= tol for i in (0, 1))
+print(json.dumps({"before": a, "after": b, "expect_size": want, "ok": ok}))
 sys.exit(0 if ok else 1)
 PY
 
