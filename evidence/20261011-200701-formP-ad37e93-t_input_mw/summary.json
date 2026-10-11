@@ -1,0 +1,22 @@
+{
+  "run_id": "20261011-200701-formP-ad37e93-t_input_mw",
+  "test": "t_input_mw",
+  "result": "BLOCKED",
+  "agent": "claude",
+  "git_sha": "ad37e938912ab4ec16f6ca5f24b9c6017986c62f",
+  "note": "identity setup: a move to A's centre did not reach A at (400,300)",
+  "artifacts": [
+    "a.jsonl",
+    "b.jsonl",
+    "build-info-patched.json",
+    "clients.json",
+    "preflight.log",
+    "session.log",
+    "setup.cmds",
+    "setup.steps.json",
+    "vp.jsonl"
+  ],
+  "not_run": [
+    "identity setup: a move to A's centre did not reach A at (400,300)"
+  ]
+}
