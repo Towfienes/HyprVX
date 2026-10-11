@@ -83,7 +83,7 @@ hvx_tools_build() {
     if [[ ! -f $build/build.ninja ]]; then
         cmake -S "$HVX_REPO" -B "$build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DHYPRVX_WITH_WAYLAND_PLATFORM=ON > "$build.configure.log" 2>&1
     fi
-    cmake --build "$build" --target hyprvx_testclient hyprvx_vpointer -j2 > "$build.build.log" 2>&1
+    cmake --build "$build" --target hyprvx_testclient hyprvx_vpointer hyprvx_vkeyboard hyprvx_x11client -j2 > "$build.build.log" 2>&1
     echo "$build"
 }
 hvx_testclient() {
@@ -132,6 +132,131 @@ hvx_pointer_run() {
 
 hvx_client_cmd() {
     printf '%s\n' "$2" > "$HVX_EVID/$1.fifo"
+}
+
+# ---- Feature 002 (test-tooling 1.4) -------------------------------------------------------------------------------
+# HVX_FORM=P|S selects the delivery form (default P): form P runs the patched build (mechanism in the binary, dev control
+# from -DHYPRVX_DEV=ON) and loads plugin/P/hyprvx-drift-P.so for policy tests; form S runs the stock build and always
+# loads plugin/S-dev/hyprvx-drift-S.so (policy + mechanism hooks + dev control; scripts/build-plugin.sh --form S --dev).
+HVX_FORM="${HVX_FORM:-P}"
+case $HVX_FORM in P|S) ;; *) echo "HVX_FORM must be P or S" >&2; exit 2 ;; esac
+hvx_form_variant() { [[ $HVX_FORM == P ]] && echo patched || echo stock; }
+hvx_form_label() { echo "form$HVX_FORM"; }
+hvx_plugin_path() {
+    [[ $HVX_FORM == P ]] && echo "$HOME/.cache/hyprvx/$HYPRVX_AGENT/plugin/P/hyprvx-drift-P.so" \
+        || echo "$HOME/.cache/hyprvx/$HYPRVX_AGENT/plugin/S-dev/hyprvx-drift-S.so"
+}
+
+# hvx_plugin_load [PATH]: loads the form's plugin (or PATH) into the verified session; its sha256 and build-info go to
+# the evidence. A refused load is returned to the caller (tests decide whether that is BLOCKED or the result).
+hvx_plugin_load() {
+    local so=${1:-$(hvx_plugin_path)} reply
+    [[ -f $so ]] || { echo "no plugin at $so; run scripts/build-plugin.sh" >&2; return 1; }
+    reply=$(hvx_nested plugin load "$so" 2>&1) || { printf '%s\n' "$reply" >> "$HVX_EVID/plugin-load.log"; return 1; }
+    printf '%s\n' "$reply" >> "$HVX_EVID/plugin-load.log"
+    sha256sum "$so" > "$HVX_EVID/plugin.sha256"
+    [[ -f $(dirname -- "$so")/build-info.json ]] && cp "$(dirname -- "$so")/build-info.json" "$HVX_EVID/build-info-plugin.json"
+    return 0
+}
+hvx_plugin_unload() {
+    hvx_nested plugin unload "${1:-$(hvx_plugin_path)}"
+}
+
+# hvx_start_form [--policy] START_ARGS...: starts the form's compositor (patched or stock). Form S always loads its
+# plugin (the mechanism lives there); form P loads the policy plugin only with --policy. Build info of the prefix is
+# copied to the evidence.
+hvx_start_form() {
+    local policy=0
+    [[ ${1:-} == --policy ]] && { policy=1; shift; }
+    local variant
+    variant=$(hvx_form_variant)
+    hvx_copy_build_info "$variant"
+    hvx_nested start --variant "$variant" "$@" && HVX_OWN_SESSION=1 || return 1
+    if [[ $HVX_FORM == S || $policy == 1 ]]; then
+        hvx_plugin_load || return 1
+    fi
+}
+
+# hvx_hyprctl_form ARGS...: hyprctl of the form's prefix through `nested.sh run` (dispatchers, keyword, -j queries).
+hvx_hyprctl_form() {
+    hvx_hyprctl "$(hvx_form_variant)" "$@"
+}
+# hvx_dispatch NAME [ARGS...]: a dispatcher; the reply is printed and never evidence (Constitution II).
+hvx_dispatch() {
+    hvx_hyprctl_form dispatch "$@"
+}
+
+# hvx_vkeyboard_start NAME: hyprvx-vkeyboard on the nested display with control FIFO NAME.fifo and log NAME.jsonl.
+hvx_vkeyboard_start() {
+    local name=$1 fifo="$HVX_EVID/$1.fifo" log="$HVX_EVID/$1.jsonl" vk
+    vk="$(hvx_tools_build)/hyprvx-vkeyboard"
+    rm -f "$fifo"
+    mkfifo -m 600 "$fifo"
+    : > "$log"
+    hvx_nested run --background -- "$vk" --log "$log" --control "$fifo" > /dev/null
+    hvx_wait_for "$log" '"ev": "ready"' || hvx_die_blocked "vkeyboard $name never became ready"
+}
+# hvx_key NAME COMMAND KEY: one vkeyboard command, waiting for its done line.
+hvx_key() {
+    local name=$1 log="$HVX_EVID/$1.jsonl" before
+    before=$(grep -c '"ev": "done"' "$log" || true)
+    printf '%s %s\n' "$2" "$3" > "$HVX_EVID/$name.fifo"
+    local deadline=$(($(date +%s%N) + HVX_READY_TIMEOUT * 1000000000))
+    while (($(grep -c '"ev": "done"' "$log" || true) <= before)); do
+        (($(date +%s%N) < deadline)) || hvx_die_blocked "vkeyboard $name did not complete '$2 $3'"
+        sleep 0.01
+    done
+}
+
+# hvx_x11client_start NAME SIZE [x11client args...]: hyprvx-x11client through `nested.sh run --x11` (DISPLAY resolved
+# only through the verified compositor PID); waits for its first drawn line.
+hvx_x11client_start() {
+    local name=$1 size=$2
+    shift 2
+    local fifo="$HVX_EVID/$name.fifo" log="$HVX_EVID/$name.jsonl" x11
+    x11="$(hvx_tools_build)/hyprvx-x11client"
+    rm -f "$fifo"
+    mkfifo -m 600 "$fifo"
+    : > "$log"
+    hvx_nested run --background --x11 -- "$x11" --size "$size" --title "$name" --log "$log" --control "$fifo" "$@" \
+        > /dev/null || hvx_die_blocked "x11client $name: nested XWayland display not resolvable"
+    hvx_wait_for "$log" '"ev": "drawn"' 10 || hvx_die_blocked "x11client $name never drew"
+}
+# X11 ready rule (test-tooling 1.4 4c): drawn for a new redraw, then the section 5 ready rule on a Wayland client twice.
+hvx_x11_ready() {
+    local name=$1 wayland=$2 log="$HVX_EVID/$1.jsonl" before
+    before=$(grep -c '"ev": "drawn"' "$log" || true)
+    hvx_client_cmd "$name" redraw
+    local deadline=$(($(date +%s%N) + HVX_READY_TIMEOUT * 1000000000))
+    while (($(grep -c '"ev": "drawn"' "$log" || true) <= before)); do
+        (($(date +%s%N) < deadline)) || hvx_die_blocked "x11client $name did not redraw"
+        sleep 0.01
+    done
+    hvx_ready "$wayland"
+}
+
+# hvx_events_start: socket2 event log of the verified session in events.log (tests/native/events_log.py).
+hvx_events_start() {
+    : > "$HVX_EVID/events.log"
+    hvx_nested run --background -- python3 -I "$HVX_REPO/tests/native/events_log.py" "$HVX_EVID/events.log" > /dev/null
+    hvx_wait_for "$HVX_EVID/events.log" 'hyprvx-events-log>>ready' || hvx_die_blocked "socket2 event logger did not start"
+}
+
+# hvx_clients_snapshot NAME: the window model Drift must not change (hyprctl -j clients: address, workspace, at, size,
+# floating, fullscreen), sorted, in NAME.clients.json.
+hvx_clients_snapshot() {
+    hvx_hyprctl_form -j clients | python3 -I -c "
+import json, sys
+clients = json.load(sys.stdin)
+keep = [{k: c.get(k) for k in ('address', 'class', 'workspace', 'at', 'size', 'floating', 'fullscreen', 'mapped')} for c in clients]
+print(json.dumps(sorted(keep, key=lambda c: c['address']), indent=1, sort_keys=True))" > "$HVX_EVID/$1.clients.json"
+}
+
+# hvx_window_address CLASS: the address of the (first) mapped client of that class.
+hvx_window_address() {
+    hvx_hyprctl_form -j clients | python3 -I -c "
+import json, sys
+print(next(c['address'] for c in json.load(sys.stdin) if c.get('class') == sys.argv[1]))" "$1"
 }
 
 # hvx_wait_for FILE PATTERN [TIMEOUT]: waits until a line containing PATTERN appears.

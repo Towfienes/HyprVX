@@ -78,9 +78,16 @@ exec-once = touch "$XDG_RUNTIME_DIR/hyprvx-exec-once"
 
 # The test client floats at a fixed logical position with its own fixed size (min = max size).
 windowrule = match:class ^(hyprvx-testclient)$, float on, move 140 100
-# Second client for the focus test (t_focus.sh, app-id hyprvx-testclient-b); no other test starts it.
+# Second client for the focus test (t_focus.sh, app-id hyprvx-testclient-b) and the Feature 002 multi-window scenes.
 windowrule = match:class ^(hyprvx-testclient-b)$, float on, move 960 560
+# Feature 002 (test-tooling 1.4 section 5): a third Wayland client for multi-window scenes, and the X11 test client
+# (WM_CLASS hyprvx-x11client), both floating at fixed positions. No Feature 001 test starts them.
+windowrule = match:class ^(hyprvx-testclient-c)$, float on, move 520 320
+windowrule = match:class ^(hyprvx-x11client)$, float on, move 240 160
 
 # Compositor move drag without a modifier: hyprvx-vpointer has no keyboard, so the side button (BTN_SIDE, 275) stands
 # in for Super+LMB (same movewindow mouse bind and drag controller). Only t_drag_scope.sh presses it.
 bindm = , mouse:275, movewindow
+# Hyprland's own resize bind for T-RESIZE (Feature 002 FR-009), on BTN_EXTRA (276) for the same reason; only t_resize.sh
+# presses it.
+bindm = , mouse:276, resizewindow
