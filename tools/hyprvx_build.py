@@ -217,7 +217,9 @@ def main(repo, variant, dry_run):
     compiler = re.search(r"^CMAKE_CXX_COMPILER:FILEPATH=(.+)$", (build / "CMakeCache.txt").read_text(), re.MULTILINE)
     if not compiler:
         blocked("configured C++ compiler is unavailable")
-    info = {"variant": variant, "dev_control": base == "patched" and not nodev, "upstream_commit": pin, "source_commit": head, "patchset_id": patchset_id,
+    # "variant" is the source variant (nested.py matches it against --variant); build_variant and dev_control tell a
+    # patched-nodev build apart.
+    info = {"variant": base, "build_variant": variant, "dev_control": base == "patched" and not nodev, "upstream_commit": pin, "source_commit": head, "patchset_id": patchset_id,
             "patches": [{"file": str(p.relative_to(repo)), "sha256": hashlib.sha256(p.read_bytes()).hexdigest()}
                         for p in patches], "git_dirty": git_dirty,
             "binary_sha256": hashlib.sha256((prefix / "bin/Hyprland").read_bytes()).hexdigest(),
