@@ -173,13 +173,13 @@ description: "Task list for Feature 002 — Multi-Window Drift MVP (Option A), C
 
 ### Tests
 
-- [ ] T041 [P] [US3] Write `tests/native/t_keys.sh` (T-KEYS) and `tests/native/t_scroll.sh` (T-SCROLL): key taps reach only the clicked offset window; `scroll` reaches the window under the pointer, while Super + `scroll` zooms and the client gets nothing
-- [ ] T042 [P] [US3] Extend `tests/native/t_x11.sh` with a policy case: the override-redirect menu takes its parent's offset (and the focused-window fallback when it has no parent), drawn attached and receiving input
-- [ ] T043 [P] [US3] Write `tests/native/t_fullscreen.sh` (T-FULLSCREEN): a fullscreen window in Drift is byte-identical to the stock fullscreen capture; leaving fullscreen restores the Drift view
+- [x] T041 [P] [US3] Write `tests/native/t_keys.sh` (T-KEYS) and `tests/native/t_scroll.sh` (T-SCROLL): key taps reach only the clicked offset window; `scroll` reaches the window under the pointer, while Super + `scroll` zooms and the client gets nothing
+- [x] T042 [P] [US3] Extend `tests/native/t_x11.sh` with a policy case: the override-redirect menu takes its parent's offset (and the focused-window fallback when it has no parent), drawn attached and receiving input
+- [x] T043 [P] [US3] Write `tests/native/t_fullscreen.sh` (T-FULLSCREEN): a fullscreen window in Drift is byte-identical to the stock fullscreen capture; leaving fullscreen restores the Drift view
 
 ### Implementation
 
-- [ ] T044 [US3] Implement override-redirect offset inheritance (R9) on window open in `platform/plugin/src/policy/Windows.cpp`; logged when it falls back to 0
+- [x] T044 [US3] Implement override-redirect offset inheritance (R9) on window open in `platform/plugin/src/policy/Windows.cpp`; logged when it falls back to 0
 - [ ] T045 [US3] Run T041–T043, T017 and T019 in form P; debug until V-05, V-07, V-16..V-18 PASS
 
 ---
