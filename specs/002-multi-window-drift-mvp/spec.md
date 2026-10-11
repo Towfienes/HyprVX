@@ -57,7 +57,8 @@ fullscreen) and a capture, enter Drift, change the camera and move windows, leav
    build showing the same scene.
 3. **Given** the same session, **When** Drift Mode is turned off, **Then** every window's workspace, logical
    position, size, floating and fullscreen state equals what it was before Drift Mode was turned on (or what
-   Hyprland itself changed meanwhile), and no window-move event was emitted by Drift.
+   Hyprland itself changed meanwhile, and the sizes of floating windows the user resized in Drift, FR-009), and no
+   window-move event was emitted by Drift.
 4. **Given** Drift Mode was used and turned off, **When** it is turned on again on the same workspace, **Then** the
    windows reappear at the world positions they had and the workspace's last camera is restored.
 5. **Given** any state, **When** the user invokes panic, **Then** Drift Mode is off within one frame and the capture
@@ -150,7 +151,17 @@ layout position.
 ### Edge Cases
 
 - A window moved to another workspace by Hyprland or by the user keeps its world offset; it is shown in Drift only
-  when its workspace is the active one (Option A).
+  when its workspace is the active one (Option A). A drag of that window ends when it leaves the scene.
+- Enabling Drift while the monitor's active workspace is a special workspace keeps Drift OFF (`err:state`); special
+  workspaces never get a camera.
+- Unloading the policy plugin while Drift is on acts as panic (identity camera, mechanism offsets 0) and the
+  compositor keeps running.
+- A monitor that is removed while in Drift leaves Drift; when it is added again, Drift stays OFF until the user turns
+  it on.
+- A workspace that is destroyed and recreated with the same id gets back the camera stored for that id during the
+  session.
+- A pointer constraint or lock held by a client stays in force across entering and leaving Drift; its region follows
+  the camera after the change (Feature 001 warp/constraint seam).
 - Hyprland re-tiles windows (new window, closed window, layout change) while Drift is on: logical positions change as
   stock; world offsets are kept, so windows may overlap in the canvas.
 - The focused monitor is removed or disabled while Drift is on: Drift turns off for it without a crash.
@@ -166,29 +177,39 @@ layout position.
 ### Functional Requirements
 
 - **FR-001**: The system MUST provide a Drift Mode per monitor with the states OFF, ENTERING, DRIFT and EXITING, and
-  user-bindable commands to toggle it, turn it off and panic. Every transition MUST be idempotent. Entering MUST
-  validate that the running compositor matches the build HyprVX was made for; a mismatch MUST keep Drift off and
-  notify the user.
-- **FR-002**: Super+Escape MUST turn Drift Mode off. Panic MUST turn Drift off on every monitor within one frame.
+  user-bindable commands to toggle it, turn it off and panic. Every transition MUST be idempotent and MUST complete
+  within the command or event that triggers it, so no input is handled in ENTERING or EXITING. Entering MUST require a
+  regular active workspace and MUST validate that the running compositor matches the build HyprVX was made for
+  (Hyprland commit; patchset id in the patched form; plugin API hash in the stock form). A mismatch MUST keep Drift
+  off and show a notification that names the expected and the running build.
+- **FR-002**: Super+Escape MUST turn Drift Mode off. Panic MUST turn Drift off on every monitor within one frame,
+  measured as: the first capture taken after the panic command returns equals the stock image (frame counts are not
+  measured in this project).
 - **FR-003**: With Drift Mode off, the compositor MUST behave as stock: pixel-identical output for the same scene, no
-  extra render pass elements, no input interception (Constitution III).
+  extra render pass elements, and no input interception, meaning no Drift listener cancels any event (Constitution
+  III).
 - **FR-004**: Each workspace MUST have its own camera while in Drift Mode (Option A: the scene of a monitor is its
   active workspace). Leaving Drift MUST show the identity view; the cameras and world offsets MUST be kept for the
   session and restored when Drift is entered again.
 - **FR-005**: HyprVX MUST own a world offset per window. A window is drawn, culled, damaged and hit-tested at its
   logical box plus its world offset, through the single camera transform (Constitution IV). Drift MUST NOT write any
   window's workspace, logical geometry, tiled/floating state or layout (Constitution V).
-- **FR-006**: Popups, subsurfaces, decorations and X11 windows (including override-redirect windows tied to a parent)
-  MUST follow the world offset of the window they belong to, for drawing and for input.
+- **FR-006**: Popups, subsurfaces, decorations and X11 windows MUST follow the world offset of the window they belong
+  to, for drawing and for input. An X11 override-redirect window MUST take the offset of its transient-for parent,
+  otherwise of the focused X11 window of the same client, otherwise 0. Layer surfaces and their popups never get an
+  offset.
 - **FR-007**: The camera MUST be controllable in Drift Mode by user-bindable commands (pan by a screen distance, zoom
-  by a factor anchored at the pointer, reset to identity), by Super + scroll wheel (anchor zoom) and by Super + left
-  button drag on empty canvas (pan). Zoom MUST stay within the MVP range [0.1, 2.0].
+  by a factor anchored at the pointer, reset to identity), by Super + scroll wheel (anchor zoom, one step per wheel
+  detent) and by Super + left button drag on empty canvas (pan). Empty canvas means no window content and no
+  top/overlay layer surface under the pointer. Zoom MUST stay within the MVP range [0.1, 2.0].
 - **FR-008**: In Drift Mode, Super + left button drag on a window MUST move that window by changing only its world
   offset, by the screen distance divided by the zoom.
-- **FR-009**: In Drift Mode, border drags on floating windows MUST resize the window for real, through the inverse
-  transform; border drags on tiled windows MUST be ignored (and logged once per drag).
+- **FR-009**: In Drift Mode, resize drags on floating windows (border drags and Hyprland's own resize bind) MUST
+  resize the window for real, through the inverse transform; resize drags on tiled windows MUST be ignored (and logged
+  once per drag).
 - **FR-010**: Pointer focus, click focus, keyboard focus and scrolling MUST reach the window drawn under the pointer,
-  with surface-local coordinates computed through the inverse transform and the window's world offset.
+  with surface-local coordinates computed through the inverse transform and the window's world offset. The only input
+  Drift consumes is its own controls in DRIFT (Super + Escape, Super + wheel, Super + left button).
 - **FR-011**: A window that maps while Drift Mode is on MUST get a world offset that puts its centre at the centre of
   the viewport.
 - **FR-012**: Fullscreen windows MUST be drawn with the identity camera while fullscreen.
@@ -196,9 +217,10 @@ layout position.
   emit no synthetic compositor events (Constitution VII).
 - **FR-014**: The mechanism MUST be built reproducibly from the pinned upstream commit plus the ordered patch series,
   and MUST also be deliverable as the plugin on stock Hyprland selected by DV3-16; both forms MUST pass the same
-  suite.
+  suite with byte-identical captures.
 - **FR-015**: All verification MUST run in the nested compositor with identity re-verification before every mutating
-  command; nothing runs against the host compositor.
+  command; nothing runs against the host compositor. Every new channel into the nested session (virtual keyboard,
+  XWayland display resolution, plugin loading) MUST refuse anything that is not the verified nested session.
 - **FR-016**: The dev-only camera control of Feature 001 MUST keep working in dev builds and MUST stay absent from
   non-dev builds.
 
@@ -218,21 +240,21 @@ layout position.
 
 - **SC-001**: After entering Drift, moving windows, changing the camera and leaving Drift, the capture is
   pixel-identical to the stock capture of the same scene in 3/3 runs, and the window list (workspace, position, size,
-  floating, fullscreen) is unchanged.
-- **SC-002**: Windows with distinct non-zero world offsets are drawn within ± 2 px of the contract position and size
-  at zoom 0.25, 0.5, 1 and 2, at output scale 1 and 1.25.
+  floating, fullscreen) is unchanged (floating test windows, so Hyprland does not re-tile during the test).
+- **SC-002**: Windows with distinct non-zero world offsets, Wayland and X11, are drawn within ± 2 px of the contract
+  position and size at zoom 0.25, 0.5, 1 and 2, at output scale 1 and 1.25.
 - **SC-003**: Pointer surface-local error is ≤ 1 px for windows with non-zero world offsets, their popups and
   subsurfaces, and X11 windows, at every sampled point.
 - **SC-004**: A window drag of screen distance d at zoom z changes the world offset by d / z within 1 px, with 0
   window-move events and an unchanged logical box.
-- **SC-005**: Anchor zoom keeps the world point under the pointer within 1 px over 20 zoom steps.
+- **SC-005**: Anchor zoom keeps the world point under the pointer within 1 px, cumulatively, over 20 zoom steps.
 - **SC-006**: Panic returns to the stock image within one frame in 10/10 trials; toggling twice in a row changes
   nothing after the first toggle.
 - **SC-007**: Partial-damage frames equal forced full-damage frames for 50 random camera/offset states with three
   windows (0 stale regions).
 - **SC-008**: The 12-step scenario, with steps 3, 5 and 7 performed by keyboard/pointer camera controls and steps 9
-  (snap part) and 10 deferred to Phase 5, completes in the nested session for both delivery forms; a human reviewer
-  confirms the captured sequence (NOT AUTOMATABLE; signed in `checklists/verification.md`).
+  (snap part) and 10 deferred to Phase 5, completes in the nested session for both delivery forms; the user reviews
+  the captured sequence and signs it in `checklists/verification.md` (NOT AUTOMATABLE).
 
 ## Assumptions
 
@@ -243,7 +265,12 @@ layout position.
   this feature.
 - Keyboard input in nested tests comes from a nested-only virtual keyboard; `ydotool` and any uinput device stay
   forbidden (host safety).
-- World offsets and cameras live for the compositor session only; persistence across restarts is later work.
+- World offsets and cameras live for the compositor session only (restored on re-entering Drift in the same session);
+  persistence across restarts is later work.
+- The per-frame cost of the per-window camera hints in Drift is measured, not budgeted, in this feature (Phase 7
+  sets budgets).
+- The open risks of DV3-16 stay open; Feature 002 adds no new private-member access beyond what the copied functions
+  already need, and records every new hook target.
 - Snap, groups/clusters, pin, navigation, bookmarks, trackpad gestures and momentum are later phases; step 10 of the
   scenario (pin) and the snap part of step 9 are therefore not part of this feature's gate.
 

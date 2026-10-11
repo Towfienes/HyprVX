@@ -12,9 +12,9 @@ Monitor = the focused monitor unless stated otherwise. Replies through `hyprctl 
 | Dispatcher | Args | Effect | Errors |
 |---|---|---|---|
 | `hyprvx:toggle` | — | OFF → ENTERING → DRIFT, or DRIFT → EXITING → OFF | `err:incompatible` (validation failed; Drift stays OFF and a notification is shown) |
-| `hyprvx:on` | — | Enter Drift; no-op if already entering or in DRIFT | `err:incompatible` |
+| `hyprvx:on` | — | Enter Drift; no-op if already entering or in DRIFT | `err:incompatible`, `err:state` (active workspace is special) |
 | `hyprvx:off` | — | Leave Drift; no-op if OFF | never fails |
-| `hyprvx:panic` | — | Every monitor OFF within one frame (camera identity, mechanism offsets 0) | never fails |
+| `hyprvx:panic` | — | Every monitor OFF within one frame (camera identity, mechanism offsets 0). Stored offsets and cameras are kept; only the dev-control `panic` also clears them | never fails |
 | `hyprvx:pan` | `<dx> <dy>` (screen logical px) | DRIFT only: `C = panByScreen(C, (dx, dy))`, i.e. content moves by (dx, dy) | `err:state` (not in DRIFT), `err:invalid` (non-finite) |
 | `hyprvx:zoom` | `<factor>` (> 0) | DRIFT only: `C = anchorZoom(C, M, pointer, z·factor, [0.1, 2.0])`, clamped to the range | `err:state`, `err:invalid` |
 | `hyprvx:reset` | — | DRIFT only: camera of the scene workspace → identity | `err:state` |
@@ -27,7 +27,7 @@ clients.
 | Input | Effect |
 |---|---|
 | Super + Escape (key press) | `hyprvx:off` on the focused monitor |
-| Super + wheel (vertical) | zoom by `zoom_step^(−steps)` at the pointer (wheel up = zoom in) |
+| Super + wheel (vertical) | zoom by `zoom_step` per detent at the pointer, wheel up = zoom in (steps = −value120 / 120, so high-resolution wheels give fractional steps) |
 | Super + left button on empty canvas, drag | pan: content follows the pointer |
 | Super + left button on a window, drag | move: `O(w) += Δscreen / z`; the window follows the pointer |
 
