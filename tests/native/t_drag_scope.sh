@@ -20,8 +20,6 @@ hvx_copy_build_info patched
 hvx_start --variant patched --size "$SIZE" --scale "$SCALE" > "$HVX_EVID/session.log" 2>&1 \
     || { cat "$HVX_EVID/session.log" >&2; hvx_die_blocked "nested patched session did not start"; }
 SESSION_DIR=$(hvx_session_dir)
-# The blocked-drag WARN lines must reach the nested log file; Hyprland stops file logging after startup by default.
-hvx_hyprctl patched keyword debug:disable_logs false > "$HVX_EVID/logs.reply" || hvx_die_blocked "enabling the nested log failed"
 hvx_client_start client 800x600 --resizable
 hvx_vpointer_start vp
 

@@ -35,6 +35,11 @@ animations {
     enabled = false
 }
 
+# File logging after startup (stdout logs stay off): t_drag_scope.sh checks the patched build's blocked-drag WARN lines.
+debug {
+    disable_logs = false
+}
+
 misc {
     disable_hyprland_logo = true
     disable_splash_rendering = true
