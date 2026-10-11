@@ -152,17 +152,17 @@ description: "Task list for Feature 002 — Multi-Window Drift MVP (Option A), C
 
 ### Tests
 
-- [ ] T033 [P] [US2] Write `tests/native/t_anchor.sh` (T-ANCHOR): 20 zoom steps by `hyprvx:zoom` and by Super + `scroll` at a fixed pointer; cumulative drift of the world point under the pointer ≤ 1 px (measured on the capture of a marker under the pointer)
-- [ ] T034 [P] [US2] Write `tests/native/t_pan_drift.sh` (T-PAN): `hyprvx:pan dx dy` and a Super + left drag on empty canvas move content by the request ± 1 px; a Super + left drag over a top-layer surface is not a pan
-- [ ] T035 [P] [US2] Write `tests/native/t_ws_camera.sh` (T-WS-CAMERA): two workspaces with different cameras; each switch shows its own camera; a recreated workspace id gets its stored camera
-- [ ] T036 [P] [US2] Write `tests/native/t_ws_anim.sh` (T-WS-ANIM): workspace animations enabled in the nested config at runtime; captures right after a switch in Drift equal the settled image; control: the same switch with Drift OFF is animated at the same capture times
+- [x] T033 [P] [US2] Write `tests/native/t_anchor.sh` (T-ANCHOR): 20 zoom steps by `hyprvx:zoom` and by Super + `scroll` at a fixed pointer; cumulative drift of the world point under the pointer ≤ 1 px (measured on the capture of a marker under the pointer)
+- [x] T034 [P] [US2] Write `tests/native/t_pan_drift.sh` (T-PAN): `hyprvx:pan dx dy` and a Super + left drag on empty canvas move content by the request ± 1 px; a Super + left drag over a top-layer surface is not a pan
+- [x] T035 [P] [US2] Write `tests/native/t_ws_camera.sh` (T-WS-CAMERA): two workspaces with different cameras; each switch shows its own camera; a recreated workspace id gets its stored camera
+- [x] T036 [P] [US2] Write `tests/native/t_ws_anim.sh` (T-WS-ANIM): workspace animations enabled in the nested config at runtime; captures right after a switch in Drift equal the settled image; control: the same switch with Drift OFF is animated at the same capture times
 
 ### Implementation
 
-- [ ] T037 [US2] Implement `hyprvx:pan`, `hyprvx:zoom`, `hyprvx:reset` and the config value `plugin:hyprvx:zoom_step` in `platform/plugin/src/policy/Camera.cpp`, through `DriftModel` and `CameraMath` only
-- [ ] T038 [US2] Implement Super + wheel (zoom per detent, value120-based) and Super + left drag on empty canvas (pan) in `platform/plugin/src/policy/Input.cpp`; empty canvas = no window content and no top/overlay layer surface under the pointer (FR-007)
-- [ ] T039 [US2] Implement per-workspace cameras and animation suppression on `workspace.active` in `platform/plugin/src/policy/Session.cpp` (R2, R7)
-- [ ] T040 [US2] Run T033–T036 and T016 (with policy cameras) in form P; debug until V-12..V-15 PASS
+- [x] T037 [US2] Implement `hyprvx:pan`, `hyprvx:zoom`, `hyprvx:reset` and the config value `plugin:hyprvx:zoom_step` in `platform/plugin/src/policy/Camera.cpp`, through `DriftModel` and `CameraMath` only
+- [x] T038 [US2] Implement Super + wheel (zoom per detent, value120-based) and Super + left drag on empty canvas (pan) in `platform/plugin/src/policy/Input.cpp`; empty canvas = no window content and no top/overlay layer surface under the pointer (FR-007)
+- [x] T039 [US2] Implement per-workspace cameras and animation suppression on `workspace.active` in `platform/plugin/src/policy/Session.cpp` (R2, R7)
+- [x] T040 [US2] Run T033–T036 and T016 (with policy cameras) in form P; debug until V-12..V-15 PASS
 
 ---
 
