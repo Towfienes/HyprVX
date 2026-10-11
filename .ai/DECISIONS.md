@@ -282,3 +282,46 @@ Status: accepted (user, 2026-10-10)
 Regular project-local commits are authorized on `v3/001-*` branches and for approved planning changes on
 `v3/spec-foundation`. No push, no destructive cleanup, no merge into `dev`, `main` or `v3/spec-foundation`
 without approval.
+
+### DV3-14 - Codex Auto-review for scoped escalations
+
+Status: accepted (user, 2026-10-11); effective from WO-04. WO-01 to WO-03 keep manual approval.
+
+Codex keeps `workspace-write` and `on-request`. A work order marked "Auto-review: allowed" may run with
+`approvals_reviewer = "auto_review"`, so Codex's automatic reviewer approves escalations instead of the user, only
+for: git commit/fetch/merge inside the Codex clone (no push, rebase or force), allowed source downloads,
+`systemd-run --user --scope` and builds under the heavy lock, unit-test socket binds, and system commands the work
+order lists. Starting or controlling a nested compositor, GPU/`/dev/dri`, or anything touching the host
+Wayland/Hyprland socket stays under manual user approval in a session without the auto reviewer. Writes outside the
+clone, its cache and `/tmp`, host configuration, Caelestia, `/usr` and sudo remain forbidden. Full Access and
+Bypass Permissions are never enabled. A rejection makes the item BLOCKED. Every commit lists auto-approved
+escalations in an `Escalations:` trailer. Acceptance gates, stop conditions and Claude's review and integration of
+every handoff are unchanged. Details: master plan §O3.
+
+### DV3-15 - Return to Claude-only execution
+
+Status: accepted (user, 2026-10-11). Supersedes DV3-09 (hybrid collaboration) and DV3-14 (Codex Auto-review).
+
+Claude Code is the only implementation agent. The Codex lane, work orders, cross-agent handoffs, ownership split and
+inter-agent Git synchronization are retired; master plan §O is history except O5 (resource rules). All completed
+work, integrated Codex commits, evidence and approved technical corrections (P1–P5, P10, infra-before-claims, K0,
+GATE-A, GATE-N, U0) remain. Open tasks keep their IDs, dependencies and gates and are owned by Claude. Technical
+difference: R1 (T044, T069) and T068 lose author/verifier independence; they become clean-room rebuilds with a
+source-verification report written before reading new results. The Codex clone is left untouched as a reference.
+
+### DV3-16 - Production delivery: plugin on stock Hyprland (DV3-01 outcome)
+
+Status: accepted (user, 2026-10-11, at the Feature 001 gate T071).
+
+Applying the DV3-01 rule: the plugin-hook spike (T066–T068) passed the same visual + input suites as the patch series
+with byte-identical captures, so production delivery is a plugin on stock Hyprland. The spike is **not
+production-ready**; these risks stay recorded and open (`specs/001-native-spatial-camera/delivery-decision.md`):
+24 hooks, 17 of them whole copies of patched Hyprland functions (about 1700 lines, generated from the patch series,
+which therefore stays maintained); private-member access through `#define private public`; ABI compatibility
+(same compiler and exact headers of the running binary, x86_64 trampolines, signature mismatches found only at load
+time); two seams a hook cannot reach (file-static `updateRelativeCursorCoords`, the special-workspace camera hint);
+regeneration and re-verification on every Hyprland update. Not verified: loading into the distribution binary,
+special workspaces, warp-on-focus, pointer constraints under a camera, physical hardware. The plugin is not installed
+into the host and the host Hyprland binary is not replaced. Roadmap, architecture C (patch the mechanism, plugin the
+policy) and all gates are unchanged.
+

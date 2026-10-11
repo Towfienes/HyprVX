@@ -1,0 +1,3 @@
+{"run_id": "20261011-023315-stock-2f7da5d", "test": "T014 V-01/V-03 stock build", "result": "FAIL", "agent": "claude", "git_sha": "2f7da5d",
+ "reason": "fetch, scanner, configure, compile and install succeeded; the post-build provenance check rejected a truthful version.h (GIT_COMMIT_HASH efb5099..., GIT_DIRTY clean-upstream) because it matched '#define NAME \"value\"' with a single space while version.h.in aligns values; fixed in 514f8d8; build-info.json not written",
+ "artifacts": ["preflight.log", "fetch.log", "build.log", "version.h"], "not_run": ["build-info.json"]}

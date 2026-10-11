@@ -341,3 +341,72 @@ Production safety: host Hyprland and Caelestia untouched; no plugin loaded; no p
   on scratch repos). Codex will use a separate `--no-hardlinks` clone with no access to the shared `.git`.
 - Next gate: user approval of `specs/001-native-spatial-camera/tasks.md` on branch `v3/001-native-spatial-camera`.
 - Build/compositor verification: NOT RUN (documentation and task generation only).
+
+## Pre-approval consistency fixes (2026-10-11)
+
+- Evidence handoff: raw evidence in `~/.cache/hyprvx/<agent>/evidence/<run-id>/`; Claude imports and verifies
+  (`sha256sum -c`) into the retained archive `~/.local/share/hyprvx/evidence/<agent>/<run-id>/` before ticking.
+- GATE-N: PASS only with S1/S2/P/N/H (`contracts/test-tooling.md` §6.1); analyzer defect, invalid setup and
+  unreproduced V2 defect are classified separately and never PASS.
+- `tools/vpointer` (T054) is fully inside the blocked Phase 2; no early start.
+- Build/compositor verification: NOT RUN.
+
+## Sprint 1 implementation (2026-10-11)
+
+- User approved `tasks.md` at `966e6b6` and authorized T001–T053.
+- T001/T002 done (contracts frozen; Codex clone `/home/towfienes/Projects/HyprVX-v3-codex`, branch `v3/001-codex`,
+  push disabled). WO-01/WO-02/WO-03 issued to Codex.
+- T007/T008 done: `core/include/hyprvx/core/CameraMath.hpp` (BSD-3-Clause, contract 1.1) and `hyprvx::Camera`
+  delegation. Verified: ctest 298/298, simulator output byte-identical to `ab6647c`, 200 000-case bit-exact V1
+  self-check (evidence `20261011-003807-core-e94ffd2`, archived). Independent verification is Codex's T009.
+- Patches 0001–0005 drafted (render seam, culling, damage-union rule, HYPRVX_DEV dev control); `git am` on
+  `efb5099` reproduces the draft tree; syntax-only checks pass. Hyprland build and native tests: NOT RUN (need
+  Codex's scripts, GATE-A, GATE-N).
+- `contracts/dev-control.md` bumped to 1.1 (additive: `hyprctl hyprvx-dev` transport, state JSON, `-DHYPRVX_DEV=ON`).
+
+## Sprint 1 status at G1 (2026-10-11)
+
+- Since DV3-15 Claude Code is the only implementation agent; Codex history is kept (merges, clone, evidence).
+- T001–T053 done and ticked; the user approved G1 on 2026-10-11 and authorized Phase 2 (T054–T071) up to T071.
+- Patch series 0001–0005 (patchset `47b6baa12904`): camera as a pure view in the render pass, culling, damage union,
+  dev control behind `-DHYPRVX_DEV=ON`. Two defects found and fixed by native tests during T040 (border interior,
+  fractional-edge round-out).
+- Verification: V-01..V-07, V-09..V-15, V-22..V-25 PASS; V-04 two clean rebuilds, 346/346 captures byte-identical;
+  V-08 PARTIAL (RC2 not reproduced on V2); V-20 PASS (user review, 2026-10-11); V-16..V-19, V-21 are Phase 2 (NOT RUN).
+- T045 (informational): no stock/patched CPU difference visible at the 10 ms tick for redraw or idle; about 2 ms of
+  compositor CPU per non-identity camera change; frames presented not measured.
+- Production safety: host Hyprland 0.56.2 and Caelestia untouched (V-22 audit repeated at G1 over 201 nested sessions, `20261011-095853-audit-b15784b-v22`); every native run was nested with a
+  verified identity; no package changes; `dev` still at `15f75b0`; nothing pushed.
+
+## Phase 2 status at the Feature 001 gate (2026-10-11)
+
+- T054–T069 done and ticked; T070 open only for the user's V-20 review of the Phase 2 image set; T071 (Feature 001
+  gate) is next and needs user approval. U0 and Feature 002 stay blocked.
+- Patch series 0001–0009 (patchset `efaf0ea2cf21`): 0006 hit-test, 0007 seat-local coordinates/constraints/warps,
+  0008 decoration hit selection and blocked compositor drags, 0009 popups. Lint PASS (9 patches).
+- US3 suite 8/8 at scales 1 and 1.25 (V-16..V-19 PASS) with negative controls failing on the 0001–0005 build;
+  Sprint 1 regression 16/16; T069 clean-room rebuild (`a157e6a8`) reproduces every result with byte-identical
+  captures. V-19 also passes without 0009 (closest-monitor fallback in efb5099).
+- Delivery spike (T066–T068, `delivery-decision.md`): stock + plugin (24 hooks; 17 are generated copies of patched
+  functions) passes the same suites with byte-identical captures and the stability checks; under DV3-01 this selects
+  plugin delivery, with costs and open items listed for the T071 decision.
+- Harness/test fixes found by running: nested log kept after the compositor exits, cursor sprite off in captures,
+  pointer driver reads complete JSONL records only, t_drag_scope keeps a FAIL; GATE-A re-checked byte-identical to
+  the Sprint 1 baseline after each test-config change.
+- Environment: native runs need the host in GPU profile Integrated (AMD only); in Hybrid the nested compositor gets
+  the NVIDIA render node, whose GBM rejects the headless swapchain (diagnosed 2026-10-11).
+- Still open: V-08 PARTIAL (RC2 not reproduced), frames presented NOT MEASURED, `test_build_scripts.py` KeyError
+  without `HYPRVX_AGENT`, three untracked Node files (`package.json`, `package-lock.json`, `node_modules/`) not
+  created by Claude.
+- Production safety: V-22 Phase 2 audit `20261011-141225-audit-c836666-v22p2` PASS; `dev` still at `15f75b0`;
+  nothing pushed.
+
+## Feature 001 closed at T071 (2026-10-11)
+
+- The user approved the Feature 001 gate (T071) and the Phase 2 V-20 image set (T070); `tasks.md` T001–T071 are all
+  ticked with archived evidence.
+- Delivery decision DV3-16: plugin on stock Hyprland per DV3-01. The spike is not production-ready; risks recorded
+  in `delivery-decision.md` and `.ai/DECISIONS.md`. Nothing installed into the host.
+- Kept: V-08 PARTIAL, frames presented NOT MEASURED, NOT RUN items listed in the T071 integration-log row.
+- Not done (needs user approval): merging `v3/001-native-spatial-camera` into `v3/spec-foundation`, the U0 spike,
+  Feature 002 specification.

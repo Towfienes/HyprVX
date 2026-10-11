@@ -1,0 +1,381 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Towfienes <ngolamtien1706@gmail.com>
+Date: Sun, 11 Oct 2026 00:53:42 +0700
+Subject: [PATCH] hyprvx: render the window pass through the camera
+
+Patch 0002 of the HyprVX V3 series (Feature 001, Sprint 1).
+
+- SceneCamera: activeCamera(monitor) is the camera for the monitor's
+  window pass, or nullopt for the stock path (identity, no active
+  workspace, fullscreen active workspace). cameraRenderModif builds the
+  SCALE z + TRANSLATE modifier equivalent to cammath::forward in
+  monitor pixels and composes it in front of any geometry modifier.
+- renderAllClientsForWorkspace pushes the camera hint before the window
+  pass and restores the outer modifier before POST_WINDOWS. The
+  special-workspace dim and blur rects are drawn outside the camera.
+  No hint when the camera is identity (FR-002).
+- RC1: under the camera hint, drawSurface intersects damage with the
+  modified window box, transforms the visible-region clip, and
+  preDrawSurface transforms the window clip box. Corner radius scales
+  with the camera. SRenderModifData gains a hyprvxCamera flag so the
+  stock path (including stock geometry modifiers) is unchanged.
+- RC2: pass simplification is disabled while a camera applies.
+- Borders: renderBorder skips the drawn (modified) window interior under
+  the camera hint instead of the logical one; otherwise the border
+  disappears where it overlaps the untransformed window box (found by
+  the first native zoom run, T040).
+- Fractional edges: under the camera, damage and clip boxes are rounded
+  out (HyprVX::roundOutBox), the transformed visible-region clip gets its
+  1 px pad back, and the border ring is scissored with the rounded-out
+  box minus the rounded-in interior; at scale 1.25 and z = 0.25 the right
+  border column and the last surface column were cut (T040).
+- No solitary client and no direct scanout while the camera is not
+  identity (reported as SC_TRANSFORM / DS_BLOCK_TRANSFORM).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ src/hyprvx/SceneCamera.cpp     | 47 ++++++++++++++++++++++++++++++++++
+ src/hyprvx/SceneCamera.hpp     | 23 +++++++++++++++++
+ src/output/Monitor.cpp         | 14 ++++++++++
+ src/render/ElementRenderer.cpp | 28 +++++++++++++++++---
+ src/render/OpenGL.cpp          | 23 ++++++++++++++---
+ src/render/Renderer.cpp        | 27 +++++++++++++++++++
+ src/render/types.hpp           |  2 ++
+ 7 files changed, 156 insertions(+), 8 deletions(-)
+ create mode 100644 src/hyprvx/SceneCamera.cpp
+ create mode 100644 src/hyprvx/SceneCamera.hpp
+
+diff --git a/src/hyprvx/SceneCamera.cpp b/src/hyprvx/SceneCamera.cpp
+new file mode 100644
+index 00000000..1dd8889d
+--- /dev/null
++++ b/src/hyprvx/SceneCamera.cpp
+@@ -0,0 +1,47 @@
++#include "SceneCamera.hpp"
++
++#include "../output/Monitor.hpp"
++#include "../desktop/Workspace.hpp"
++#include "../managers/fullscreen/FullscreenController.hpp"
++
++#include <algorithm>
++#include <cmath>
++
++using namespace hyprvx;
++using namespace Render;
++
++std::optional<cammath::CameraState> HyprVX::activeCamera(const Monitor::CMonitor& monitor) {
++    if (cameraIsIdentity(monitor))
++        return std::nullopt;
++
++    const auto& workspace = monitor.m_activeWorkspace;
++    if (!workspace || Fullscreen::controller()->hasFullscreen(workspace))
++        return std::nullopt;
++
++    return cameraOf(monitor);
++}
++
++CBox HyprVX::roundOutBox(const CBox& box) {
++    const double X0 = std::floor(box.x), Y0 = std::floor(box.y);
++    return {X0, Y0, std::ceil(box.x + box.w) - X0, std::ceil(box.y + box.h) - Y0};
++}
++
++CBox HyprVX::roundInBox(const CBox& box) {
++    const double X0 = std::ceil(box.x), Y0 = std::ceil(box.y);
++    return {X0, Y0, std::max(0.0, std::floor(box.x + box.w) - X0), std::max(0.0, std::floor(box.y + box.h) - Y0)};
++}
++
++SRenderModifData HyprVX::cameraRenderModif(const Monitor::CMonitor& monitor, const cammath::CameraState& camera, const SRenderModifData& outer) {
++    // A box in monitor pixels is (W - M)·s. Its forward image is (forward(W) - M)·s = z·(W - M)·s + (forward(M) - M)·s,
++    // i.e. SCALE by z, then TRANSLATE by the forward image of the monitor origin.
++    const auto       M      = monitorOrigin(monitor);
++    const auto       ORIGIN = cammath::forward(camera, M, M);
++
++    SRenderModifData modif;
++    modif.enabled      = outer.enabled;
++    modif.hyprvxCamera = true;
++    modif.modifs.emplace_back(SRenderModifData::eRenderModifType::RMOD_TYPE_SCALE, sc<float>(camera.zoom));
++    modif.modifs.emplace_back(SRenderModifData::eRenderModifType::RMOD_TYPE_TRANSLATE, Vector2D{ORIGIN.x - M.x, ORIGIN.y - M.y} * monitor.m_scale);
++    modif.modifs.insert(modif.modifs.end(), outer.modifs.begin(), outer.modifs.end());
++    return modif;
++}
+diff --git a/src/hyprvx/SceneCamera.hpp b/src/hyprvx/SceneCamera.hpp
+new file mode 100644
+index 00000000..e4082003
+--- /dev/null
++++ b/src/hyprvx/SceneCamera.hpp
+@@ -0,0 +1,23 @@
++#pragma once
++
++// HyprVX: which camera applies to a monitor's window pass, and its render modifier (patch 0002).
++
++#include "MonitorCamera.hpp"
++#include "../render/types.hpp"
++
++#include <optional>
++
++namespace HyprVX {
++    // The camera for the monitor's window pass, or nullopt for the stock path: identity camera, no active
++    // workspace, or a fullscreen active workspace (fullscreen renders with the identity camera).
++    std::optional<hyprvx::cammath::CameraState> activeCamera(const Monitor::CMonitor& monitor);
++
++    // Render modifier equivalent to cammath::forward in monitor pixels, applied before the outer modifiers.
++    // Marked hyprvxCamera so that clip and damage are transformed with it.
++    Render::SRenderModifData cameraRenderModif(const Monitor::CMonitor& monitor, const hyprvx::cammath::CameraState& camera, const Render::SRenderModifData& outer);
++
++    // Modified boxes have fractional edges. Regions used for clipping, damage or scissoring must cover every pixel the
++    // quad touches (round out); an interior that is skipped must not cover a touched edge pixel (round in).
++    Hyprutils::Math::CBox roundOutBox(const Hyprutils::Math::CBox& box);
++    Hyprutils::Math::CBox roundInBox(const Hyprutils::Math::CBox& box);
++}
+diff --git a/src/output/Monitor.cpp b/src/output/Monitor.cpp
+index e69d8dda..dae1491f 100644
+--- a/src/output/Monitor.cpp
++++ b/src/output/Monitor.cpp
+@@ -1813,6 +1813,13 @@ uint32_t CMonitor::isSolitaryBlocked(bool full) {
+             return reasons;
+     }
+ 
++    // HyprVX: no solitary client while the camera is not identity
++    if UNLIKELY (!HyprVX::cameraIsIdentity(*this)) {
++        reasons |= SC_TRANSFORM;
++        if (!full)
++            return reasons;
++    }
++
+     if (m_activeSpecialWorkspace) {
+         reasons |= SC_SPECIAL;
+         if (!full)
+@@ -2027,6 +2034,13 @@ uint16_t CMonitor::isDSBlocked(bool full) {
+             return reasons;
+     }
+ 
++    // HyprVX: no direct scanout while the camera is not identity
++    if UNLIKELY (!HyprVX::cameraIsIdentity(*this)) {
++        reasons |= DS_BLOCK_TRANSFORM;
++        if (!full)
++            return reasons;
++    }
++
+     if (*PDIRECTSCANOUT == 2) {
+         const auto FSWINDOW = Fullscreen::controller()->getFullscreenWindow(m_self.lock());
+ 
+diff --git a/src/render/ElementRenderer.cpp b/src/render/ElementRenderer.cpp
+index 50b5a797..2e3bbea6 100644
+--- a/src/render/ElementRenderer.cpp
++++ b/src/render/ElementRenderer.cpp
+@@ -3,6 +3,7 @@
+ #include "../layout/LayoutManager.hpp"
+ #include "../desktop/view/Window.hpp"
+ #include "render/pass/ClearPassElement.hpp"
++#include "../hyprvx/SceneCamera.hpp"
+ #include <hyprutils/memory/SharedPtr.hpp>
+ #include <hyprutils/memory/UniquePtr.hpp>
+ #include <hyprutils/utils/ScopeGuard.hpp>
+@@ -275,6 +276,16 @@ void IElementRenderer::drawSurface(WP<CSurfacePassElement> element, const CRegio
+         return;
+     }
+ 
++    // HyprVX (RC1): under the camera hint the quad is drawn at the modified box, so clip and damage must be too
++    CBox damageBox = windowBox;
++    if UNLIKELY (m_renderData.renderModif.enabled && m_renderData.renderModif.hyprvxCamera) {
++        m_renderData.renderModif.applyToBox(damageBox);
++        damageBox = HyprVX::roundOutBox(damageBox);
++        m_renderData.renderModif.applyToRegion(clipRegion);
++        // visibleRegion() pads by 1 px against rounding; the modifier scaled that pad by the zoom, so restore it
++        clipRegion.expand(1);
++    }
++
+     // check for fractional scale surfaces misaligning the buffer size
+     // in those cases it's better to just force nearest neighbor
+     // as long as the window is not animated. During those it'd look weird.
+@@ -285,6 +296,10 @@ void IElementRenderer::drawSurface(WP<CSurfacePassElement> element, const CRegio
+     float rounding      = m_data.rounding;
+     float roundingPower = m_data.roundingPower;
+ 
++    // HyprVX: corner radius follows the camera zoom
++    if UNLIKELY (m_renderData.renderModif.enabled && m_renderData.renderModif.hyprvxCamera)
++        rounding *= m_renderData.renderModif.combinedScale();
++
+     rounding -= 1; // to fix a border issue
+ 
+     if (m_data.dontRound) {
+@@ -324,7 +339,7 @@ void IElementRenderer::drawSurface(WP<CSurfacePassElement> element, const CRegio
+                             .clipRegion            = clipRegion,
+                             .currentLS             = m_data.pLS,
+                         }),
+-                        m_renderData.damage.copy().intersect(windowBox));
++                        m_renderData.damage.copy().intersect(damageBox));
+         else
+             drawElement(makeShared<CTexPassElement>(CTexPassElement::SRenderData{
+                             .tex            = TEXTURE,
+@@ -342,7 +357,7 @@ void IElementRenderer::drawSurface(WP<CSurfacePassElement> element, const CRegio
+                             .clipRegion     = clipRegion,
+                             .currentLS      = m_data.pLS,
+                         }),
+-                        m_renderData.damage.copy().intersect(windowBox));
++                        m_renderData.damage.copy().intersect(damageBox));
+     } else {
+         if (BLUR && m_data.popup)
+             drawElement(makeShared<CTexPassElement>(CTexPassElement::SRenderData{
+@@ -364,7 +379,7 @@ void IElementRenderer::drawSurface(WP<CSurfacePassElement> element, const CRegio
+                             .clipRegion            = clipRegion,
+                             .currentLS             = m_data.pLS,
+                         }),
+-                        m_renderData.damage.copy().intersect(windowBox));
++                        m_renderData.damage.copy().intersect(damageBox));
+         else
+             drawElement(makeShared<CTexPassElement>(CTexPassElement::SRenderData{
+                             .tex            = TEXTURE,
+@@ -382,7 +397,7 @@ void IElementRenderer::drawSurface(WP<CSurfacePassElement> element, const CRegio
+                             .clipRegion     = clipRegion,
+                             .currentLS      = m_data.pLS,
+                         }),
+-                        m_renderData.damage.copy().intersect(windowBox));
++                        m_renderData.damage.copy().intersect(damageBox));
+     }
+ 
+     g_pHyprRenderer->blend(true);
+@@ -395,6 +410,11 @@ void IElementRenderer::preDrawSurface(WP<CSurfacePassElement> element, const CRe
+     auto& m_renderData              = g_pHyprRenderer->m_renderData;
+     m_renderData.clipBox            = element->m_data.clipBox;
+     m_renderData.useNearestNeighbor = element->m_data.useNearestNeighbor;
++    // HyprVX (RC1): the window clip box is in untransformed monitor pixels
++    if UNLIKELY (m_renderData.renderModif.enabled && m_renderData.renderModif.hyprvxCamera && !m_renderData.clipBox.empty()) {
++        m_renderData.renderModif.applyToBox(m_renderData.clipBox);
++        m_renderData.clipBox = HyprVX::roundOutBox(m_renderData.clipBox);
++    }
+     g_pHyprRenderer->pushMonitorTransformEnabled(element->m_data.flipEndFrame);
+     m_renderData.currentWindow = element->m_data.pWindow;
+ 
+diff --git a/src/render/OpenGL.cpp b/src/render/OpenGL.cpp
+index baee1ad2..ae50ce30 100644
+--- a/src/render/OpenGL.cpp
++++ b/src/render/OpenGL.cpp
+@@ -58,6 +58,7 @@
+ #include "Texture.hpp"
+ #include "gl/GLFramebuffer.hpp"
+ #include "gl/GLTexture.hpp"
++#include "../hyprvx/SceneCamera.hpp"
+ 
+ using namespace Hyprutils::OS;
+ using namespace NColorManagement;
+@@ -2225,8 +2226,15 @@ void CHyprOpenGLImpl::renderBorder(const CBox& box, const Config::CGradientValue
+ 
+     // calculate the border's region, which we need to render over. No need to run the shader on
+     // things outside there
+-    CRegion borderRegion = g_pHyprRenderer->m_renderData.damage.copy().intersect(newBox);
+-    borderRegion.subtract(box.copy().expand(-scaledBorderSize - round));
++    // HyprVX: under the camera hint the drawn boxes have fractional edges; cover the whole border ring and skip only
++    // the drawn (modified) window interior, not the logical one
++    const bool HYPRVXCAMERA = m_renderData.renderModif.enabled && m_renderData.renderModif.hyprvxCamera;
++    CBox       interior     = box;
++    if UNLIKELY (HYPRVXCAMERA)
++        m_renderData.renderModif.applyToBox(interior);
++    interior.expand(-scaledBorderSize - round);
++    CRegion borderRegion = g_pHyprRenderer->m_renderData.damage.copy().intersect(HYPRVXCAMERA ? HyprVX::roundOutBox(newBox) : newBox);
++    borderRegion.subtract(HYPRVXCAMERA ? HyprVX::roundInBox(interior) : interior);
+ 
+     if (g_pHyprRenderer->m_renderData.clipBox.width != 0 && g_pHyprRenderer->m_renderData.clipBox.height != 0)
+         borderRegion.intersect(g_pHyprRenderer->m_renderData.clipBox);
+@@ -2313,8 +2321,15 @@ void CHyprOpenGLImpl::renderBorder(const CBox& box, const Config::CGradientValue
+ 
+     // calculate the border's region, which we need to render over. No need to run the shader on
+     // things outside there
+-    CRegion borderRegion = g_pHyprRenderer->m_renderData.damage.copy().intersect(newBox);
+-    borderRegion.subtract(box.copy().expand(-scaledBorderSize - round));
++    // HyprVX: under the camera hint the drawn boxes have fractional edges; cover the whole border ring and skip only
++    // the drawn (modified) window interior, not the logical one
++    const bool HYPRVXCAMERA = m_renderData.renderModif.enabled && m_renderData.renderModif.hyprvxCamera;
++    CBox       interior     = box;
++    if UNLIKELY (HYPRVXCAMERA)
++        m_renderData.renderModif.applyToBox(interior);
++    interior.expand(-scaledBorderSize - round);
++    CRegion borderRegion = g_pHyprRenderer->m_renderData.damage.copy().intersect(HYPRVXCAMERA ? HyprVX::roundOutBox(newBox) : newBox);
++    borderRegion.subtract(HYPRVXCAMERA ? HyprVX::roundInBox(interior) : interior);
+ 
+     if (g_pHyprRenderer->m_renderData.clipBox.width != 0 && g_pHyprRenderer->m_renderData.clipBox.height != 0)
+         borderRegion.intersect(g_pHyprRenderer->m_renderData.clipBox);
+diff --git a/src/render/Renderer.cpp b/src/render/Renderer.cpp
+index 249f0843..b1492d70 100644
+--- a/src/render/Renderer.cpp
++++ b/src/render/Renderer.cpp
+@@ -44,6 +44,7 @@
+ #include "pass/ClearPassElement.hpp"
+ #include "pass/RectPassElement.hpp"
+ #include "pass/RendererHintsPassElement.hpp"
++#include "../hyprvx/SceneCamera.hpp"
+ #include "pass/SurfacePassElement.hpp"
+ #include "../debug/log/Logger.hpp"
+ #include "../protocols/ColorManagement.hpp"
+@@ -1178,11 +1179,23 @@ void IHyprRenderer::renderAllClientsForWorkspace(PHLMONITOR pMonitor, PHLWORKSPA
+     if (preBlurQueued(pMonitor))
+         m_renderPass.add(makeUnique<CPreBlurElement>());
+ 
++    // HyprVX: camera hint over the window pass, composed in front of the geometry modifier; none when identity (FR-002)
++    const auto HYPRVXCAMERA     = pWorkspace == pMonitor->m_activeWorkspace ? HyprVX::activeCamera(*pMonitor) : std::nullopt;
++    const auto pushHyprvxCamera = [&](bool on) {
++        if UNLIKELY (HYPRVXCAMERA)
++            m_renderPass.add(makeUnique<CRendererHintsPassElement>(
++                CRendererHintsPassElement::SData{on ? HyprVX::cameraRenderModif(*pMonitor, *HYPRVXCAMERA, RENDERMODIFDATA) : RENDERMODIFDATA}));
++    };
++    pushHyprvxCamera(true);
++
+     if UNLIKELY /* subjective? */ (Fullscreen::controller()->hasFullscreen(pWorkspace))
+         renderWorkspaceWindowsFullscreen(pMonitor, pWorkspace, time);
+     else
+         renderWorkspaceWindows(pMonitor, pWorkspace, time);
+ 
++    // HyprVX: the special-workspace dim and blur cover the output, outside the camera
++    pushHyprvxCamera(false);
++
+     // and then special
+     if UNLIKELY (pMonitor->m_specialDim->value() != 0.F) {
+         CRectPassElement::SRectData data;
+@@ -1202,6 +1215,8 @@ void IHyprRenderer::renderAllClientsForWorkspace(PHLMONITOR pMonitor, PHLWORKSPA
+         m_renderPass.add(makeUnique<CRectPassElement>(data));
+     }
+ 
++    pushHyprvxCamera(true);
++
+     // special
+     for (auto const& ws : State::workspaceState()->workspaces()) {
+         if (ws->m_alpha->value() <= 0.F || !ws->m_isSpecialWorkspace)
+@@ -1228,6 +1243,8 @@ void IHyprRenderer::renderAllClientsForWorkspace(PHLMONITOR pMonitor, PHLWORKSPA
+         renderWindow(w, pMonitor, time, true, RENDER_PASS_ALL);
+     }
+ 
++    pushHyprvxCamera(false);
++
+     Event::bus()->m_events.render.stage.emit(RENDER_POST_WINDOWS);
+ 
+     // Render surfaces above windows for monitor
+@@ -2157,6 +2174,16 @@ void IHyprRenderer::renderMonitor(PHLMONITOR pMonitor, bool commit) {
+             pMonitor->m_forceFullFrames = 0;
+     }
+ 
++    // HyprVX (RC2): pass simplification uses untransformed bounding boxes and opaque regions, so it is off while a
++    // camera applies. The pass is rendered by endRender() below, before the guard restores the flag.
++    const bool HYPRVXNOSIMPLIFY = !m_renderData.noSimplify && HyprVX::activeCamera(*pMonitor).has_value();
++    if UNLIKELY (HYPRVXNOSIMPLIFY)
++        m_renderData.noSimplify = true;
++    CScopeGuard hyprvxNoSimplify([this, HYPRVXNOSIMPLIFY] {
++        if UNLIKELY (HYPRVXNOSIMPLIFY)
++            m_renderData.noSimplify = false;
++    });
++
+     Event::bus()->m_events.render.stage.emit(RENDER_BEGIN);
+ 
+     bool renderCursor = true;
+diff --git a/src/render/types.hpp b/src/render/types.hpp
+index eaac1618..068b81e8 100644
+--- a/src/render/types.hpp
++++ b/src/render/types.hpp
+@@ -67,6 +67,8 @@ namespace Render {
+         float                                              combinedScale();
+ 
+         bool                                               enabled = true;
++        // HyprVX: set on the camera hint; clip and damage boxes are transformed with it
++        bool hyprvxCamera = false;
+     };
+ 
+     struct SRenderData {

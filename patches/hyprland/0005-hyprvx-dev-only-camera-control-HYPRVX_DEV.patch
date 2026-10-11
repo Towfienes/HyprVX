@@ -1,0 +1,291 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Towfienes <ngolamtien1706@gmail.com>
+Date: Sun, 11 Oct 2026 01:03:35 +0700
+Subject: [PATCH] hyprvx: dev-only camera control (HYPRVX_DEV)
+
+Patch 0005 of the HyprVX V3 series (Feature 001, Sprint 1), per
+contracts/dev-control.md v1.1.
+
+- CMake option HYPRVX_DEV (default OFF) defines HYPRVX_DEV; without it
+  DevControl.cpp compiles to an empty registerDevControl().
+- Dispatchers hyprvx-dev:camera <Px> <Py> <z> (focused monitor),
+  hyprvx-dev:camera-mon <monitor> <Px> <Py> <z>, hyprvx-dev:panic,
+  hyprvx-dev:state and hyprvx-dev:full-damage. Values go through
+  HyprVX::setCamera, i.e. cammath::validate; rejection replies
+  err:invalid (unknown monitor: err:monitor) and leaves the camera
+  unchanged. panic resets every camera to exact identity and never
+  fails.
+- `hyprctl hyprvx-dev <command> [args]` runs the same handlers with
+  either config parser and returns the state JSON for `state`
+  (dispatch replies are only ok/error).
+- SMonitorCamera counts the camera hint elements added to render
+  passes (passElementsAdded; identity must add none).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ CMakeLists.txt               |   6 ++
+ src/Compositor.cpp           |   2 +
+ src/hyprvx/DevControl.cpp    | 169 +++++++++++++++++++++++++++++++++++
+ src/hyprvx/DevControl.hpp    |   9 ++
+ src/hyprvx/MonitorCamera.hpp |   2 +
+ src/render/Renderer.cpp      |   4 +-
+ 6 files changed, 191 insertions(+), 1 deletion(-)
+ create mode 100644 src/hyprvx/DevControl.cpp
+ create mode 100644 src/hyprvx/DevControl.hpp
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index cf7f53aa..9f4c1fa3 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -96,6 +96,12 @@ endif()
+ 
+ add_compile_definitions(HYPRLAND_VERSION="${HYPRLAND_VERSION}")
+ 
++option(HYPRVX_DEV "HyprVX: dev-only camera control for nested test builds" OFF)
++if(HYPRVX_DEV)
++  message(STATUS "HyprVX dev camera control enabled")
++  add_compile_definitions(HYPRVX_DEV)
++endif()
++
+ include_directories(. "src/" "protocols/")
+ 
+ set(CMAKE_CXX_STANDARD 26)
+diff --git a/src/Compositor.cpp b/src/Compositor.cpp
+index 1d2d8b93..3e5ff58f 100644
+--- a/src/Compositor.cpp
++++ b/src/Compositor.cpp
+@@ -1,5 +1,6 @@
+ 
+ #include "Compositor.hpp"
++#include "hyprvx/DevControl.hpp"
+ #include "config/supplementary/executor/Executor.hpp"
+ #include "debug/log/Logger.hpp"
+ #include "desktop/DesktopTypes.hpp"
+@@ -720,6 +721,7 @@ void CCompositor::initManagers(eManagersInitStage stage) {
+         case STAGE_LATE: {
+             Log::logger->log(Log::DEBUG, "Creating CHyprCtl");
+             g_pHyprCtl = makeUnique<CHyprCtl>();
++            HyprVX::registerDevControl();
+ 
+             Log::logger->log(Log::DEBUG, "Creating the InputManager!");
+             g_pInputManager = makeUnique<CInputManager>();
+diff --git a/src/hyprvx/DevControl.cpp b/src/hyprvx/DevControl.cpp
+new file mode 100644
+index 00000000..ac973a36
+--- /dev/null
++++ b/src/hyprvx/DevControl.cpp
+@@ -0,0 +1,169 @@
++#include "DevControl.hpp"
++
++#ifdef HYPRVX_DEV
++
++#include "MonitorCamera.hpp"
++
++#include "../output/Monitor.hpp"
++#include "../state/MonitorState.hpp"
++#include "../state/MonitorQuery.hpp"
++#include "../desktop/state/FocusState.hpp"
++#include "../managers/KeybindManager.hpp"
++#include "../debug/HyprCtl.hpp"
++#include "../render/Renderer.hpp"
++#include "../helpers/MiscFunctions.hpp"
++#include "../debug/log/Logger.hpp"
++
++#include <charconv>
++#include <format>
++#include <functional>
++#include <optional>
++#include <string>
++#include <string_view>
++#include <vector>
++
++using namespace hyprvx;
++
++namespace {
++    std::vector<std::string_view> splitWords(std::string_view args) {
++        std::vector<std::string_view> words;
++        size_t                        pos = 0;
++        while (pos < args.size()) {
++            const auto START = args.find_first_not_of(" \t", pos);
++            if (START == std::string_view::npos)
++                break;
++            const auto END = std::min(args.find_first_of(" \t", START), args.size());
++            words.emplace_back(args.substr(START, END - START));
++            pos = END;
++        }
++        return words;
++    }
++
++    std::optional<double> parseNumber(std::string_view word) {
++        double     value = 0.0;
++        const auto RES   = std::from_chars(word.data(), word.data() + word.size(), value);
++        if (RES.ec != std::errc{} || RES.ptr != word.data() + word.size())
++            return std::nullopt;
++        return value;
++    }
++
++    SDispatchResult error(std::string code) {
++        return {.success = false, .error = std::move(code)};
++    }
++
++    // <Px> <Py> <z>; validation is cammath::validate inside setCamera (no change on rejection).
++    SDispatchResult setFromWords(const PHLMONITOR& monitor, const std::vector<std::string_view>& words) {
++        if (!monitor)
++            return error("err:monitor");
++        if (words.size() != 3)
++            return error("err:invalid");
++
++        const auto PX = parseNumber(words[0]);
++        const auto PY = parseNumber(words[1]);
++        const auto Z  = parseNumber(words[2]);
++        if (!PX || !PY || !Z)
++            return error("err:invalid");
++
++        if (!HyprVX::setCamera(*monitor, {{*PX, *PY}, *Z}))
++            return error("err:invalid");
++        return {};
++    }
++
++    SDispatchResult camera(std::string args) {
++        return setFromWords(Desktop::focusState()->monitor(), splitWords(args));
++    }
++
++    SDispatchResult cameraMon(std::string args) {
++        auto words = splitWords(args);
++        if (words.empty())
++            return error("err:monitor");
++
++        const auto MONITOR = State::monitorState()->query().name(words.front()).run();
++        if (!MONITOR)
++            return error("err:monitor");
++
++        words.erase(words.begin());
++        return setFromWords(MONITOR, words);
++    }
++
++    // Never fails: every camera returns to exact identity (the scene has no other state in Feature 001).
++    SDispatchResult panic(std::string) {
++        for (auto const& m : State::monitorState()->monitors())
++            HyprVX::resetCamera(*m);
++        Log::logger->log(Log::WARN, "[hyprvx] panic: all cameras reset to identity");
++        return {};
++    }
++
++    SDispatchResult fullDamage(std::string) {
++        for (auto const& m : State::monitorState()->monitors())
++            g_pHyprRenderer->damageMonitor(m);
++        return {};
++    }
++
++    // Bookkeeping only (Constitution II): never a pass condition.
++    std::string stateJSON() {
++        std::string out = "[";
++        for (auto const& m : State::monitorState()->monitors()) {
++            const auto CAMERA = HyprVX::cameraOf(*m);
++            if (out.size() > 1)
++                out += ",";
++            out += std::format(R"({{"monitor":"{}","P":[{:.17g},{:.17g}],"z":{:.17g},"identity":{},"revision":{},"passElementsAdded":{}}})", escapeJSONStrings(m->m_name),
++                               CAMERA.origin.x, CAMERA.origin.y, CAMERA.zoom, HyprVX::cameraIsIdentity(*m), m->m_hyprvxCamera.revision, m->m_hyprvxCamera.passElementsAdded);
++        }
++        return out + "]";
++    }
++
++    SDispatchResult state(std::string) {
++        Log::logger->log(Log::DEBUG, "[hyprvx] state: {}", stateJSON());
++        return {};
++    }
++
++    struct SCommand {
++        std::string_view                            name;
++        std::function<SDispatchResult(std::string)> fn;
++    };
++
++    const std::vector<SCommand>& commands() {
++        static const std::vector<SCommand> COMMANDS = {
++            {"camera", camera}, {"camera-mon", cameraMon}, {"panic", panic}, {"state", state}, {"full-damage", fullDamage},
++        };
++        return COMMANDS;
++    }
++
++    // `hyprctl hyprvx-dev <command> [args]`: works with either config parser, and returns the state JSON.
++    std::string hyprctlCommand(eHyprCtlOutputFormat, std::string in) {
++        const auto WORDS = splitWords(in);
++        if (WORDS.size() < 2)
++            return "err:invalid";
++
++        const auto NAME = WORDS[1];
++        if (NAME == "state")
++            return stateJSON();
++
++        const auto START = sc<size_t>(NAME.data() - in.data()) + NAME.size();
++        const auto ARGS  = START < in.size() ? in.substr(START) : std::string{};
++        for (auto const& c : commands()) {
++            if (c.name != NAME)
++                continue;
++            const auto RES = c.fn(ARGS);
++            return RES.success ? "ok" : RES.error;
++        }
++        return "err:invalid";
++    }
++}
++
++void HyprVX::registerDevControl() {
++    for (auto const& c : commands())
++        g_pKeybindManager->m_dispatchers[std::format("hyprvx-dev:{}", c.name)] = c.fn;
++
++    g_pHyprCtl->registerCommand(SHyprCtlCommand{.name = "hyprvx-dev", .exact = false, .fn = hyprctlCommand});
++    Log::logger->log(Log::WARN, "[hyprvx] dev camera control enabled (HYPRVX_DEV build)");
++}
++
++#else
++
++void HyprVX::registerDevControl() {
++    ;
++}
++
++#endif
+diff --git a/src/hyprvx/DevControl.hpp b/src/hyprvx/DevControl.hpp
+new file mode 100644
+index 00000000..b5e5d911
+--- /dev/null
++++ b/src/hyprvx/DevControl.hpp
+@@ -0,0 +1,9 @@
++#pragma once
++
++// HyprVX dev-only camera control (patch 0005, contracts/dev-control.md). Built only with HYPRVX_DEV; for nested test
++// sessions, never a product interface.
++
++namespace HyprVX {
++    // Registers the hyprvx-dev:* dispatchers and the `hyprctl hyprvx-dev <command> [args]` command.
++    void registerDevControl();
++}
+diff --git a/src/hyprvx/MonitorCamera.hpp b/src/hyprvx/MonitorCamera.hpp
+index 24654454..1cb2f7c5 100644
+--- a/src/hyprvx/MonitorCamera.hpp
++++ b/src/hyprvx/MonitorCamera.hpp
+@@ -17,6 +17,8 @@ namespace HyprVX {
+         bool                         active = false;
+         // Incremented on every change; drives full-output damage.
+         uint64_t revision = 0;
++        // Camera hint elements added to render passes (identity must add none; dev-control state).
++        uint64_t passElementsAdded = 0;
+     };
+ 
+     // MVP zoom range (data-model.md).
+diff --git a/src/render/Renderer.cpp b/src/render/Renderer.cpp
+index 561e8dc0..5b23d81b 100644
+--- a/src/render/Renderer.cpp
++++ b/src/render/Renderer.cpp
+@@ -1182,9 +1182,11 @@ void IHyprRenderer::renderAllClientsForWorkspace(PHLMONITOR pMonitor, PHLWORKSPA
+     // HyprVX: camera hint over the window pass, composed in front of the geometry modifier; none when identity (FR-002)
+     const auto HYPRVXCAMERA     = pWorkspace == pMonitor->m_activeWorkspace ? HyprVX::activeCamera(*pMonitor) : std::nullopt;
+     const auto pushHyprvxCamera = [&](bool on) {
+-        if UNLIKELY (HYPRVXCAMERA)
++        if UNLIKELY (HYPRVXCAMERA) {
++            pMonitor->m_hyprvxCamera.passElementsAdded++;
+             m_renderPass.add(makeUnique<CRendererHintsPassElement>(
+                 CRendererHintsPassElement::SData{on ? HyprVX::cameraRenderModif(*pMonitor, *HYPRVXCAMERA, RENDERMODIFDATA) : RENDERMODIFDATA}));
++        }
+     };
+     pushHyprvxCamera(true);
+ 

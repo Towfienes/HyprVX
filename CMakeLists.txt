@@ -9,6 +9,9 @@ project(
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(HYPRVX_BUILD_TESTS "Build HyprVX tests" ON)
+option(HYPRVX_WITH_SDL "Build SDL simulators" OFF)
+option(HYPRVX_WITH_WAYLAND_PLATFORM "Build the Wayland platform" OFF)
+option(HYPRVX_WITH_HYPRLAND_PLUGIN "Build the Hyprland plugin" OFF)
 
 add_library(hyprvx_core STATIC
     core/src/Camera.cpp
@@ -158,115 +161,136 @@ set_target_properties(
 )
 
 
-find_package(PkgConfig REQUIRED)
+if(HYPRVX_WITH_SDL OR HYPRVX_WITH_WAYLAND_PLATFORM OR HYPRVX_WITH_HYPRLAND_PLUGIN)
+    find_package(PkgConfig REQUIRED)
+endif()
 
-pkg_check_modules(
-    SDL3
-    REQUIRED
-    IMPORTED_TARGET
-    sdl3
-)
+if(HYPRVX_WITH_WAYLAND_PLATFORM)
+    pkg_check_modules(WAYLAND_CLIENT REQUIRED IMPORTED_TARGET wayland-client)
+    pkg_check_modules(XKBCOMMON REQUIRED IMPORTED_TARGET xkbcommon)
+    pkg_check_modules(WAYLAND_PROTOCOLS REQUIRED wayland-protocols)
+    pkg_get_variable(WAYLAND_PROTOCOLS_DIR wayland-protocols pkgdatadir)
+    find_program(WAYLAND_SCANNER wayland-scanner REQUIRED)
+    set(HYPRVX_PROTOCOL_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated-protocols)
+    file(MAKE_DIRECTORY ${HYPRVX_PROTOCOL_DIR})
 
-pkg_check_modules(WAYLAND_CLIENT REQUIRED IMPORTED_TARGET wayland-client)
-pkg_check_modules(XKBCOMMON REQUIRED IMPORTED_TARGET xkbcommon)
-pkg_check_modules(HYPRLAND REQUIRED IMPORTED_TARGET hyprland)
-find_program(WAYLAND_SCANNER wayland-scanner REQUIRED)
-set(HYPRVX_PROTOCOL_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated-protocols)
-file(MAKE_DIRECTORY ${HYPRVX_PROTOCOL_DIR})
+    function(hyprvx_client_protocol protocol_name xml_path)
+        add_custom_command(
+            OUTPUT ${HYPRVX_PROTOCOL_DIR}/${protocol_name}-client-protocol.h
+                   ${HYPRVX_PROTOCOL_DIR}/${protocol_name}-protocol.c
+            COMMAND ${WAYLAND_SCANNER} client-header ${xml_path}
+                    ${HYPRVX_PROTOCOL_DIR}/${protocol_name}-client-protocol.h
+            COMMAND ${WAYLAND_SCANNER} private-code ${xml_path}
+                    ${HYPRVX_PROTOCOL_DIR}/${protocol_name}-protocol.c
+            DEPENDS ${xml_path}
+            VERBATIM)
+        set(HYPRVX_GENERATED_PROTOCOLS ${HYPRVX_GENERATED_PROTOCOLS}
+            ${HYPRVX_PROTOCOL_DIR}/${protocol_name}-protocol.c
+            ${HYPRVX_PROTOCOL_DIR}/${protocol_name}-client-protocol.h PARENT_SCOPE)
+    endfunction()
 
-function(hyprvx_client_protocol protocol_name xml_path)
-    add_custom_command(
-        OUTPUT ${HYPRVX_PROTOCOL_DIR}/${protocol_name}-client-protocol.h
-               ${HYPRVX_PROTOCOL_DIR}/${protocol_name}-protocol.c
-        COMMAND ${WAYLAND_SCANNER} client-header ${xml_path}
-                ${HYPRVX_PROTOCOL_DIR}/${protocol_name}-client-protocol.h
-        COMMAND ${WAYLAND_SCANNER} private-code ${xml_path}
-                ${HYPRVX_PROTOCOL_DIR}/${protocol_name}-protocol.c
-        DEPENDS ${xml_path}
-        VERBATIM)
-    set(HYPRVX_GENERATED_PROTOCOLS ${HYPRVX_GENERATED_PROTOCOLS}
-        ${HYPRVX_PROTOCOL_DIR}/${protocol_name}-protocol.c
-        ${HYPRVX_PROTOCOL_DIR}/${protocol_name}-client-protocol.h PARENT_SCOPE)
-endfunction()
+    hyprvx_client_protocol(wlr-layer-shell ${CMAKE_CURRENT_SOURCE_DIR}/platform/protocols/wlr-layer-shell-unstable-v1.xml)
+    hyprvx_client_protocol(pointer-gestures ${WAYLAND_PROTOCOLS_DIR}/unstable/pointer-gestures/pointer-gestures-unstable-v1.xml)
+    hyprvx_client_protocol(xdg-shell ${WAYLAND_PROTOCOLS_DIR}/stable/xdg-shell/xdg-shell.xml)
 
-hyprvx_client_protocol(wlr-layer-shell ${CMAKE_CURRENT_SOURCE_DIR}/platform/protocols/wlr-layer-shell-unstable-v1.xml)
-hyprvx_client_protocol(pointer-gestures /usr/share/wayland-protocols/unstable/pointer-gestures/pointer-gestures-unstable-v1.xml)
-hyprvx_client_protocol(xdg-shell /usr/share/wayland-protocols/stable/xdg-shell/xdg-shell.xml)
+    add_library(hyprvx_wayland_platform STATIC
+        platform/src/NativeSession.cpp
+        platform/src/NativeEventBridge.cpp
+        ${HYPRVX_GENERATED_PROTOCOLS})
+    target_include_directories(hyprvx_wayland_platform PUBLIC platform/include PRIVATE ${HYPRVX_PROTOCOL_DIR})
+    target_link_libraries(hyprvx_wayland_platform PUBLIC hyprvx_nested_guard hyprvx_runtime_navigation
+        PkgConfig::WAYLAND_CLIENT PkgConfig::XKBCOMMON)
+    target_compile_features(hyprvx_wayland_platform PUBLIC cxx_std_20)
 
-add_library(hyprvx_wayland_platform STATIC
-    platform/src/NativeSession.cpp
-    platform/src/NativeEventBridge.cpp
-    ${HYPRVX_GENERATED_PROTOCOLS})
-target_include_directories(hyprvx_wayland_platform PUBLIC platform/include PRIVATE ${HYPRVX_PROTOCOL_DIR})
-target_link_libraries(hyprvx_wayland_platform PUBLIC hyprvx_nested_guard hyprvx_runtime_navigation
-    PkgConfig::WAYLAND_CLIENT PkgConfig::XKBCOMMON)
-target_compile_features(hyprvx_wayland_platform PUBLIC cxx_std_20)
+    add_executable(hyprvx_native_dev platform/src/native_dev_main.cpp)
+    set_target_properties(hyprvx_native_dev PROPERTIES OUTPUT_NAME hyprvx-native-dev)
+    target_link_libraries(hyprvx_native_dev PRIVATE hyprvx_wayland_platform)
 
-add_executable(hyprvx_native_dev platform/src/native_dev_main.cpp)
-set_target_properties(hyprvx_native_dev PROPERTIES OUTPUT_NAME hyprvx-native-dev)
-target_link_libraries(hyprvx_native_dev PRIVATE hyprvx_wayland_platform)
+    # Deterministic client for native tests (contracts/test-tooling.md section 4).
+    add_executable(hyprvx_testclient tools/testclient/main.cpp ${HYPRVX_GENERATED_PROTOCOLS})
+    set_target_properties(hyprvx_testclient PROPERTIES OUTPUT_NAME hyprvx-testclient)
+    target_include_directories(hyprvx_testclient PRIVATE ${HYPRVX_PROTOCOL_DIR})
+    target_link_libraries(hyprvx_testclient PRIVATE PkgConfig::WAYLAND_CLIENT)
+    target_compile_features(hyprvx_testclient PRIVATE cxx_std_20)
 
-add_library(hyprvx_hyprland_plugin MODULE platform/src/HyprlandPlugin.cpp)
-target_link_libraries(hyprvx_hyprland_plugin PRIVATE hyprvx_nested_guard PkgConfig::HYPRLAND)
-target_compile_features(hyprvx_hyprland_plugin PRIVATE cxx_std_23)
+    # Test-only virtual pointer for the nested compositor (contracts/test-tooling.md section 4a).
+    hyprvx_client_protocol(wlr-virtual-pointer ${CMAKE_CURRENT_SOURCE_DIR}/tools/vpointer/protocols/wlr-virtual-pointer-unstable-v1.xml)
+    add_executable(hyprvx_vpointer tools/vpointer/main.cpp
+        ${HYPRVX_PROTOCOL_DIR}/wlr-virtual-pointer-protocol.c ${HYPRVX_PROTOCOL_DIR}/wlr-virtual-pointer-client-protocol.h)
+    set_target_properties(hyprvx_vpointer PROPERTIES OUTPUT_NAME hyprvx-vpointer)
+    target_include_directories(hyprvx_vpointer PRIVATE ${HYPRVX_PROTOCOL_DIR})
+    target_link_libraries(hyprvx_vpointer PRIVATE PkgConfig::WAYLAND_CLIENT)
+    target_compile_features(hyprvx_vpointer PRIVATE cxx_std_20)
+endif()
 
-add_executable(
-    hyprvx_visual_simulator
-    simulator/visual_main.cpp
-    simulator/SdlNavigationInput.cpp
-)
+if(HYPRVX_WITH_HYPRLAND_PLUGIN)
+    pkg_check_modules(HYPRLAND REQUIRED IMPORTED_TARGET hyprland)
+    add_library(hyprvx_hyprland_plugin MODULE platform/src/HyprlandPlugin.cpp)
+    target_link_libraries(hyprvx_hyprland_plugin PRIVATE hyprvx_nested_guard PkgConfig::HYPRLAND)
+    target_compile_features(hyprvx_hyprland_plugin PRIVATE cxx_std_23)
+endif()
 
-target_link_libraries(
-    hyprvx_visual_simulator
-    PRIVATE
-        hyprvx_runtime_navigation
-        hyprvx_core
-        PkgConfig::SDL3
-)
+if(HYPRVX_WITH_SDL)
+    pkg_check_modules(SDL3 REQUIRED IMPORTED_TARGET sdl3)
 
-set_target_properties(
-    hyprvx_visual_simulator
-    PROPERTIES
-        OUTPUT_NAME hyprvx-visual-sim
-)
+    add_executable(
+        hyprvx_visual_simulator
+        simulator/visual_main.cpp
+        simulator/SdlNavigationInput.cpp
+    )
 
+    target_link_libraries(
+        hyprvx_visual_simulator
+        PRIVATE
+            hyprvx_runtime_navigation
+            hyprvx_core
+            PkgConfig::SDL3
+    )
 
-add_executable(
-    hyprvx_multi_output_simulator
-    simulator/multi_output_main.cpp
-)
-
-target_link_libraries(
-    hyprvx_multi_output_simulator
-    PRIVATE
-        hyprvx_core
-        PkgConfig::SDL3
-)
-
-set_target_properties(
-    hyprvx_multi_output_simulator
-    PROPERTIES
-        OUTPUT_NAME hyprvx-multi-output-sim
-)
+    set_target_properties(
+        hyprvx_visual_simulator
+        PROPERTIES
+            OUTPUT_NAME hyprvx-visual-sim
+    )
 
 
-add_executable(
-    hyprvx_topology_simulator
-    simulator/topology_main.cpp
-)
+    add_executable(
+        hyprvx_multi_output_simulator
+        simulator/multi_output_main.cpp
+    )
 
-target_link_libraries(
-    hyprvx_topology_simulator
-    PRIVATE
-        hyprvx_core
-        PkgConfig::SDL3
-)
+    target_link_libraries(
+        hyprvx_multi_output_simulator
+        PRIVATE
+            hyprvx_core
+            PkgConfig::SDL3
+    )
 
-set_target_properties(
-    hyprvx_topology_simulator
-    PROPERTIES
-        OUTPUT_NAME hyprvx-topology-sim
-)
+    set_target_properties(
+        hyprvx_multi_output_simulator
+        PROPERTIES
+            OUTPUT_NAME hyprvx-multi-output-sim
+    )
+
+
+    add_executable(
+        hyprvx_topology_simulator
+        simulator/topology_main.cpp
+    )
+
+    target_link_libraries(
+        hyprvx_topology_simulator
+        PRIVATE
+            hyprvx_core
+            PkgConfig::SDL3
+    )
+
+    set_target_properties(
+        hyprvx_topology_simulator
+        PROPERTIES
+            OUTPUT_NAME hyprvx-topology-sim
+    )
+endif()
 
 add_executable(
     hyprvx_ipc_watch
@@ -314,6 +338,7 @@ if(BUILD_TESTING AND HYPRVX_BUILD_TESTS)
 
         tests/unit/test_geometry.cpp
         tests/unit/test_camera.cpp
+        tests/unit/test_camera_math.cpp
         tests/unit/test_camera_motion.cpp
         tests/unit/test_island.cpp
         tests/unit/test_island_interaction.cpp
@@ -350,9 +375,6 @@ if(BUILD_TESTING AND HYPRVX_BUILD_TESTS)
         tests/unit/test_runtime_camera_controller.cpp
         tests/unit/test_runtime_navigation_input.cpp
         tests/unit/test_nested_guard.cpp
-        tests/unit/test_overlay_state.cpp
-        tests/unit/test_native_event_bridge.cpp
-        tests/unit/test_plugin_compatibility.cpp
         tests/unit/test_projection_state.cpp
     )
 
@@ -361,11 +383,20 @@ if(BUILD_TESTING AND HYPRVX_BUILD_TESTS)
         PRIVATE
             hyprvx_runtime_navigation
             hyprvx_nested_guard
-            hyprvx_wayland_platform
             hyprvx_runtime_projection
             hyprvx_hyprland_ipc
             GTest::gtest_main
     )
+    if(HYPRVX_WITH_WAYLAND_PLATFORM)
+        target_sources(hyprvx_hyprland_ipc_tests PRIVATE
+            tests/unit/test_overlay_state.cpp
+            tests/unit/test_native_event_bridge.cpp
+        )
+        target_link_libraries(hyprvx_hyprland_ipc_tests PRIVATE hyprvx_wayland_platform)
+    endif()
+    if(HYPRVX_WITH_HYPRLAND_PLUGIN)
+        target_sources(hyprvx_hyprland_ipc_tests PRIVATE tests/unit/test_plugin_compatibility.cpp)
+    endif()
     target_compile_definitions(hyprvx_hyprland_ipc_tests PRIVATE
         HYPRVX_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/data"
     )

@@ -1,0 +1,169 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Towfienes <ngolamtien1706@gmail.com>
+Date: Sun, 11 Oct 2026 00:57:52 +0700
+Subject: [PATCH] hyprvx: damage through the camera
+
+Patch 0004 of the HyprVX V3 series (Feature 001, Sprint 1).
+
+- Damage-union rule (FR-005): while a camera applies on a monitor,
+  damageSurface, damageWindow and damageBox (and damageRegion through
+  it) also add the camera image of the damage, computed with
+  cammath::damageBox (forwardBox, round out, +1 px) and converted to
+  monitor pixels. The stock damage is still added, so window-owned
+  content (surfaces, popups, subsurfaces, decorations) and screen-space
+  content (layers, layer popups, overlays) are both covered without
+  classifying the owner; layers are never drawn transformed.
+- The frame-callback hack in damageSurface also schedules a frame on
+  monitors whose camera shows the surface.
+- Every camera change (setCamera, resetCamera) damages the whole
+  output.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ src/hyprvx/MonitorCamera.cpp |  9 +++++++++
+ src/hyprvx/SceneCamera.cpp   | 26 ++++++++++++++++++++++++++
+ src/hyprvx/SceneCamera.hpp   | 10 ++++++++++
+ src/render/Renderer.cpp      | 10 +++++++++-
+ 4 files changed, 54 insertions(+), 1 deletion(-)
+
+diff --git a/src/hyprvx/MonitorCamera.cpp b/src/hyprvx/MonitorCamera.cpp
+index b3910e84..c8061d3b 100644
+--- a/src/hyprvx/MonitorCamera.cpp
++++ b/src/hyprvx/MonitorCamera.cpp
+@@ -2,6 +2,7 @@
+ 
+ #include "../output/Monitor.hpp"
+ #include "../debug/log/Logger.hpp"
++#include "../render/Renderer.hpp"
+ 
+ using namespace hyprvx;
+ 
+@@ -16,6 +17,12 @@ namespace {
+         return "unknown";
+     }
+ 
++    // FR-005: every camera change damages the whole output.
++    void damageOnChange(Monitor::CMonitor& monitor) {
++        if (g_pHyprRenderer)
++            g_pHyprRenderer->damageMonitor(monitor.m_self.lock());
++    }
++
+     bool sameState(const cammath::CameraState& a, const cammath::CameraState& b) {
+         return a.origin.x == b.origin.x && a.origin.y == b.origin.y && a.zoom == b.zoom;
+     }
+@@ -46,6 +53,7 @@ bool HyprVX::setCamera(Monitor::CMonitor& monitor, const cammath::CameraState& c
+     stored.active = !cammath::isIdentity(camera, monitorOrigin(monitor));
+     stored.state  = camera;
+     stored.revision++;
++    damageOnChange(monitor);
+     return true;
+ }
+ 
+@@ -57,4 +65,5 @@ void HyprVX::resetCamera(Monitor::CMonitor& monitor) {
+     stored.active = false;
+     stored.state  = cammath::identityFor(monitorOrigin(monitor));
+     stored.revision++;
++    damageOnChange(monitor);
+ }
+diff --git a/src/hyprvx/SceneCamera.cpp b/src/hyprvx/SceneCamera.cpp
+index 1dd8889d..58ea0773 100644
+--- a/src/hyprvx/SceneCamera.cpp
++++ b/src/hyprvx/SceneCamera.cpp
+@@ -45,3 +45,29 @@ SRenderModifData HyprVX::cameraRenderModif(const Monitor::CMonitor& monitor, con
+     modif.modifs.insert(modif.modifs.end(), outer.modifs.begin(), outer.modifs.end());
+     return modif;
+ }
++
++bool HyprVX::cameraShows(const Monitor::CMonitor& monitor, const CBox& globalLogical) {
++    const auto CAMERA = activeCamera(monitor);
++    if (!CAMERA)
++        return false;
++
++    const auto VISIBLE = cammath::visibleWorldRect(*CAMERA, {monitor.m_size.x, monitor.m_size.y});
++    return globalLogical.overlaps({VISIBLE.pos.x, VISIBLE.pos.y, VISIBLE.size.x, VISIBLE.size.y});
++}
++
++void HyprVX::addCameraDamage(Monitor::CMonitor& monitor, const CBox& globalLogical) {
++    const auto CAMERA = activeCamera(monitor);
++    if (!CAMERA || globalLogical.empty())
++        return;
++
++    const auto M      = monitorOrigin(monitor);
++    const auto SCREEN = cammath::damageBox(*CAMERA, M, {{globalLogical.x, globalLogical.y}, {globalLogical.w, globalLogical.h}});
++    monitor.addDamage(CBox{SCREEN.pos.x - M.x, SCREEN.pos.y - M.y, SCREEN.size.x, SCREEN.size.y}.scale(monitor.m_scale).round());
++}
++
++void HyprVX::addCameraDamage(Monitor::CMonitor& monitor, const CRegion& globalLogical) {
++    if (!activeCamera(monitor))
++        return;
++
++    globalLogical.forEachRect([&monitor](const auto& RECT) { addCameraDamage(monitor, CBox(RECT.x1, RECT.y1, RECT.x2 - RECT.x1, RECT.y2 - RECT.y1)); });
++}
+diff --git a/src/hyprvx/SceneCamera.hpp b/src/hyprvx/SceneCamera.hpp
+index e4082003..f9711785 100644
+--- a/src/hyprvx/SceneCamera.hpp
++++ b/src/hyprvx/SceneCamera.hpp
+@@ -4,6 +4,7 @@
+ 
+ #include "MonitorCamera.hpp"
+ #include "../render/types.hpp"
++#include "../helpers/math/Math.hpp"
+ 
+ #include <optional>
+ 
+@@ -20,4 +21,13 @@ namespace HyprVX {
+     // quad touches (round out); an interior that is skipped must not cover a touched edge pixel (round in).
+     Hyprutils::Math::CBox roundOutBox(const Hyprutils::Math::CBox& box);
+     Hyprutils::Math::CBox roundInBox(const Hyprutils::Math::CBox& box);
++
++    // True when the camera applies and its visible world rect overlaps a global logical box.
++    bool cameraShows(const Monitor::CMonitor& monitor, const CBox& globalLogical);
++
++    // Damage-union rule (FR-005). While a camera applies, damage given in global logical coordinates is also added at
++    // its camera image (cammath::damageBox, then monitor pixels). Callers keep adding the stock damage too, so
++    // window-owned content and screen-space content (layers, overlays) are both covered without classifying the owner.
++    void addCameraDamage(Monitor::CMonitor& monitor, const CBox& globalLogical);
++    void addCameraDamage(Monitor::CMonitor& monitor, const CRegion& globalLogical);
+ }
+diff --git a/src/render/Renderer.cpp b/src/render/Renderer.cpp
+index b1492d70..561e8dc0 100644
+--- a/src/render/Renderer.cpp
++++ b/src/render/Renderer.cpp
+@@ -2746,7 +2746,7 @@ void IHyprRenderer::damageSurface(SP<CWLSurfaceResource> pSurface, double x, dou
+                 if (!m->m_output)
+                     continue;
+ 
+-                if (BOX->overlaps(m->logicalBox()))
++                if (BOX->overlaps(m->logicalBox()) || HyprVX::cameraShows(*m, *BOX))
+                     m->scheduleFrame(Aquamarine::IOutput::AQ_SCHEDULE_NEEDS_FRAME);
+             }
+         }
+@@ -2768,6 +2768,10 @@ void IHyprRenderer::damageSurface(SP<CWLSurfaceResource> pSurface, double x, dou
+     for (auto const& m : State::monitorState()->monitors()) {
+         if (!m->m_output)
+             continue;
++
++        // HyprVX (FR-005): damage-union rule, see HyprVX::addCameraDamage
++        HyprVX::addCameraDamage(*m, damageBox);
++
+         if (!EXTENTS.overlaps(m->logicalBox()))
+             continue;
+ 
+@@ -2796,6 +2800,8 @@ void IHyprRenderer::damageWindow(PHLWINDOW pWindow, bool forceFull) {
+             CBox fixedDamageBox = {windowBox.x - m->m_position.x, windowBox.y - m->m_position.y, windowBox.width, windowBox.height};
+             fixedDamageBox.scale(m->m_scale).round();
+             m->addDamage(fixedDamageBox);
++            // HyprVX (FR-005): damage-union rule, see HyprVX::addCameraDamage
++            HyprVX::addCameraDamage(*m, windowBox);
+         }
+     }
+ 
+@@ -2826,6 +2832,8 @@ void IHyprRenderer::damageBox(const CBox& box, bool skipFrameSchedule) {
+         if (!skipFrameSchedule) {
+             CBox damageBox = box.copy().translate(-m->m_position).scale(m->m_scale).round();
+             m->addDamage(damageBox);
++            // HyprVX (FR-005): damage-union rule, see HyprVX::addCameraDamage
++            HyprVX::addCameraDamage(*m, box);
+         }
+     }
+ 

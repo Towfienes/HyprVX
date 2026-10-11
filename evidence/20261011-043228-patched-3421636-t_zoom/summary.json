@@ -1,0 +1,20 @@
+{
+  "run_id": "20261011-043228-patched-3421636-t_zoom",
+  "test": "t_zoom",
+  "result": "BLOCKED",
+  "agent": "claude",
+  "git_sha": "34216369b0423ae9271413735b711e932f6fb833",
+  "note": "z025: identity box not found where the window rule puts it (setup invalid)",
+  "artifacts": [
+    "build-info-patched.json",
+    "preflight.log",
+    "z025-identity.json",
+    "z025-identity.png",
+    "z025-identity.state.json",
+    "z025.jsonl",
+    "z025.session.log"
+  ],
+  "not_run": [
+    "z025: identity box not found where the window rule puts it (setup invalid)"
+  ]
+}

@@ -1,0 +1,290 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Towfienes <ngolamtien1706@gmail.com>
+Date: Sun, 11 Oct 2026 00:43:01 +0700
+Subject: [PATCH] hyprvx: vendor CameraMath and add per-monitor camera state
+
+Patch 0001 of the HyprVX V3 series (Feature 001, Sprint 1).
+
+- src/hyprvx/CameraMath.hpp: byte-identical copy of HyprVX
+  core/include/hyprvx/core/CameraMath.hpp (BSD-3-Clause), the single
+  world <-> screen transform (contract v1.1).
+- src/hyprvx/MonitorCamera.{hpp,cpp}: per-monitor camera (origin, zoom,
+  revision). Inactive means identityFor(M) and follows the monitor
+  origin exactly. setCamera validates against the MVP zoom range
+  0.1 ... 2.0 and leaves the state unchanged (and logs) on rejection;
+  every change increments the revision. resetCamera restores exact
+  identity.
+- CMonitor gains one member, m_hyprvxCamera.
+
+No render, input or damage change: nothing reads the camera yet.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ src/hyprvx/CameraMath.hpp    | 125 +++++++++++++++++++++++++++++++++++
+ src/hyprvx/MonitorCamera.cpp |  60 +++++++++++++++++
+ src/hyprvx/MonitorCamera.hpp |  34 ++++++++++
+ src/output/Monitor.hpp       |   4 ++
+ 4 files changed, 223 insertions(+)
+ create mode 100644 src/hyprvx/CameraMath.hpp
+ create mode 100644 src/hyprvx/MonitorCamera.cpp
+ create mode 100644 src/hyprvx/MonitorCamera.hpp
+
+diff --git a/src/hyprvx/CameraMath.hpp b/src/hyprvx/CameraMath.hpp
+new file mode 100644
+index 00000000..27d20aed
+--- /dev/null
++++ b/src/hyprvx/CameraMath.hpp
+@@ -0,0 +1,125 @@
++// SPDX-License-Identifier: BSD-3-Clause
++// Copyright (c) 2026, the HyprVX authors.
++//
++// HyprVX camera transform: the single source of truth for world <-> screen mapping (Constitution IV).
++// Contract: specs/001-native-spatial-camera/contracts/transform-contract.md, version 1.1.
++//
++// Header-only, C++20, standard library only. This file is vendored unchanged into the Hyprland patch series;
++// it must not depend on hyprvx_core. Adapters to other vector/box types live at the call sites and contain no
++// arithmetic beyond field copies.
++
++#pragma once
++
++#include <cmath>
++
++namespace hyprvx::cammath {
++
++struct Vec {
++    double x = 0.0, y = 0.0;
++};
++
++struct Box {
++    Vec pos;
++    Vec size;
++};
++
++// P (world point shown at the monitor origin M) and z.
++struct CameraState {
++    Vec    origin;
++    double zoom = 1.0;
++};
++
++// MVP range; callers may pass others.
++struct ZoomLimits {
++    double min = 0.1;
++    double max = 2.0;
++};
++
++enum class Error {
++    None,
++    NonFinite,
++    NonPositiveZoom,
++    ZoomOutOfRange,
++};
++
++// Exact compare: identity is set exactly by identityFor() (reset/panic), never reached by arithmetic.
++[[nodiscard]] constexpr bool isIdentity(const CameraState& c, Vec M) noexcept {
++    return c.origin.x == M.x && c.origin.y == M.y && c.zoom == 1.0;
++}
++
++// world -> screen-logical: M + (W - P)·z. Identity returns W unchanged, because M + (W - M) is not exact.
++[[nodiscard]] constexpr Vec forward(const CameraState& c, Vec M, Vec W) noexcept {
++    if (isIdentity(c, M))
++        return W;
++    return {M.x + (W.x - c.origin.x) * c.zoom, M.y + (W.y - c.origin.y) * c.zoom};
++}
++
++// screen-logical -> world: P + (S - M)/z. Identity returns S unchanged.
++[[nodiscard]] constexpr Vec inverse(const CameraState& c, Vec M, Vec S) noexcept {
++    if (isIdentity(c, M))
++        return S;
++    return {c.origin.x + (S.x - M.x) / c.zoom, c.origin.y + (S.y - M.y) / c.zoom};
++}
++
++[[nodiscard]] constexpr Box forwardBox(const CameraState& c, Vec M, Box B) noexcept {
++    if (isIdentity(c, M))
++        return B;
++    return {forward(c, M, B.pos), {B.size.x * c.zoom, B.size.y * c.zoom}};
++}
++
++[[nodiscard]] constexpr Box inverseBox(const CameraState& c, Vec M, Box R) noexcept {
++    if (isIdentity(c, M))
++        return R;
++    return {inverse(c, M, R.pos), {R.size.x / c.zoom, R.size.y / c.zoom}};
++}
++
++[[nodiscard]] constexpr Box visibleWorldRect(const CameraState& c, Vec monitorSize) noexcept {
++    return {c.origin, {monitorSize.x / c.zoom, monitorSize.y / c.zoom}};
++}
++
++// Unscaled surface units. Identity yields S - surfaceOrigin through the inverse short-circuit.
++[[nodiscard]] constexpr Vec surfaceLocal(const CameraState& c, Vec M, Vec S, Vec surfaceOrigin) noexcept {
++    const Vec W = inverse(c, M, S);
++    return {W.x - surfaceOrigin.x, W.y - surfaceOrigin.y};
++}
++
++// Screen damage for a window-owned world box: roundOut(forwardBox(worldBox)) expanded by 1 px on every side.
++[[nodiscard]] inline Box damageBox(const CameraState& c, Vec M, Box worldBox) noexcept {
++    const Box    R  = forwardBox(c, M, worldBox);
++    const double x0 = std::floor(R.pos.x) - 1.0;
++    const double y0 = std::floor(R.pos.y) - 1.0;
++    const double x1 = std::ceil(R.pos.x + R.size.x) + 1.0;
++    const double y1 = std::ceil(R.pos.y + R.size.y) + 1.0;
++    return {{x0, y0}, {x1 - x0, y1 - y0}};
++}
++
++[[nodiscard]] inline Error validate(const CameraState& c, ZoomLimits limits) noexcept {
++    if (!std::isfinite(c.origin.x) || !std::isfinite(c.origin.y) || !std::isfinite(c.zoom))
++        return Error::NonFinite;
++    if (!(c.zoom > 0.0))
++        return Error::NonPositiveZoom;
++    if (c.zoom < limits.min || c.zoom > limits.max)
++        return Error::ZoomOutOfRange;
++    return Error::None;
++}
++
++// Keeps the world point under screen anchor a fixed: W_a = inverse(c, M, a); P' = W_a - (a - M)/z'.
++// zNew is clamped to limits; non-finite a or zNew returns c unchanged.
++[[nodiscard]] inline CameraState anchorZoom(const CameraState& c, Vec M, Vec a, double zNew, ZoomLimits limits) noexcept {
++    if (!std::isfinite(a.x) || !std::isfinite(a.y) || !std::isfinite(zNew))
++        return c;
++    const double z  = zNew < limits.min ? limits.min : (zNew > limits.max ? limits.max : zNew);
++    const Vec    Wa = inverse(c, M, a);
++    return {{Wa.x - (a.x - M.x) / z, Wa.y - (a.y - M.y) / z}, z};
++}
++
++// P' = P - d/z: content follows a screen-space drag of d.
++[[nodiscard]] constexpr CameraState panByScreen(const CameraState& c, Vec d) noexcept {
++    return {{c.origin.x - d.x / c.zoom, c.origin.y - d.y / c.zoom}, c.zoom};
++}
++
++[[nodiscard]] constexpr CameraState identityFor(Vec M) noexcept {
++    return {M, 1.0};
++}
++
++} // namespace hyprvx::cammath
+diff --git a/src/hyprvx/MonitorCamera.cpp b/src/hyprvx/MonitorCamera.cpp
+new file mode 100644
+index 00000000..b3910e84
+--- /dev/null
++++ b/src/hyprvx/MonitorCamera.cpp
+@@ -0,0 +1,60 @@
++#include "MonitorCamera.hpp"
++
++#include "../output/Monitor.hpp"
++#include "../debug/log/Logger.hpp"
++
++using namespace hyprvx;
++
++namespace {
++    const char* errorName(cammath::Error error) {
++        switch (error) {
++            case cammath::Error::None: return "none";
++            case cammath::Error::NonFinite: return "non-finite";
++            case cammath::Error::NonPositiveZoom: return "non-positive zoom";
++            case cammath::Error::ZoomOutOfRange: return "zoom out of range";
++        }
++        return "unknown";
++    }
++
++    bool sameState(const cammath::CameraState& a, const cammath::CameraState& b) {
++        return a.origin.x == b.origin.x && a.origin.y == b.origin.y && a.zoom == b.zoom;
++    }
++}
++
++cammath::Vec HyprVX::monitorOrigin(const Monitor::CMonitor& monitor) {
++    return {monitor.m_position.x, monitor.m_position.y};
++}
++
++cammath::CameraState HyprVX::cameraOf(const Monitor::CMonitor& monitor) {
++    return monitor.m_hyprvxCamera.active ? monitor.m_hyprvxCamera.state : cammath::identityFor(monitorOrigin(monitor));
++}
++
++bool HyprVX::cameraIsIdentity(const Monitor::CMonitor& monitor) {
++    return cammath::isIdentity(cameraOf(monitor), monitorOrigin(monitor));
++}
++
++bool HyprVX::setCamera(Monitor::CMonitor& monitor, const cammath::CameraState& camera) {
++    if (const auto error = cammath::validate(camera, CAMERA_ZOOM_LIMITS); error != cammath::Error::None) {
++        Log::logger->log(Log::ERR, "[hyprvx] camera rejected on {}: {} (origin {}, {} zoom {})", monitor.m_name, errorName(error), camera.origin.x, camera.origin.y, camera.zoom);
++        return false;
++    }
++
++    if (sameState(cameraOf(monitor), camera))
++        return true;
++
++    auto& stored  = monitor.m_hyprvxCamera;
++    stored.active = !cammath::isIdentity(camera, monitorOrigin(monitor));
++    stored.state  = camera;
++    stored.revision++;
++    return true;
++}
++
++void HyprVX::resetCamera(Monitor::CMonitor& monitor) {
++    auto& stored = monitor.m_hyprvxCamera;
++    if (!stored.active)
++        return;
++
++    stored.active = false;
++    stored.state  = cammath::identityFor(monitorOrigin(monitor));
++    stored.revision++;
++}
+diff --git a/src/hyprvx/MonitorCamera.hpp b/src/hyprvx/MonitorCamera.hpp
+new file mode 100644
+index 00000000..24654454
+--- /dev/null
++++ b/src/hyprvx/MonitorCamera.hpp
+@@ -0,0 +1,34 @@
++#pragma once
++
++// HyprVX per-monitor camera state (patch 0001). The transform itself lives only in CameraMath.hpp.
++
++#include "CameraMath.hpp"
++
++#include <cstdint>
++
++namespace Monitor {
++    class CMonitor;
++}
++
++namespace HyprVX {
++    struct SMonitorCamera {
++        // Meaningful only while active. Inactive means identityFor(M), which follows the monitor origin exactly.
++        hyprvx::cammath::CameraState state;
++        bool                         active = false;
++        // Incremented on every change; drives full-output damage.
++        uint64_t revision = 0;
++    };
++
++    // MVP zoom range (data-model.md).
++    inline constexpr hyprvx::cammath::ZoomLimits CAMERA_ZOOM_LIMITS{};
++
++    hyprvx::cammath::Vec                         monitorOrigin(const Monitor::CMonitor& monitor);
++    hyprvx::cammath::CameraState                 cameraOf(const Monitor::CMonitor& monitor);
++    bool                                         cameraIsIdentity(const Monitor::CMonitor& monitor);
++
++    // Rejects invalid cameras (non-finite, zoom <= 0 or outside CAMERA_ZOOM_LIMITS): state unchanged, logged.
++    bool setCamera(Monitor::CMonitor& monitor, const hyprvx::cammath::CameraState& camera);
++
++    // Exact identity, used by reset and panic.
++    void resetCamera(Monitor::CMonitor& monitor);
++}
+diff --git a/src/output/Monitor.hpp b/src/output/Monitor.hpp
+index 945fecd1..94371c4f 100644
+--- a/src/output/Monitor.hpp
++++ b/src/output/Monitor.hpp
+@@ -33,6 +33,7 @@
+ 
+ #include "../helpers/TransferFunction.hpp"
+ #include "../config/shared/monitor/MonitorRule.hpp"
++#include "../hyprvx/MonitorCamera.hpp"
+ 
+ class CSyncTimeline;
+ class CEventLoopTimer;
+@@ -372,6 +373,9 @@ namespace Monitor {
+         bool                                m_blurFBDirty        = true;
+         bool                                m_blurFBShouldRender = false;
+ 
++        // HyprVX camera (patch 0001): identity unless set through HyprVX::setCamera
++        HyprVX::SMonitorCamera m_hyprvxCamera;
++
+         // For the list lookup
+ 
+         bool operator==(const CMonitor& rhs) {

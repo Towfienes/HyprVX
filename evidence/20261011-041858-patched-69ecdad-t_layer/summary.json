@@ -1,0 +1,16 @@
+{
+  "run_id": "20261011-041858-patched-69ecdad-t_layer",
+  "test": "t_layer",
+  "result": "BLOCKED",
+  "agent": "claude",
+  "git_sha": "69ecdad005019d1219ab29ea5d90db32fa071abe",
+  "note": "nested patched session did not start",
+  "artifacts": [
+    "build-info-patched.json",
+    "preflight.log",
+    "session.log"
+  ],
+  "not_run": [
+    "nested patched session did not start"
+  ]
+}

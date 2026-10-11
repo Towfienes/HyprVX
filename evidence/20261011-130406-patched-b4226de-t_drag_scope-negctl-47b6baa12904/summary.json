@@ -1,0 +1,41 @@
+{
+  "run_id": "20261011-130406-patched-b4226de-t_drag_scope-negctl-47b6baa12904",
+  "test": "t_drag_scope",
+  "result": "BLOCKED",
+  "agent": "claude",
+  "git_sha": "b4226de7737eec5fbe0c3c3f982134e26fe6902d",
+  "note": "pointer driver id_resize_drag.steps did not complete",
+  "artifacts": [
+    "after_move.clients.json",
+    "after_resize.clients.json",
+    "before.clients.json",
+    "build-info-patched.json",
+    "camera.png",
+    "camera.reply",
+    "camera.state.json",
+    "client.jsonl",
+    "geometry.txt",
+    "held.cmds",
+    "held.result.json",
+    "held.steps.json",
+    "id_after_move.clients.json",
+    "id_before.clients.json",
+    "id_move_drag.cmds",
+    "id_move_drag.steps.json",
+    "id_resize_drag.cmds",
+    "id_resize_drag.steps.json",
+    "identity-geometry.txt",
+    "identity.png",
+    "identity.state.json",
+    "move_drag.cmds",
+    "move_drag.steps.json",
+    "preflight.log",
+    "resize_drag.cmds",
+    "resize_drag.steps.json",
+    "session.log",
+    "vp.jsonl"
+  ],
+  "not_run": [
+    "pointer driver id_resize_drag.steps did not complete"
+  ]
+}

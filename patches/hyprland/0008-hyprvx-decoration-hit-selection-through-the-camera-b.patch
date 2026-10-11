@@ -1,0 +1,112 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Towfienes <ngolamtien1706@gmail.com>
+Date: Sun, 11 Oct 2026 12:09:49 +0700
+Subject: [PATCH] hyprvx: decoration hit selection through the camera; block
+ compositor drags
+
+Patch 0008 of the HyprVX V3 series (Feature 001, Phase 2, T063).
+
+- CWindow::checkInputOnDecos tests decoration boxes and popups at the
+  world point of the screen coordinates it receives (all callers pass
+  raw pointer coordinates), FR-012.
+- processMouseDownNormal selects the border/corner resize area at the
+  world point.
+- CDragStateController::dragBegin blocks and logs a compositor move or
+  resize drag (mouse binds, border resize, group-bar drag) while the
+  window's monitor has an active camera, before any drag state is set,
+  so the window's logical geometry is never written (FR-012, DV3-11).
+- No border resize cursor icon while a camera applies.
+---
+ src/desktop/view/Window.cpp                 |  5 ++++-
+ src/layout/supplementary/DragController.cpp | 12 ++++++++++++
+ src/managers/input/InputManager.cpp         | 10 +++++++---
+ 3 files changed, 23 insertions(+), 4 deletions(-)
+
+diff --git a/src/desktop/view/Window.cpp b/src/desktop/view/Window.cpp
+index f27f66b8..12b023dd 100644
+--- a/src/desktop/view/Window.cpp
++++ b/src/desktop/view/Window.cpp
+@@ -450,7 +450,10 @@ void CWindow::uncacheWindowDecos() {
+     }
+ }
+ 
+-bool CWindow::checkInputOnDecos(const eInputType type, const Vector2D& mouseCoords, std::any data) {
++bool CWindow::checkInputOnDecos(const eInputType type, const Vector2D& screenCoords, std::any data) {
++    // HyprVX: decoration boxes and popups are window content, selected at the world point (FR-012).
++    const auto mouseCoords = HyprVX::screenToWorld(screenCoords);
++
+     if (type != INPUT_TYPE_DRAG_END && hasPopupAt(mouseCoords))
+         return false;
+ 
+diff --git a/src/layout/supplementary/DragController.cpp b/src/layout/supplementary/DragController.cpp
+index d73a3a83..5d3bcf91 100644
+--- a/src/layout/supplementary/DragController.cpp
++++ b/src/layout/supplementary/DragController.cpp
+@@ -13,6 +13,7 @@
+ #include "../../protocols/XDGShell.hpp"
+ #include "../../render/Renderer.hpp"
+ #include "../../state/MonitorState.hpp"
++#include "../../hyprvx/SceneCamera.hpp"
+ 
+ #include <string_view>
+ 
+@@ -127,6 +128,17 @@ bool CDragStateController::updateDragWindow() {
+ }
+ 
+ void CDragStateController::dragBegin(SP<ITarget> target, eMouseBindMode mode, std::optional<eRectCorner> forcedEdge, bool exclusiveDeviceGrab) {
++    // HyprVX: a compositor move/resize drag writes the window's logical geometry. While the camera of the window's monitor
++    // is non-identity it is blocked and logged before any drag state is set (FR-012, DV3-11); moving windows in Drift
++    // changes the world offset O(w) and belongs to Feature 002.
++    if (const auto WINDOW = target ? target->window() : nullptr; WINDOW) {
++        if (const auto PMONITOR = WINDOW->m_monitor.lock(); PMONITOR && HyprVX::activeCamera(*PMONITOR)) {
++            Log::logger->log(Log::WARN, "HyprVX: blocked a compositor {} drag of window {:x} while the camera is non-identity (FR-012)",
++                             isResizeMode(mode) ? "resize" : "move", rc<uintptr_t>(WINDOW.get()));
++            return;
++        }
++    }
++
+     m_target              = target;
+     m_dragMode            = mode;
+     m_forcedGrabbedCorner = forcedEdge;
+diff --git a/src/managers/input/InputManager.cpp b/src/managers/input/InputManager.cpp
+index 12f27bc7..729070c2 100644
+--- a/src/managers/input/InputManager.cpp
++++ b/src/managers/input/InputManager.cpp
+@@ -59,6 +59,7 @@
+ 
+ #include <aquamarine/input/Input.hpp>
+ #include "../../hyprvx/InputCamera.hpp"
++#include "../../hyprvx/SceneCamera.hpp"
+ #include <hyprutils/string/VarList.hpp>
+ #include <hyprutils/string/VarList2.hpp>
+ 
+@@ -673,8 +674,9 @@ void CInputManager::mouseMoveUnified(uint32_t time, bool refocus, bool mouse, st
+ 
+     if (pFoundWindow) {
+         // change cursor icon if hovering over border
+-        if (*PRESIZEONBORDER && *PRESIZECURSORICON) {
+-            if (!Fullscreen::controller()->isFullscreen(pFoundWindow) && !pFoundWindow->hasPopupAt(mouseCoords))
++        // HyprVX: no resize icon while a camera applies (border resize is blocked, FR-012).
++        if (*PRESIZEONBORDER && *PRESIZECURSORICON && !HyprVX::activeCamera(*PMONITOR)) {
++            if (!Fullscreen::controller()->isFullscreen(pFoundWindow) && !pFoundWindow->hasPopupAt(WINDOWCOORDS))
+                 setCursorIconOnBorder(pFoundWindow);
+             else if (m_borderIconDirection != BORDERICON_NONE) {
+                 m_borderIconDirection = BORDERICON_NONE;
+@@ -883,6 +885,8 @@ void CInputManager::processMouseDownNormal(const IPointer::SButtonEvent& e, SP<I
+ 
+     const auto mouseCoords = g_pInputManager->getMouseCoordsInternal();
+     const auto w           = Desktop::viewState()->hitTest().windowAt(mouseCoords, Desktop::View::ALLOW_FLOATING | Desktop::View::RESERVED_EXTENTS | Desktop::View::INPUT_EXTENTS);
++    // HyprVX: window geometry is in world coordinates (border selection by the inverse transform, FR-012).
++    const auto worldCoords = HyprVX::screenToWorld(mouseCoords);
+ 
+     if (w && !m_lastFocusOnLS && !g_pSessionLockManager->isSessionLocked() && w->checkInputOnDecos(INPUT_TYPE_BUTTON, mouseCoords, e))
+         return;
+@@ -894,7 +898,7 @@ void CInputManager::processMouseDownNormal(const IPointer::SButtonEvent& e, SP<I
+             const CBox real = w->geometricBox(Desktop::View::IGeometric::GEOMETRIC_CURRENT);
+             const CBox grab = {real.x - BORDER_GRAB_AREA, real.y - BORDER_GRAB_AREA, real.width + 2 * BORDER_GRAB_AREA, real.height + 2 * BORDER_GRAB_AREA};
+ 
+-            if ((grab.containsPoint(mouseCoords) && (!real.containsPoint(mouseCoords) || w->isInCurvedCorner(mouseCoords.x, mouseCoords.y))) && !w->hasPopupAt(mouseCoords)) {
++            if ((grab.containsPoint(worldCoords) && (!real.containsPoint(worldCoords) || w->isInCurvedCorner(worldCoords.x, worldCoords.y))) && !w->hasPopupAt(worldCoords)) {
+                 g_pKeybindManager->resizeWithBorder(e);
+                 return;
+             }

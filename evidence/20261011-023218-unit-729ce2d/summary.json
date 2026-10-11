@@ -1,0 +1,7 @@
+{"run_id": "20261011-023218-unit-729ce2d", "test": "T009 V-06/V-25 CameraMath property tests", "result": "PASS", "agent": "claude",
+ "git_sha": "729ce2d327c6c04b76636748f125cb25b8f49d82",
+ "checks": {"ctest_headless": "100% tests passed out of 297",
+            "camera_math_default_seed_20261011": "10/10", "camera_math_seed_987654321": "10/10",
+            "mutation": "3/3 mutants killed (identity short-circuit removed, damageBox +1 px removed, clamped anchor uses zNew)"},
+ "artifacts": ["configure.log", "build.log", "ctest.log", "camera_math_seed_default.log", "camera_math_seed_987654321.log", "mutation.log", "mutant-anchor-CameraMath.hpp"],
+ "not_run": ["SDL/Wayland/plugin options (covered by T006 enabled build)"]}

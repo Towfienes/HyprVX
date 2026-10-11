@@ -1,0 +1,17 @@
+{
+  "run_id": "20261011-095719-patched-f1c2f47-t050",
+  "test": "T050 quickstart validation: step 3 (ctest 297/297, analyzer tests 10/10, lint PASS) and step 5 manual nested session (z=0.25 bbox PASS) run literally in fish",
+  "result": "PASS",
+  "agent": "claude",
+  "git_sha": "f1c2f4789979782d8c50dc308d468bd6ec00358c",
+  "note": "qs3.fish/qs5.fish are the executed commands; the manual script waited one full sync round after the camera change (its seq-1 wait matched the map commit)",
+  "artifacts": [
+    "client.jsonl",
+    "qs3.fish",
+    "qs5.fish",
+    "session.json",
+    "z025.json",
+    "z025.png"
+  ],
+  "not_run": []
+}

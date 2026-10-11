@@ -1,0 +1,21 @@
+{
+  "run_id": "20261011-043810-patched-3421636-t_layer",
+  "test": "t_layer",
+  "result": "BLOCKED",
+  "agent": "claude",
+  "git_sha": "34216369b0423ae9271413735b711e932f6fb833",
+  "note": "identity window box not found (setup invalid)",
+  "artifacts": [
+    "build-info-patched.json",
+    "identity.json",
+    "identity.png",
+    "identity.state.json",
+    "layer.jsonl",
+    "preflight.log",
+    "session.log",
+    "window.jsonl"
+  ],
+  "not_run": [
+    "identity window box not found (setup invalid)"
+  ]
+}

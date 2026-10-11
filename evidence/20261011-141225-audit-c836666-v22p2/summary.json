@@ -1,0 +1,15 @@
+{
+  "run_id": "20261011-141225-audit-c836666-v22p2",
+  "test": "V-22 host-safety audit for Phase 2: 234 nested sessions since the 10:32 reboot (T070)",
+  "result": "PASS",
+  "agent": "claude",
+  "git_sha": "c8366667b7dad07b4d011bd1145068a5e3638b09",
+  "note": "no nested session with the host signature; all runtimes private /tmp/hvx-*; ~/.config/hypr and caelestia unchanged since 2026-10-11 00:00; hyprland package 0.56.2-4.1 unchanged; every plugin load/unload through nested.sh run. Sessions before the reboot were removed with /tmp; they are covered by 20261011-095853-audit-b15784b-v22. The host Hyprland restart at 12:54:35 (GPU profile Integrated) was the user action.",
+  "artifacts": [
+    "host_state.txt",
+    "nested_sessions.json",
+    "plugin_load_calls.txt",
+    "preflight.log"
+  ],
+  "not_run": []
+}

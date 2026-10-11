@@ -1,0 +1,39 @@
+{
+  "run_id": "20261011-140640-spike-a47e51a-t_popup",
+  "test": "t_popup",
+  "result": "BLOCKED",
+  "agent": "claude",
+  "git_sha": "a47e51ac2b1b82b630aaa4d1707eaf23cfc3cf1d",
+  "note": "pointer driver z05-popup.steps did not complete",
+  "artifacts": [
+    "build-info-spike-plugin.json",
+    "build-info-spike-stock.json",
+    "client.jsonl",
+    "identity-popup.cmds",
+    "identity-popup.input.json",
+    "identity-popup.json",
+    "identity-popup.points.json",
+    "identity-popup.steps.json",
+    "identity-sub.cmds",
+    "identity-sub.input.json",
+    "identity-sub.json",
+    "identity-sub.points.json",
+    "identity-sub.steps.json",
+    "identity.png",
+    "identity.reply",
+    "identity.state.json",
+    "plugin.sha256",
+    "preflight.log",
+    "session.log",
+    "vp.jsonl",
+    "z05-popup.cmds",
+    "z05-popup.json",
+    "z05-popup.points.json",
+    "z05.png",
+    "z05.reply",
+    "z05.state.json"
+  ],
+  "not_run": [
+    "pointer driver z05-popup.steps did not complete"
+  ]
+}

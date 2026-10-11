@@ -1,0 +1,16 @@
+{
+  "run_id": "20261011-115208-patched-870f07c-t_pointer",
+  "test": "t_pointer",
+  "result": "BLOCKED",
+  "agent": "claude",
+  "git_sha": "870f07c9823e991de2ff44b82f8e9f06f2ad77bc",
+  "note": "nested patched session did not start",
+  "artifacts": [
+    "build-info-patched.json",
+    "preflight.log",
+    "session.log"
+  ],
+  "not_run": [
+    "nested patched session did not start"
+  ]
+}

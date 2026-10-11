@@ -1,0 +1,1 @@
+{"run_id": "20261011-051254-patched-fbd98a9", "test": "patched build 47b6baa12904 (0002 border + rounding fixes)", "result": "PASS", "agent": "claude", "git_sha": "9d248936a3e5e4b41cded84d378b6160df56fc8f", "variant": "patched", "patchset_id": "47b6baa12904", "artifacts": ["apply.log", "build.log", "build-info.json", "hyprland-version.txt"], "not_run": []}

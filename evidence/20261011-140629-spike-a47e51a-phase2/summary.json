@@ -1,0 +1,21 @@
+{
+  "run_id": "20261011-140629-spike-a47e51a-phase2",
+  "test": "Phase 2 US3 native suite at scales 1 1.25 (V-16..V-19)",
+  "result": "BLOCKED",
+  "agent": "claude",
+  "git_sha": "a47e51ac2b1b82b630aaa4d1707eaf23cfc3cf1d",
+  "note": "per-test runs listed in results.txt",
+  "artifacts": [
+    "preflight.log",
+    "results.txt",
+    "t_drag_scope_scale1.25.log",
+    "t_drag_scope_scale1.log",
+    "t_focus_scale1.25.log",
+    "t_focus_scale1.log",
+    "t_pointer_scale1.25.log",
+    "t_pointer_scale1.log",
+    "t_popup_scale1.25.log",
+    "t_popup_scale1.log"
+  ],
+  "not_run": []
+}

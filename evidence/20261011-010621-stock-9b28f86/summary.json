@@ -1,0 +1,54 @@
+{
+  "run_id": "20261011-010621-stock-9b28f86",
+  "test": "V-01/V-03 stock build preflight",
+  "task": "T014",
+  "agent": "codex",
+  "result": "BLOCKED",
+  "variant": "stock",
+  "patchset_id": "none",
+  "binary_sha256": null,
+  "source_commit": "9b28f86",
+  "upstream_commit": "efb50993780079460b0cbed1363e2166a2de1d9f",
+  "raw_path": "/home/towfienes/.cache/hyprvx/codex/evidence/20261011-010621-stock-9b28f86",
+  "checks": [
+    {
+      "item": "memory-preflight",
+      "command": "date +%Y%m%d-%H%M%S && git rev-parse --short HEAD && rg '^MemAvailable:' /proc/meminfo && cat /proc/pressure/memory",
+      "command_exit_code": 0,
+      "result": "BLOCKED",
+      "MemAvailable_KiB": 6734664,
+      "required_KiB": 6815744,
+      "MemAvailable_GiB": 6.422676086425781,
+      "PSI_full_avg10": 0.15,
+      "artifact": "preflight.log"
+    }
+  ],
+  "reason": "MemAvailable thấp hơn 6.5 GiB; WO-01 §1.5, §4 và test-tooling §2 yêu cầu dừng trước job nặng.",
+  "not_run": [
+    {
+      "item": "T014 fetch Hyprland/submodules and build scanner",
+      "reason": "Không khởi động pipeline khi preflight RAM không đạt."
+    },
+    {
+      "item": "T014 stock build/install, build-info.json and build log",
+      "reason": "Không có job build được chạy; không tạo artifact giả."
+    },
+    {
+      "item": "T015,T016,T017,T018,T019,T021,T020 (batch 1b)",
+      "reason": "WO-01 §3 yêu cầu batch 1 không có BLOCKED."
+    },
+    {
+      "item": "T009; T022 GATE-A",
+      "reason": "Điểm dừng cứng của WO-01; chưa thực hiện."
+    },
+    {
+      "item": "Live PSI-trigger registration and abort; generated binary provenance",
+      "reason": "T013 chỉ được kiểm tra syntax, dry-run và self-check; cần môi trường T014."
+    }
+  ],
+  "contract_questions": [],
+  "artifacts": [
+    "preflight.log",
+    "summary.json"
+  ]
+}
