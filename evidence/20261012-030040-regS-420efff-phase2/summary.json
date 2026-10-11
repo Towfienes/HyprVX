@@ -1,0 +1,21 @@
+{
+  "run_id": "20261012-030040-regS-420efff-phase2",
+  "test": "Phase 2 US3 native suite at scales 1 1.25 (V-16..V-19)",
+  "result": "PASS",
+  "agent": "claude",
+  "git_sha": "420efffd6d0448f12c52fc5e7c03d55e7d0d4f31",
+  "note": "per-test runs listed in results.txt",
+  "artifacts": [
+    "preflight.log",
+    "results.txt",
+    "t_drag_scope_scale1.25.log",
+    "t_drag_scope_scale1.log",
+    "t_focus_scale1.25.log",
+    "t_focus_scale1.log",
+    "t_pointer_scale1.25.log",
+    "t_pointer_scale1.log",
+    "t_popup_scale1.25.log",
+    "t_popup_scale1.log"
+  ],
+  "not_run": []
+}

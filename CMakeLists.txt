@@ -16,6 +16,7 @@ option(HYPRVX_WITH_HYPRLAND_PLUGIN "Build the Hyprland plugin" OFF)
 add_library(hyprvx_core STATIC
     core/src/Camera.cpp
     core/src/CameraMotion.cpp
+    core/src/DriftModel.cpp
     core/src/Island.cpp
     core/src/IslandInteraction.cpp
     core/src/SpatialNavigation.cpp
@@ -221,6 +222,22 @@ if(HYPRVX_WITH_WAYLAND_PLATFORM)
     target_include_directories(hyprvx_vpointer PRIVATE ${HYPRVX_PROTOCOL_DIR})
     target_link_libraries(hyprvx_vpointer PRIVATE PkgConfig::WAYLAND_CLIENT)
     target_compile_features(hyprvx_vpointer PRIVATE cxx_std_20)
+
+    # Test-only virtual keyboard for the nested compositor (Feature 002 test-tooling 1.4 section 4b).
+    hyprvx_client_protocol(virtual-keyboard-unstable-v1 ${CMAKE_CURRENT_SOURCE_DIR}/tools/vkeyboard/protocols/virtual-keyboard-unstable-v1.xml)
+    add_executable(hyprvx_vkeyboard tools/vkeyboard/main.cpp
+        ${HYPRVX_PROTOCOL_DIR}/virtual-keyboard-unstable-v1-protocol.c ${HYPRVX_PROTOCOL_DIR}/virtual-keyboard-unstable-v1-client-protocol.h)
+    set_target_properties(hyprvx_vkeyboard PROPERTIES OUTPUT_NAME hyprvx-vkeyboard)
+    target_include_directories(hyprvx_vkeyboard PRIVATE ${HYPRVX_PROTOCOL_DIR})
+    target_link_libraries(hyprvx_vkeyboard PRIVATE PkgConfig::WAYLAND_CLIENT PkgConfig::XKBCOMMON)
+    target_compile_features(hyprvx_vkeyboard PRIVATE cxx_std_20)
+
+    # Deterministic X11 (XWayland) client for native tests (Feature 002 test-tooling 1.4 section 4c).
+    pkg_check_modules(XCB REQUIRED IMPORTED_TARGET xcb)
+    add_executable(hyprvx_x11client tools/x11client/main.cpp)
+    set_target_properties(hyprvx_x11client PROPERTIES OUTPUT_NAME hyprvx-x11client)
+    target_link_libraries(hyprvx_x11client PRIVATE PkgConfig::XCB)
+    target_compile_features(hyprvx_x11client PRIVATE cxx_std_20)
 endif()
 
 if(HYPRVX_WITH_HYPRLAND_PLUGIN)
@@ -339,6 +356,7 @@ if(BUILD_TESTING AND HYPRVX_BUILD_TESTS)
         tests/unit/test_geometry.cpp
         tests/unit/test_camera.cpp
         tests/unit/test_camera_math.cpp
+        tests/unit/test_drift_model.cpp
         tests/unit/test_camera_motion.cpp
         tests/unit/test_island.cpp
         tests/unit/test_island_interaction.cpp

@@ -6,15 +6,20 @@
 # broken in turn: wrong PID, wrong start time, host signature, non-private runtime dir. For each, `run`, `dev`,
 # `capture` and `stop` must exit 3, run nothing, and leave the fake compositor unsignalled. Finally a stale session
 # (fake compositor gone) is cleaned by `recover` without signalling anything, and `stop` on it exits 3.
-# No real compositor is started and the host session is never contacted.
+# Feature 002 (test-tooling 1.4, V-03): `xdisplay`, `plugin load` and `run --x11` refuse the tampered sessions too;
+# on the intact fake session `xdisplay` accepts only a lock file holding the compositor's PID (or a direct child's)
+# and `plugin load` refuses a session whose binary is outside the agent prefix (it would use a foreign hyprctl).
+# hyprvx-vkeyboard and hyprvx-x11client (path in $1/$2, built by tests/native/lib.sh) refuse foreign displays.
+# No real compositor is started and the host session is never contacted (no X server is ever connected).
 set -euo pipefail
 readonly repo="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)"
 export HYPRVX_AGENT=claude
-exec python3 -I - "$repo" <<'PY'
+exec python3 -I - "$repo" "${1:-}" "${2:-}" <<'PY'
 import json, os, shutil, signal, socket, subprocess, sys, tempfile, time
 from pathlib import Path
 
 repo = Path(sys.argv[1])
+vkeyboard, x11client = sys.argv[2], sys.argv[3]
 harness = [sys.executable, "-I", str(repo / "tools/hyprvx_nested.py")]
 root = Path(tempfile.mkdtemp(prefix="hyprvx-nested-test-", dir="/tmp"))
 runtime = Path(tempfile.mkdtemp(prefix="hvx-", dir="/tmp"))
@@ -85,9 +90,11 @@ try:
         "wrong start time": dict(good, process_start=str(int(good["process_start"]) + 1)),
         "host signature": dict(good, host_signature=signature),
     }
+    plugin_so = Path.home() / ".cache/hyprvx/claude/plugin/P/hyprvx-drift-P.so"
     for name, data in cases.items():
         write(data)
-        for command in (["run", "--", "touch", str(marker_file)], ["dev", "state"], ["capture", str(root / "x.png")], ["stop"]):
+        for command in (["run", "--", "touch", str(marker_file)], ["dev", "state"], ["capture", str(root / "x.png")], ["stop"],
+                        ["xdisplay"], ["plugin", "load", str(plugin_so)], ["run", "--x11", "--", "touch", str(marker_file)]):
             r = harness_run(*command)
             check(f"{name}: {command[0]} exits 3", r.returncode == 3, f"exit {r.returncode}: {r.stderr.strip()}")
     # Host signature taken from the live environment, not only from the marker.
@@ -101,6 +108,18 @@ try:
         check(f"non-private runtime dir: {command[0]} exits 3", r.returncode == 3, r.stderr.strip())
     os.chmod(runtime, 0o700)
 
+    # Intact fake session: the binary is not an agent-prefix build, so plugin load must not use its hyprctl.
+    write(good)
+    r = harness_run("plugin", "load", str(plugin_so))
+    check("intact session, binary outside the agent prefix: plugin load exits 3", r.returncode == 3, f"exit {r.returncode}: {r.stderr.strip()}")
+    # xdisplay on the intact fake session. Lock files are only read; the test never creates anything in /tmp/.X11-unix.
+    # No lock file of ours holds the fake compositor's PID, so the display is refused (exit 3) - unless a stale lock with
+    # that PID exists, which the check below would report.
+    r = harness_run("xdisplay")
+    check("intact session without its own XWayland lock: xdisplay exits 3", r.returncode == 3, f"exit {r.returncode}: {r.stdout} {r.stderr.strip()}")
+    r = harness_run("run", "--x11", "--", "touch", str(marker_file))
+    check("intact session without its own XWayland lock: run --x11 exits 3", r.returncode == 3, r.stderr.strip())
+
     check("nothing ran for any refused command", not marker_file.exists())
     check("fake compositor never signalled", server.poll() is None and not signalled.exists())
 
@@ -113,6 +132,42 @@ try:
     check("stale session: recover cleans up (exit 0)", r.returncode == 0 and not (root / "session.json").exists(), r.stdout + r.stderr)
     check("stale session: logs kept", (session / "session.json").exists())
     check("stale session: runtime dir removed", not runtime.exists())
+
+    # Test tools on foreign displays (no compositor of ours behind them).
+    def tool_env(extra):
+        e = {k: v for k, v in os.environ.items() if k not in ("WAYLAND_DISPLAY", "XDG_RUNTIME_DIR", "WAYLAND_SOCKET", "DISPLAY")}
+        e.update(extra)
+        return e
+    fake_rt = Path(tempfile.mkdtemp(prefix="hvx-", dir="/tmp"))
+    os.chmod(fake_rt, 0o700)
+    fake_srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    fake_srv.bind(str(fake_rt / "wayland-9")); fake_srv.listen(4)
+    fifo = root / "tool.fifo"
+    os.mkfifo(fifo, 0o600)
+    try:
+        if vkeyboard:
+            for name, extra in {"host-like runtime dir": {"XDG_RUNTIME_DIR": os.environ.get("XDG_RUNTIME_DIR", "/run/user/1000"), "WAYLAND_DISPLAY": "wayland-1"},
+                                "display path": {"XDG_RUNTIME_DIR": str(fake_rt), "WAYLAND_DISPLAY": "/tmp/x/wayland-1"},
+                                "private dir, foreign compositor": {"XDG_RUNTIME_DIR": str(fake_rt), "WAYLAND_DISPLAY": "wayland-9"}}.items():
+                r = subprocess.run([vkeyboard, "--log", str(root / "vk.jsonl"), "--control", str(fifo)], env=tool_env(extra),
+                                   capture_output=True, text=True, timeout=10)
+                check(f"vkeyboard, {name}: exits 3", r.returncode == 3, f"exit {r.returncode}: {r.stderr.strip()}")
+        else:
+            print("NOT RUN vkeyboard refusal (no binary given)")
+            failures.append("vkeyboard refusal not run")
+        if x11client:
+            for name, extra in {"host-like runtime dir": {"XDG_RUNTIME_DIR": os.environ.get("XDG_RUNTIME_DIR", "/run/user/1000"), "DISPLAY": ":99"},
+                                "no DISPLAY": {"XDG_RUNTIME_DIR": str(fake_rt)},
+                                "DISPLAY not a local display": {"XDG_RUNTIME_DIR": str(fake_rt), "DISPLAY": "tcp/host:0"}}.items():
+                r = subprocess.run([x11client, "--size", "100x100", "--title", "t", "--log", str(root / "x.jsonl"), "--control", str(fifo)],
+                                   env=tool_env(extra), capture_output=True, text=True, timeout=10)
+                check(f"x11client, {name}: exits 3", r.returncode == 3, f"exit {r.returncode}: {r.stderr.strip()}")
+        else:
+            print("NOT RUN x11client refusal (no binary given)")
+            failures.append("x11client refusal not run")
+    finally:
+        fake_srv.close()
+        shutil.rmtree(fake_rt, ignore_errors=True)
 finally:
     if server.poll() is None:
         server.kill(); server.wait()

@@ -7,7 +7,8 @@
 // TL red, TR green, BL blue, BR magenta. SHM XRGB8888 (opaque). The control FIFO accepts
 // "fill X Y W H RRGGBB", "redraw", "sync" and "quit". Every commit gets a frame callback; the log is JSON lines.
 // --popup maps one xdg_popup and --subsurface one wl_subsurface at a fixed parent-local offset, each with its own
-// palette (test-tooling 1.3); pointer events name the surface they are for.
+// palette (test-tooling 1.3); pointer events name the surface they are for. Test-tooling 1.4 adds wl_keyboard logs
+// (kb_enter, kb_leave, key, modifiers) and pointer axis logs.
 
 #include <algorithm>
 #include <cerrno>
@@ -99,6 +100,7 @@ struct Client {
     wl_subcompositor*      subcompositor = nullptr;
     wl_seat*               seat = nullptr;
     wl_pointer*            pointer = nullptr;
+    wl_keyboard*           keyboard = nullptr;
     const char*            pointerSurface = "none"; // surface of the last pointer enter
     wl_surface*            surface = nullptr;
     xdg_surface*           xdgSurface = nullptr;
@@ -443,7 +445,11 @@ void pointerButton(void* data, wl_pointer*, uint32_t, uint32_t, uint32_t button,
     logLine(c, "\"ev\": \"button\", \"surface\": \"%s\", \"button\": %u, \"state\": \"%s\"", c.pointerSurface, button,
             state == WL_POINTER_BUTTON_STATE_PRESSED ? "pressed" : "released");
 }
-void pointerAxis(void*, wl_pointer*, uint32_t, uint32_t, wl_fixed_t) {}
+void pointerAxis(void* data, wl_pointer*, uint32_t, uint32_t axis, wl_fixed_t value) {
+    auto& c = *static_cast<Client*>(data);
+    logLine(c, "\"ev\": \"axis\", \"axis\": \"%s\", \"value\": %.4f, \"surface\": \"%s\"",
+            axis == WL_POINTER_AXIS_HORIZONTAL_SCROLL ? "h" : "v", wl_fixed_to_double(value), c.pointerSurface);
+}
 void pointerFrame(void*, wl_pointer*) {}
 void pointerAxisSource(void*, wl_pointer*, uint32_t) {}
 void pointerAxisStop(void*, wl_pointer*, uint32_t, uint32_t) {}
@@ -466,11 +472,42 @@ const wl_pointer_listener kPointerListener = {.enter = pointerEnter,
                                               .axis_relative_direction = pointerAxisRelative,
                                               .warp = pointerWarp};
 
+// ---- keyboard log (test-tooling 1.4 section 4) -----------------------------------------------------------------
+
+void keyboardKeymap(void*, wl_keyboard*, uint32_t, int32_t fd, uint32_t) {
+    close(fd);
+}
+void keyboardEnter(void* data, wl_keyboard*, uint32_t, wl_surface* surface, wl_array*) {
+    auto& c = *static_cast<Client*>(data);
+    logLine(c, "\"ev\": \"kb_enter\", \"surface\": \"%s\"", surfaceName(c, surface));
+}
+void keyboardLeave(void* data, wl_keyboard*, uint32_t, wl_surface*) {
+    logLine(*static_cast<Client*>(data), "\"ev\": \"kb_leave\"");
+}
+void keyboardKey(void* data, wl_keyboard*, uint32_t, uint32_t, uint32_t key, uint32_t state) {
+    logLine(*static_cast<Client*>(data), "\"ev\": \"key\", \"key\": %u, \"state\": \"%s\"", key,
+            state == WL_KEYBOARD_KEY_STATE_PRESSED ? "pressed" : "released");
+}
+void keyboardModifiers(void* data, wl_keyboard*, uint32_t, uint32_t depressed, uint32_t, uint32_t, uint32_t) {
+    logLine(*static_cast<Client*>(data), "\"ev\": \"modifiers\", \"depressed\": %u", depressed);
+}
+void keyboardRepeatInfo(void*, wl_keyboard*, int32_t, int32_t) {}
+const wl_keyboard_listener kKeyboardListener = {.keymap = keyboardKeymap,
+                                                .enter = keyboardEnter,
+                                                .leave = keyboardLeave,
+                                                .key = keyboardKey,
+                                                .modifiers = keyboardModifiers,
+                                                .repeat_info = keyboardRepeatInfo};
+
 void seatCapabilities(void* data, wl_seat* seat, uint32_t caps) {
     auto& c = *static_cast<Client*>(data);
     if ((caps & WL_SEAT_CAPABILITY_POINTER) && !c.pointer) {
         c.pointer = wl_seat_get_pointer(seat);
         wl_pointer_add_listener(c.pointer, &kPointerListener, &c);
+    }
+    if ((caps & WL_SEAT_CAPABILITY_KEYBOARD) && !c.keyboard) {
+        c.keyboard = wl_seat_get_keyboard(seat);
+        wl_keyboard_add_listener(c.keyboard, &kKeyboardListener, &c);
     }
 }
 void seatName(void*, wl_seat*, const char*) {}

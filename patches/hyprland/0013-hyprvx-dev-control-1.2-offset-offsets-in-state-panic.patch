@@ -1,0 +1,118 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Towfienes <ngolamtien1706@gmail.com>
+Date: Sun, 11 Oct 2026 19:56:10 +0700
+Subject: [PATCH] hyprvx: dev control 1.2 (offset, offsets in state, panic
+ resets offsets)
+
+Patch 0013 of the HyprVX V3 series (Feature 002, T024).
+
+`hyprctl hyprvx-dev offset <address> <x> <y>` sets a window's world offset
+directly, for mechanism tests that must not depend on the policy; `state`
+lists the non-zero offsets; `panic` also resets every offset. Dev builds
+only (HYPRVX_DEV); replies are never evidence.
+---
+ src/hyprvx/DevControl.cpp | 53 +++++++++++++++++++++++++++++++++++----
+ 1 file changed, 48 insertions(+), 5 deletions(-)
+
+diff --git a/src/hyprvx/DevControl.cpp b/src/hyprvx/DevControl.cpp
+index ac973a36..35bfbe69 100644
+--- a/src/hyprvx/DevControl.cpp
++++ b/src/hyprvx/DevControl.cpp
+@@ -3,11 +3,14 @@
+ #ifdef HYPRVX_DEV
+ 
+ #include "MonitorCamera.hpp"
++#include "WindowOffset.hpp"
+ 
+ #include "../output/Monitor.hpp"
+ #include "../state/MonitorState.hpp"
+ #include "../state/MonitorQuery.hpp"
+ #include "../desktop/state/FocusState.hpp"
++#include "../desktop/state/WindowState.hpp"
++#include "../desktop/view/Window.hpp"
+ #include "../managers/KeybindManager.hpp"
+ #include "../debug/HyprCtl.hpp"
+ #include "../render/Renderer.hpp"
+@@ -86,29 +89,69 @@ namespace {
+         return setFromWords(MONITOR, words);
+     }
+ 
+-    // Never fails: every camera returns to exact identity (the scene has no other state in Feature 001).
++    // Never fails: every camera returns to exact identity and every world offset to 0 (dev control 1.2).
+     SDispatchResult panic(std::string) {
+         for (auto const& m : State::monitorState()->monitors())
+             HyprVX::resetCamera(*m);
+-        Log::logger->log(Log::WARN, "[hyprvx] panic: all cameras reset to identity");
++        HyprVX::resetWindowOffsets();
++        Log::logger->log(Log::WARN, "[hyprvx] panic: all cameras reset to identity, all window offsets to 0");
+         return {};
+     }
+ 
++    // <address> <x> <y> (dev control 1.2, Feature 002 test-tooling 1.4): sets O(w) directly, for mechanism tests that
++    // must not depend on the policy. Validation is setWindowOffset's (no change on rejection).
++    SDispatchResult offset(std::string args) {
++        const auto WORDS = splitWords(args);
++        if (WORDS.size() != 3)
++            return error("err:invalid");
++        auto       addressWord = WORDS[0];
++        if (addressWord.starts_with("0x"))
++            addressWord.remove_prefix(2);
++        uintptr_t  address = 0;
++        const auto RES     = std::from_chars(addressWord.data(), addressWord.data() + addressWord.size(), address, 16);
++        const auto X       = parseNumber(WORDS[1]);
++        const auto Y       = parseNumber(WORDS[2]);
++        if (RES.ec != std::errc{} || RES.ptr != addressWord.data() + addressWord.size() || !X || !Y)
++            return error("err:invalid");
++
++        for (auto const& w : Desktop::windowState()->windows()) {
++            if (rc<uintptr_t>(w.get()) == address)
++                return HyprVX::setWindowOffset(w, {*X, *Y}) ? SDispatchResult{} : error("err:invalid");
++        }
++        return error("err:window");
++    }
++
+     SDispatchResult fullDamage(std::string) {
+         for (auto const& m : State::monitorState()->monitors())
+             g_pHyprRenderer->damageMonitor(m);
+         return {};
+     }
+ 
++    // Non-zero world offsets as a JSON array (dev control 1.2).
++    std::string offsetsJSON() {
++        std::string out = "[";
++        for (auto const& w : Desktop::windowState()->windows()) {
++            const auto OFFSET = HyprVX::windowOffset(w);
++            if (OFFSET == Vector2D{})
++                continue;
++            if (out.size() > 1)
++                out += ",";
++            out += std::format(R"({{"address":"0x{:x}","offset":[{:.17g},{:.17g}]}})", rc<uintptr_t>(w.get()), OFFSET.x, OFFSET.y);
++        }
++        return out + "]";
++    }
++
+     // Bookkeeping only (Constitution II): never a pass condition.
+     std::string stateJSON() {
++        const auto OFFSETS = offsetsJSON();
+         std::string out = "[";
+         for (auto const& m : State::monitorState()->monitors()) {
+             const auto CAMERA = HyprVX::cameraOf(*m);
+             if (out.size() > 1)
+                 out += ",";
+-            out += std::format(R"({{"monitor":"{}","P":[{:.17g},{:.17g}],"z":{:.17g},"identity":{},"revision":{},"passElementsAdded":{}}})", escapeJSONStrings(m->m_name),
+-                               CAMERA.origin.x, CAMERA.origin.y, CAMERA.zoom, HyprVX::cameraIsIdentity(*m), m->m_hyprvxCamera.revision, m->m_hyprvxCamera.passElementsAdded);
++            out += std::format(R"({{"monitor":"{}","P":[{:.17g},{:.17g}],"z":{:.17g},"identity":{},"revision":{},"passElementsAdded":{},"offsets":{}}})",
++                               escapeJSONStrings(m->m_name), CAMERA.origin.x, CAMERA.origin.y, CAMERA.zoom, HyprVX::cameraIsIdentity(*m), m->m_hyprvxCamera.revision,
++                               m->m_hyprvxCamera.passElementsAdded, OFFSETS);
+         }
+         return out + "]";
+     }
+@@ -125,7 +168,7 @@ namespace {
+ 
+     const std::vector<SCommand>& commands() {
+         static const std::vector<SCommand> COMMANDS = {
+-            {"camera", camera}, {"camera-mon", cameraMon}, {"panic", panic}, {"state", state}, {"full-damage", fullDamage},
++            {"camera", camera}, {"camera-mon", cameraMon}, {"panic", panic}, {"state", state}, {"full-damage", fullDamage}, {"offset", offset},
+         };
+         return COMMANDS;
+     }

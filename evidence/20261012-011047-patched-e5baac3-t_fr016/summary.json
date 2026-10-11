@@ -1,0 +1,21 @@
+{
+  "run_id": "20261012-011047-patched-e5baac3-t_fr016",
+  "test": "t_fr016",
+  "result": "BLOCKED",
+  "agent": "claude",
+  "git_sha": "e5baac3aac6c72b5f2c8bbc93b88059f4a9a3f8e",
+  "note": "control: S-dev lacks hyprvx-dev (check vacuous)",
+  "artifacts": [
+    "binaries.sha256",
+    "build-info-patched-nodev.json",
+    "build-info-patched.json",
+    "checks.txt",
+    "preflight.log",
+    "strings-patched-nodev.txt",
+    "strings-plugin-S-dev.txt",
+    "strings-plugin-S.txt"
+  ],
+  "not_run": [
+    "control: S-dev lacks hyprvx-dev (check vacuous)"
+  ]
+}

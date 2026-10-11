@@ -1,0 +1,23 @@
+{
+  "run_id": "20261011-231210-suite-b970ed5-feature002",
+  "test": "Feature 002 native suite: t_keys t_scroll t_fullscreen t_input_mw t_x11 in forms P at scales 1 1.25",
+  "result": "PASS",
+  "agent": "claude",
+  "git_sha": "b970ed518e9a654ef1d909bcba3bdeeb36737bbb",
+  "note": "per-test runs listed in results.txt",
+  "artifacts": [
+    "preflight.log",
+    "results.txt",
+    "t_fullscreen_formP_scale1.25.log",
+    "t_fullscreen_formP_scale1.log",
+    "t_input_mw_formP_scale1.25.log",
+    "t_input_mw_formP_scale1.log",
+    "t_keys_formP_scale1.25.log",
+    "t_keys_formP_scale1.log",
+    "t_scroll_formP_scale1.25.log",
+    "t_scroll_formP_scale1.log",
+    "t_x11_formP_scale1.25.log",
+    "t_x11_formP_scale1.log"
+  ],
+  "not_run": []
+}

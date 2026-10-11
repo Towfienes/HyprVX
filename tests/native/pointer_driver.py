@@ -8,6 +8,11 @@ For every command line in FILE ("move X Y", "down", "up", "click"): send it to t
 "done" line (the compositor has processed it and sent any pointer events), then send "sync" to every client and wait
 for that commit's frame_done. Pointer lines a client logged before that frame_done and after the previous barrier
 belong to the command. Output JSON: {"steps": [{"cmd": ..., "events": {NAME: [event, ...]}}, ...]}.
+"pause MS" sends nothing and waits MS milliseconds (recorded as a step without events). It exists only for Hyprland's
+compositor resize drags: CDragStateController::mouseMove skips a resize update that arrives less than one monitor
+frame after the previous one (DragController.cpp, TIMERDELTA < MSMONITOR) and applies nothing at release, so a test
+that needs every step of a resize drag applied paces its moves by more than a frame. That decision is time-based; no
+event signals it.
 Exit codes: 0 done, 2 BLOCKED (a ready signal timed out or vpointer rejected a command; the partial result is
 still written).
 """
@@ -18,7 +23,8 @@ import sys
 import time
 from pathlib import Path
 
-POINTER_EVENTS = {"enter", "leave", "motion", "button", "warp"}
+# Feature 002 adds axis (scroll) and key events, logged by hyprvx-testclient and hyprvx-x11client (test-tooling 1.4).
+POINTER_EVENTS = {"enter", "leave", "motion", "button", "warp", "axis", "key"}
 
 
 class Blocked(Exception):
@@ -61,8 +67,30 @@ def run_vpointer(fifo, log, cmd, timeout):
     wait_for(finished, timeout, f"vpointer done for {cmd!r}")
 
 
+def x11_barrier(name, fifo, log, timeout):
+    """hyprvx-x11client (test-tooling 1.4 4c): "sync" redraws and logs "drawn" after an X round trip. Done twice, so
+    XWayland has processed the Wayland pointer events sent before the first sync; returns the last drawn line index."""
+    end = None
+    for _ in range(2):
+        count = sum(1 for e in read_lines(log) if e.get("ev") == "drawn")
+        send(fifo, "sync")
+
+        def drawn():
+            seen = 0
+            for i, e in enumerate(read_lines(log)):
+                if e.get("ev") == "drawn":
+                    seen += 1
+                    if seen > count:
+                        return i
+            return None
+        end = wait_for(drawn, timeout, f"{name} drawn")
+    return end
+
+
 def barrier(name, fifo, log, timeout):
     """sync the client and wait for frame_done of that commit; returns the index of the frame_done line."""
+    if any(e.get("ev") == "drawn" for e in read_lines(log)):
+        return x11_barrier(name, fifo, log, timeout)
     last = max((e.get("seq", 0) for e in read_lines(log) if e.get("ev") == "commit"), default=0)
     send(fifo, "sync")
     seq = wait_for(lambda: next((e["seq"] for e in read_lines(log) if e.get("ev") == "commit" and e["seq"] > last), None),
@@ -92,6 +120,10 @@ def main(argv):
     steps, status = [], 0
     try:
         for cmd in commands:
+            if cmd.startswith("pause "):
+                time.sleep(int(cmd.split()[1]) / 1000.0)
+                steps.append({"cmd": cmd, "events": {}})
+                continue
             run_vpointer(vp_fifo, vp_log, cmd, args.timeout)
             step = {"cmd": cmd, "events": {}}
             for name, fifo, log in clients:

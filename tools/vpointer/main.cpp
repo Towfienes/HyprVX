@@ -2,7 +2,8 @@
 //
 //   hyprvx-vpointer --layout WxH --log PATH (--control FIFO | --script FILE)
 //
-// Commands, one per line: "move X Y" (absolute, logical px), "down [BUTTON]", "up [BUTTON]", "click [BUTTON]", "quit".
+// Commands, one per line: "move X Y" (absolute, logical px), "down [BUTTON]", "up [BUTTON]", "click [BUTTON]",
+// "scroll DX DY" (wheel units: one detent = value120 120; positive DY scrolls down; test-tooling 1.4 4a), "quit".
 // Each command is followed by a frame request and a roundtrip, then a "done" log line, so the compositor has
 // processed it (and sent any pointer events) before the line is written. Launch it only through scripts/nested.sh run;
 // it refuses any display that is not a private /tmp/hvx-* runtime dir served by an agent-prefix Hyprland binary.
@@ -29,6 +30,8 @@
 #include <wayland-client.h>
 
 #include "wlr-virtual-pointer-client-protocol.h"
+
+#include "../common/NestedOnly.hpp"
 
 namespace {
 
@@ -79,35 +82,14 @@ __attribute__((format(printf, 2, 3))) void logLine(State& s, const char* fmt, ..
     std::exit(code);
 }
 
-// ---- nested-only guard ------------------------------------------------------------------------------------------
+// ---- nested-only guard (tools/common/NestedOnly.hpp) -----------------------------------------------------------
 
 void checkEnvironment() {
-    const char* runtime = std::getenv("XDG_RUNTIME_DIR");
-    const char* display = std::getenv("WAYLAND_DISPLAY");
-    if (!runtime || std::strncmp(runtime, "/tmp/hvx-", 9) != 0 || std::strchr(runtime + 5, '/'))
-        die(3, "refusing: XDG_RUNTIME_DIR is not a private /tmp/hvx-* directory (use scripts/nested.sh run)");
-    struct stat st{};
-    if (lstat(runtime, &st) != 0 || !S_ISDIR(st.st_mode) || st.st_uid != getuid() || (st.st_mode & 0777) != 0700)
-        die(3, "refusing: XDG_RUNTIME_DIR is not a directory owned by this user with mode 0700");
-    if (!display || !*display || std::strchr(display, '/'))
-        die(3, "refusing: WAYLAND_DISPLAY must be a bare socket name inside the nested runtime directory");
+    hyprvx::tools::checkNestedEnvironment("hyprvx-vpointer");
 }
 
 void checkPeer(wl_display* display) {
-    ucred     cred{};
-    socklen_t len = sizeof cred;
-    if (getsockopt(wl_display_get_fd(display), SOL_SOCKET, SO_PEERCRED, &cred, &len) != 0)
-        die(3, "refusing: cannot read the compositor PID (SO_PEERCRED)");
-    char              exe[PATH_MAX] = {};
-    const std::string link = "/proc/" + std::to_string(cred.pid) + "/exe";
-    const ssize_t     n = readlink(link.c_str(), exe, sizeof exe - 1);
-    const char*       home = std::getenv("HOME");
-    if (n <= 0 || !home)
-        die(3, "refusing: cannot resolve the compositor executable");
-    const std::string path(exe, static_cast<size_t>(n));
-    const std::string cacheRoot = std::string(home) + "/.cache/hyprvx/";
-    if (path.rfind(cacheRoot, 0) != 0 || path.find("/prefix/") == std::string::npos)
-        die(3, "refusing: the compositor is not an agent-prefix nested build (" + path + ")");
+    hyprvx::tools::checkWaylandPeer("hyprvx-vpointer", wl_display_get_fd(display));
 }
 
 // ---- registry ---------------------------------------------------------------------------------------------------
@@ -162,6 +144,28 @@ void handleCommand(State& s, const std::string& line) {
             button(s, code, !std::strcmp(word, "down"));
         }
         logLine(s, "\"seq\": %" PRIu64 ", \"ev\": \"done\", \"cmd\": \"%s\", \"button\": %u", ++s.seq, word, code);
+    } else if (std::sscanf(line.c_str(), "scroll %lf %lf", &x, &y) == 2) {
+        if (!std::isfinite(x) || !std::isfinite(y) || std::fabs(x) > 100 || std::fabs(y) > 100) {
+            logLine(s, "\"ev\": \"error\", \"message\": \"scroll out of range\"");
+            return;
+        }
+        // Wheel source; whole detents go as axis_discrete (Hyprland sets value120 = discrete * 120), fractions as smooth
+        // axis values (15 logical units per detent, as libinput reports a wheel click).
+        const uint32_t t = nowMs();
+        zwlr_virtual_pointer_v1_axis_source(s.pointer, WL_POINTER_AXIS_SOURCE_WHEEL);
+        const double values[2] = {y, x};
+        const uint32_t axes[2] = {WL_POINTER_AXIS_VERTICAL_SCROLL, WL_POINTER_AXIS_HORIZONTAL_SCROLL};
+        for (int i = 0; i < 2; ++i) {
+            if (values[i] == 0)
+                continue;
+            const wl_fixed_t smooth = wl_fixed_from_double(15.0 * values[i]);
+            if (values[i] == std::round(values[i]))
+                zwlr_virtual_pointer_v1_axis_discrete(s.pointer, t, axes[i], smooth, static_cast<int32_t>(values[i]));
+            else
+                zwlr_virtual_pointer_v1_axis(s.pointer, t, axes[i], smooth);
+        }
+        finish(s);
+        logLine(s, "\"seq\": %" PRIu64 ", \"ev\": \"done\", \"cmd\": \"scroll\", \"dx\": %.4f, \"dy\": %.4f", ++s.seq, x, y);
     } else if (line == "quit") {
         s.running = false;
     } else {

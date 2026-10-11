@@ -1,0 +1,25 @@
+{
+  "run_id": "20261012-023141-patched-420efff-r1buildB",
+  "test": "T057 R1 clean-room build B (V-27, second clean build of 2deb797 at the same worktree path)",
+  "result": "PASS",
+  "agent": "claude",
+  "git_sha": "420efffd6d0448f12c52fc5e7c03d55e7d0d4f31",
+  "note": "0 compiler warnings; plugins P, S, S-dev bit-identical to build A; Hyprland binaries differ only through the git-am commit (source_commit e0bcb3fc vs f07201d5, embedded in version.h)",
+  "artifacts": [
+    "buildA.sha256",
+    "ccache-stats-after.txt",
+    "chain-build.log",
+    "plugin-P-build.log",
+    "plugin-P.json",
+    "plugin-S-build.log",
+    "plugin-S-dev-build.log",
+    "plugin-S-dev.json",
+    "plugin-S.json",
+    "prefix-nodev.json",
+    "prefix-patched.json",
+    "preflight.log",
+    "sha256",
+    "worktree-head.txt"
+  ],
+  "not_run": []
+}

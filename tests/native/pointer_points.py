@@ -6,7 +6,9 @@
   pointer_points.py check --meta POINTS.json --steps DRIVER.json --client NAME --surface-name main|popup|sub \
       [--tol 1] --out RESULT.json
 
-`--surface` is the surface's logical (world) box: origin and size in unscaled surface units. Expected values are an
+`--surface` is the surface's logical (world) box: origin and size in unscaled surface units. `--sample X,Y,W,H`
+(Feature 002) samples only inside that world box (e.g. a part of a surface not covered by its popup), while the
+expected local coordinates stay relative to the --surface origin. Expected values are an
 independent test oracle of contracts/transform-contract.md with M = (0, 0) (one output at the layout origin):
 forward(W) = (W - P)·z and surfaceLocal(S) = P + S/z - origin. Moves are quantized to the 1/256 px that
 hyprvx-vpointer sends, and the expectation uses the quantized point. Exit codes: 0 PASS, 1 FAIL, 2 BLOCKED.
@@ -28,9 +30,10 @@ def cmd_points(args):
     px, py, z = args.camera
     sx, sy, sw, sh = (float(v) for v in args.surface.split(","))
     lw, lh = (float(v) for v in args.layout.split(","))
-    # Drawn box on screen, then the part of it on the output, shrunk by a margin so no point sits on an edge.
-    x0, y0 = (sx - px) * z, (sy - py) * z
-    x1, y1 = x0 + sw * z, y0 + sh * z
+    bx, by, bw, bh = (float(v) for v in (args.sample or args.surface).split(","))
+    # Drawn (sampled) box on screen, then the part of it on the output, shrunk by a margin so no point sits on an edge.
+    x0, y0 = (bx - px) * z, (by - py) * z
+    x1, y1 = x0 + bw * z, y0 + bh * z
     vx0, vy0 = max(x0, 0.0) + args.margin, max(y0, 0.0) + args.margin
     vx1, vy1 = min(x1, lw) - args.margin, min(y1, lh) - args.margin
     if vx1 - vx0 < 5 or vy1 - vy0 < 4:
@@ -94,6 +97,7 @@ def main(argv):
     p = sub.add_parser("points")
     p.add_argument("--camera", nargs=3, type=float, required=True, metavar=("PX", "PY", "Z"))
     p.add_argument("--surface", required=True)
+    p.add_argument("--sample")
     p.add_argument("--layout", default="1280,800")
     p.add_argument("--n", type=int, default=20)
     p.add_argument("--margin", type=float, default=2.0)

@@ -119,12 +119,18 @@ def main(repo, variant, dry_run):
     pin = "efb50993780079460b0cbed1363e2166a2de1d9f"
     agent = os.environ["HYPRVX_AGENT"]
     cache = Path.home() / ".cache/hyprvx" / agent
-    src = cache / "src/hyprland-efb5099" / ("v3-dev" if variant == "patched" else variant)
+    # patched-nodev (Feature 002 T057, FR-016): the patched source and receipt without the dev control, installed in
+    # its own prefix <patchset id>-nodev so the dev build the tests use is never replaced.
+    nodev = variant == "patched-nodev"
+    base = "patched" if nodev else variant
+    src = cache / "src/hyprland-efb5099" / ("v3-dev" if base == "patched" else base)
 
     def git(*args):
         return output(["git", "-C", str(src), *args])
 
-    identifier, patchset_id, patches = variant_identity(repo, variant)
+    identifier, patchset_id, patches = variant_identity(repo, base)
+    if nodev:
+        identifier += "-nodev"
     prefix = cache / "prefix" / identifier
     git_dirty = "clean-upstream" if variant == "stock" else "hyprvx-" + patchset_id
     env = os.environ.copy()
@@ -153,7 +159,7 @@ def main(repo, variant, dry_run):
             if head != pin:
                 blocked("stock HEAD differs from the pinned upstream")
         else:
-            receipt_path = cache / "src" / ("hyprland-" + variant + "-patchset.json")
+            receipt_path = cache / "src" / ("hyprland-" + base + "-patchset.json")
             try:
                 receipt = json.loads(receipt_path.read_text())
             except (OSError, ValueError) as error:
@@ -182,7 +188,7 @@ def main(repo, variant, dry_run):
                  "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache", "-DCMAKE_C_COMPILER_LAUNCHER=ccache",
                  "-DCMAKE_DISABLE_FIND_PACKAGE_Git=TRUE",
                  "-DFETCHCONTENT_FULLY_DISCONNECTED=ON", "-DFETCHCONTENT_SOURCE_DIR_GLAZE=" + str(glaze_src)]
-    if variant == "patched":
+    if base == "patched" and not nodev:
         configure.append("-DHYPRVX_DEV=ON")
     commands = [configure, ["cmake", "--build", str(build), "-j4"], ["cmake", "--install", str(build)]]
     unit = "hyprvx-build-" + agent + "-" + uuid.uuid4().hex + ".scope"
@@ -211,7 +217,9 @@ def main(repo, variant, dry_run):
     compiler = re.search(r"^CMAKE_CXX_COMPILER:FILEPATH=(.+)$", (build / "CMakeCache.txt").read_text(), re.MULTILINE)
     if not compiler:
         blocked("configured C++ compiler is unavailable")
-    info = {"variant": variant, "upstream_commit": pin, "source_commit": head, "patchset_id": patchset_id,
+    # "variant" is the source variant (nested.py matches it against --variant); build_variant and dev_control tell a
+    # patched-nodev build apart.
+    info = {"variant": base, "build_variant": variant, "dev_control": base == "patched" and not nodev, "upstream_commit": pin, "source_commit": head, "patchset_id": patchset_id,
             "patches": [{"file": str(p.relative_to(repo)), "sha256": hashlib.sha256(p.read_bytes()).hexdigest()}
                         for p in patches], "git_dirty": git_dirty,
             "binary_sha256": hashlib.sha256((prefix / "bin/Hyprland").read_bytes()).hexdigest(),

@@ -1,0 +1,21 @@
+{
+  "run_id": "20261012-005110-patched-e5baac3-r1build1",
+  "test": "T057 R1 clean-room build 1: patched, patched-nodev, plugins P/S/S-dev from a fresh worktree, fresh build dirs, CCACHE_DISABLE=1",
+  "result": "PASS",
+  "agent": "claude",
+  "git_sha": "e5baac3aac6c72b5f2c8bbc93b88059f4a9a3f8e",
+  "note": "0 compiler warnings; ccache stats last updated before the build (no hits)",
+  "artifacts": [
+    "ccache-stats-after.txt",
+    "plugin-P.json",
+    "plugin-S-dev.json",
+    "plugin-S.json",
+    "prefix-nodev.json",
+    "prefix-patched.json",
+    "preflight.log",
+    "sha256",
+    "t057-build1.log",
+    "worktree-head.txt"
+  ],
+  "not_run": []
+}

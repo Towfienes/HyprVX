@@ -4,9 +4,11 @@
 #  1. A held-button drag inside the client: every motion while BTN_LEFT is held arrives at surfaceLocal(S) +-1 and the
 #     press/release reach the client.
 #  2. A compositor move drag (the nested config's no-modifier side-button movewindow bind, standing in for Super+LMB)
-#     and 3. a border resize drag (resize_on_border, pressed in the drawn border grab area) leave the window's logical
-#     geometry unchanged (`hyprctl -j clients` of the nested instance before/after), and the nested log records both
-#     as blocked.
+#     leaves the window's logical geometry unchanged (`hyprctl -j clients` of the nested instance before/after) and
+#     the nested log records it as blocked.
+#  3. A border resize drag (resize_on_border, pressed in the drawn border grab area) of this floating window resizes
+#     it through the camera: width + d/z +-1, position unchanged, no "blocked resize" log line. Feature 002 FR-009
+#     (patch 0012) replaced Feature 001's "resize blocked" here; tiled resize stays blocked (t_resize.sh).
 # Setup validity (identity control, run last): the same move and border-resize drags at identity must change the
 # geometry, else the non-identity "unchanged" results are vacuous and the run is BLOCKED.
 set -euo pipefail
@@ -67,14 +69,26 @@ sys.exit(1 if reasons else 0)
 PY
 
 # 2. Compositor move drag (side button 275) and 3. border resize drag (BTN_LEFT in the right border grab area: drawn
-# right edge x = 470, (474,200) -> world (948,400), 8 px right of the edge, inside border 2 + grab 15).
+# right edge x = 470, (474,300) -> world (948,600), 8 px right of the edge, inside border 2 + grab 15; below the
+# window centre y = 400, so stock picks the bottom-right corner: LayoutManager.hpp cornerFromBox).
 before=$(geometry before)
 printf 'move 270 200\ndown 275\nmove 370 260\nmove 470 320\nup 275\n' | steps move_drag
 after_move=$(geometry after_move)
-printf 'move 474 200\ndown\nmove 520 240\nmove 560 280\nup\n' | steps resize_drag
+# Resize drags pace their moves by > 1 frame (pointer_driver.py "pause"): Hyprland skips faster resize updates.
+printf 'move 474 300\ndown\npause 40\nmove 520 340\npause 40\nmove 560 380\nup\n' | steps resize_drag
 after_resize=$(geometry after_resize)
 printf '%s\n%s\n%s\n' "$before" "$after_move" "$after_resize" > "$HVX_EVID/geometry.txt"
-[[ $before != missing && $before == "$after_move" && $before == "$after_resize" ]] || { echo "geometry changed while non-identity" >&2; result=FAIL; }
+[[ $before != missing && $before == "$after_move" ]] || { echo "move drag changed the geometry while non-identity" >&2; result=FAIL; }
+# Bottom-right corner resize by d = (560 - 474, 380 - 300) = (86, 80) screen px = (172, 160) world units at z = 0.5
+# (worldDelta); the top-left corner stays.
+python3 -I - "$after_move" "$after_resize" "$TOL" > "$HVX_EVID/resize.check" << 'PY' || { echo "border resize did not follow the camera" >&2; result=FAIL; }
+import json, sys
+a, b, tol = json.loads(sys.argv[1]), json.loads(sys.argv[2]), float(sys.argv[3])
+want = [a["size"][0] + 172, a["size"][1] + 160]
+ok = a["at"] == b["at"] and all(abs(b["size"][i] - want[i]) <= tol for i in (0, 1))
+print(json.dumps({"before": a, "after": b, "expect_size": want, "ok": ok}))
+sys.exit(0 if ok else 1)
+PY
 
 # Identity control: the same drags must act on the stock path. Pressing inside the window centre (540,400) / on the
 # right border grab area and dragging. It validates the "unchanged" results above, so it runs only if they passed: a
@@ -90,7 +104,7 @@ if [[ $result == PASS ]]; then
         || hvx_die_blocked "identity control: the side-button move drag did not move the window (setup invalid)"
     BORDER_X=$(python3 -I -c "import json,sys; g=json.loads(sys.argv[1]); print(g['at'][0] + g['size'][0] + 8)" "$id_after_move")
     BORDER_Y=$(python3 -I -c "import json,sys; g=json.loads(sys.argv[1]); print(g['at'][1] + g['size'][1] // 2)" "$id_after_move")
-    printf 'move %s %s\ndown\nmove %s %s\nmove %s %s\nup\n' "$BORDER_X" "$BORDER_Y" $((BORDER_X + 30)) "$BORDER_Y" \
+    printf 'move %s %s\ndown\npause 40\nmove %s %s\npause 40\nmove %s %s\nup\n' "$BORDER_X" "$BORDER_Y" $((BORDER_X + 30)) "$BORDER_Y" \
         $((BORDER_X + 60)) "$BORDER_Y" | steps id_resize_drag
     id_after_resize=$(geometry id_after_resize)
     echo "$id_after_resize" >> "$HVX_EVID/identity-geometry.txt"
@@ -103,7 +117,7 @@ cp "$SESSION_DIR/hyprland.log" "$HVX_EVID/nested-hyprland.log" 2> /dev/null || h
 blocked_move=$(grep -c "HyprVX: blocked a compositor move drag" "$HVX_EVID/nested-hyprland.log" || true)
 blocked_resize=$(grep -c "HyprVX: blocked a compositor resize drag" "$HVX_EVID/nested-hyprland.log" || true)
 echo "blocked move drags: $blocked_move; blocked resize drags: $blocked_resize" | tee "$HVX_EVID/blocked.txt"
-[[ $blocked_move -ge 1 && $blocked_resize -ge 1 ]] || result=FAIL
-hvx_finish "$result" "T-DRAG-SCOPE held-button drag local coordinates; compositor drags blocked while non-identity (FR-012)" \
+[[ $blocked_move -ge 1 && $blocked_resize == 0 ]] || result=FAIL
+hvx_finish "$result" "T-DRAG-SCOPE held-button drag local coordinates; move blocked, floating resize through the camera (FR-012, F002 FR-009)" \
     "camera P=(0,0) z=0.5; side-button movewindow bind for Super+LMB; output $SIZE scale $SCALE"
 [[ $result == PASS ]]

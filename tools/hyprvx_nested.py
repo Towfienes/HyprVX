@@ -2,7 +2,9 @@
 """HyprVX V3 nested Hyprland harness (contracts/test-tooling.md section 7). Never targets the host instance.
 
   hyprvx_nested.py start --variant stock|v2|patched [--size WxH] [--scale S] [--binary PATH] [--lock-timeout SEC]
-  hyprvx_nested.py run [--background] -- CMD...
+  hyprvx_nested.py run [--background] [--x11] -- CMD...  # --x11: DISPLAY from xdisplay (test-tooling 1.4 §7)
+  hyprvx_nested.py plugin load|unload PATH        # a plugin from the agent cache's plugin/ dir; prints its sha256
+  hyprvx_nested.py xdisplay                       # the nested XWayland display (:N), only via the verified PID
   hyprvx_nested.py dev COMMAND [ARGS...]          # hyprctl hyprvx-dev COMMAND (dev-control.md transport A)
   hyprvx_nested.py capture PATH                   # grim on the nested output (.png or .ppm)
   hyprvx_nested.py dispatch hyprvx:NAME [ARGS...] # V2-as-is adapter (variant v2 only): hyprctl dispatch hyprvx:*
@@ -354,12 +356,55 @@ def start(args):
         raise
 
 
+def agent_hyprctl(data):
+    """The hyprctl next to the verified compositor binary, only inside the agent prefix root (never the host's)."""
+    hyprctl = Path(data["binary"]).with_name("hyprctl")
+    if (cache() / "prefix").resolve() not in hyprctl.resolve().parents:
+        raise IdentityError("the session's binary is not an agent-prefix build; refusing to use its hyprctl")
+    return hyprctl
+
+
+def nested_xdisplay(data, wait=5.0):
+    """The nested XWayland display, resolved only through the verified compositor PID (test-tooling 1.4 §7).
+
+    Hyprland's XWayland server writes its own PID into /tmp/.X<N>-lock (xwayland/Server.cpp tryOpenSockets). A display
+    is accepted only when that PID is the verified compositor or a direct child of it, and /tmp/.X11-unix/X<N> is a
+    socket. Anything else is refused (exit 3); the host display is never a fallback."""
+    pid = data["compositor_pid"]
+    deadline = time.monotonic() + wait
+    while True:
+        for lock in sorted(Path("/tmp").glob(".X*-lock")):
+            number = lock.name[2:-5]
+            if not number.isdigit():
+                continue
+            try:
+                owner = int(lock.read_text().strip())
+                info = os.lstat(lock)
+            except (OSError, ValueError):
+                continue
+            if info.st_uid != os.getuid() or stat.S_ISLNK(info.st_mode):
+                continue
+            try:
+                child_of_compositor = owner != pid and parent_pid(owner) == pid
+            except (OSError, IndexError):
+                child_of_compositor = False
+            sock = Path(f"/tmp/.X11-unix/X{number}")
+            if (owner == pid or child_of_compositor) and sock.is_socket():
+                return f":{number}"
+        if time.monotonic() >= deadline:
+            raise IdentityError("no XWayland display whose lock file belongs to the verified compositor")
+        time.sleep(0.1)  # startup readiness only (XWayland sockets are opened after the compositor starts)
+
+
 def run(args):
     data = verify(read_session())
     command = args.command[1:] if args.command[:1] == ["--"] else args.command
     if not command:
         raise Failed("run needs a command after --")
     env = nested_env(data)
+    if args.x11:
+        env["DISPLAY"] = nested_xdisplay(data)
+        verify(data)
     if args.background:
         log = (Path(data["session_directory"]) / "children.log").open("a")
         child = subprocess.Popen(command, env=env, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
@@ -371,9 +416,32 @@ def run(args):
     return subprocess.run(command, env=env).returncode
 
 
+def xdisplay(_):
+    data = verify(read_session())
+    print(nested_xdisplay(data))
+    return EXIT_OK
+
+
+def plugin(args):
+    """Loads or unloads a plugin built into the agent cache (scripts/build-plugin.sh) in the verified nested session."""
+    data = verify(read_session())
+    hyprctl = agent_hyprctl(data)
+    path = Path(args.path).resolve()
+    plugin_root = (cache() / "plugin").resolve()
+    if plugin_root not in path.parents or not path.is_file() or path.suffix != ".so":
+        raise Failed(f"plugin must be a .so file under {plugin_root}")
+    print(f"sha256 {sha256_file(path)} {path}")
+    verify(data)
+    result = subprocess.run([str(hyprctl), "--instance", data["signature"], "plugin", args.action, str(path)],
+                            env=nested_env(data), capture_output=True, text=True)
+    reply = result.stdout.strip()
+    print(reply)
+    return EXIT_OK if result.returncode == 0 and reply == "ok" else EXIT_FAILED
+
+
 def dev(args):
     data = verify(read_session())
-    hyprctl = Path(data["binary"]).with_name("hyprctl")
+    hyprctl = agent_hyprctl(data)
     result = subprocess.run([str(hyprctl), "--instance", data["signature"], "hyprvx-dev", *args.words],
                             env=nested_env(data), capture_output=True, text=True)
     reply = result.stdout.strip()
@@ -501,6 +569,7 @@ def main(argv):
     p.set_defaults(handler=start)
     p = commands.add_parser("run")
     p.add_argument("--background", action="store_true")
+    p.add_argument("--x11", action="store_true")
     p.add_argument("command", nargs=argparse.REMAINDER)
     p.set_defaults(handler=run)
     p = commands.add_parser("dev")
@@ -509,6 +578,11 @@ def main(argv):
     p = commands.add_parser("dispatch")
     p.add_argument("words", nargs="+")
     p.set_defaults(handler=dispatch)
+    p = commands.add_parser("plugin")
+    p.add_argument("action", choices=["load", "unload"])
+    p.add_argument("path")
+    p.set_defaults(handler=plugin)
+    commands.add_parser("xdisplay").set_defaults(handler=xdisplay)
     p = commands.add_parser("capture")
     p.add_argument("path")
     p.set_defaults(handler=capture)

@@ -1,0 +1,30 @@
+{
+  "run_id": "20261012-002727-regS-4775297-t_layer",
+  "test": "T-LAYER layer untransformed, border encloses transformed surface (V-14)",
+  "result": "PASS",
+  "agent": "claude",
+  "git_sha": "47752973f61e2307a7384b82f07117c0d410b2cf",
+  "note": "layer box 980,620,240,140; output 1280x800 scale 1",
+  "artifacts": [
+    "build-info-spike-plugin.json",
+    "build-info-spike-stock.json",
+    "cam_-400_-300_0.25.check",
+    "cam_-400_-300_0.25.png",
+    "cam_-400_-300_0.25.state.json",
+    "cam_0_0_0.5.check",
+    "cam_0_0_0.5.png",
+    "cam_0_0_0.5.state.json",
+    "cam_100_50_1.5.check",
+    "cam_100_50_1.5.png",
+    "cam_100_50_1.5.state.json",
+    "identity.json",
+    "identity.png",
+    "identity.state.json",
+    "layer.jsonl",
+    "plugin.sha256",
+    "preflight.log",
+    "session.log",
+    "window.jsonl"
+  ],
+  "not_run": []
+}

@@ -1,0 +1,132 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Towfienes <ngolamtien1706@gmail.com>
+Date: Sun, 11 Oct 2026 19:56:10 +0700
+Subject: [PATCH] hyprvx: floating resize drags through the camera; tiled
+ resize and move drags blocked
+
+Patch 0012 of the HyprVX V3 series (Feature 002, T023).
+
+Under a non-identity camera or a world offset, a compositor resize drag
+of a floating window (border drag or the resizewindow bind) takes the
+pointer in the window's L space (HyprVX::windowLocalPoint), so the anchor
+uses L + O and the delta is worldDelta(C, d) (FR-009, research R5). Move
+drags and tiled resize drags stay blocked and are logged once per drag
+(FR-012).
+---
+ src/hyprvx/InputCamera.cpp                  |  5 ++++
+ src/hyprvx/InputCamera.hpp                  |  9 ++++++
+ src/layout/supplementary/DragController.cpp | 31 +++++++++++++++------
+ 3 files changed, 36 insertions(+), 9 deletions(-)
+
+diff --git a/src/hyprvx/InputCamera.cpp b/src/hyprvx/InputCamera.cpp
+index 05a4af27..418ccbd7 100644
+--- a/src/hyprvx/InputCamera.cpp
++++ b/src/hyprvx/InputCamera.cpp
+@@ -1,5 +1,6 @@
+ #include "InputCamera.hpp"
+ #include "SceneCamera.hpp"
++#include "WindowOffset.hpp"
+ 
+ #include "../desktop/state/ViewState.hpp"
+ #include "../desktop/view/Popup.hpp"
+@@ -50,3 +51,7 @@ bool HyprVX::isWindowContent(const SP<CWLSurfaceResource>& surface) {
+         default: return false;
+     }
+ }
++
++Vector2D HyprVX::windowLocalPoint(const Desktop::View::CWindow& window, const Vector2D& screen) {
++    return screenToWorld(screen) - appliedOffset(window);
++}
+diff --git a/src/hyprvx/InputCamera.hpp b/src/hyprvx/InputCamera.hpp
+index 0c6a484f..0c0d4a3d 100644
+--- a/src/hyprvx/InputCamera.hpp
++++ b/src/hyprvx/InputCamera.hpp
+@@ -13,6 +13,10 @@ namespace Monitor {
+     class CMonitor;
+ }
+ 
++namespace Desktop::View {
++    class CWindow;
++}
++
+ namespace HyprVX {
+     // World point under a screen-logical point. The monitor is selected by the screen position (FR-007), then
+     // cammath::inverse. Returns the input unchanged on the stock path (no monitor under it, or no active camera).
+@@ -26,4 +30,9 @@ namespace HyprVX {
+     // surfaces and surfaces without a desktop view (IME popups) are screen space. Known gap: a subsurface of a layer
+     // popup is reported as window content (layer popups with subsurfaces are out of scope for Feature 001).
+     bool isWindowContent(const SP<CWLSurfaceResource>& surface);
++
++    // A pointer position in a window's L space: screenToWorld(screen) - O(w) (Feature 002, patch 0012). Compositor
++    // resize drags compare it with the logical box (anchor on L + O) and take deltas of it, so a screen delta d becomes
++    // worldDelta(C, d) = d / z. Unchanged on the stock path (identity camera, no offset).
++    Vector2D windowLocalPoint(const Desktop::View::CWindow& window, const Vector2D& screen);
+ }
+diff --git a/src/layout/supplementary/DragController.cpp b/src/layout/supplementary/DragController.cpp
+index 5d3bcf91..251c1b30 100644
+--- a/src/layout/supplementary/DragController.cpp
++++ b/src/layout/supplementary/DragController.cpp
+@@ -14,6 +14,8 @@
+ #include "../../render/Renderer.hpp"
+ #include "../../state/MonitorState.hpp"
+ #include "../../hyprvx/SceneCamera.hpp"
++#include "../../hyprvx/InputCamera.hpp"
++#include "../../hyprvx/WindowOffset.hpp"
+ 
+ #include <string_view>
+ 
+@@ -119,7 +121,9 @@ bool CDragStateController::updateDragWindow() {
+ 
+     const auto DRAG_ORIGINAL_BOX = DRAGGINGTARGET->position();
+ 
+-    m_beginDragXY         = g_pInputManager->getMouseCoordsInternal();
++    // HyprVX (Feature 002): the pointer in the window's L space; unchanged on the stock path
++    m_beginDragXY         = DRAGGINGTARGET->window() ? HyprVX::windowLocalPoint(*DRAGGINGTARGET->window(), g_pInputManager->getMouseCoordsInternal()) :
++                                                       g_pInputManager->getMouseCoordsInternal();
+     m_beginDragPositionXY = DRAG_ORIGINAL_BOX.pos();
+     m_beginDragSizeXY     = DRAG_ORIGINAL_BOX.size();
+     m_lastDragXY          = m_beginDragXY;
+@@ -128,14 +132,21 @@ bool CDragStateController::updateDragWindow() {
+ }
+ 
+ void CDragStateController::dragBegin(SP<ITarget> target, eMouseBindMode mode, std::optional<eRectCorner> forcedEdge, bool exclusiveDeviceGrab) {
+-    // HyprVX: a compositor move/resize drag writes the window's logical geometry. While the camera of the window's monitor
+-    // is non-identity it is blocked and logged before any drag state is set (FR-012, DV3-11); moving windows in Drift
+-    // changes the world offset O(w) and belongs to Feature 002.
++    // HyprVX: a compositor drag writes the window's logical geometry. While the camera of the window's monitor is
++    // non-identity or the window has a world offset:
++    //  - a move drag is blocked and logged before any drag state is set (FR-012, DV3-11); moving a window in Drift
++    //    changes its world offset O(w) (policy, Feature 002);
++    //  - a resize drag of a floating window runs through the camera (Feature 002 FR-009): the pointer is taken in the
++    //    window's L space (HyprVX::windowLocalPoint), so the anchor uses L + O and the delta is worldDelta(C, d);
++    //  - a resize drag of a tiled window is blocked and logged once per drag.
+     if (const auto WINDOW = target ? target->window() : nullptr; WINDOW) {
+-        if (const auto PMONITOR = WINDOW->m_monitor.lock(); PMONITOR && HyprVX::activeCamera(*PMONITOR)) {
+-            Log::logger->log(Log::WARN, "HyprVX: blocked a compositor {} drag of window {:x} while the camera is non-identity (FR-012)",
+-                             isResizeMode(mode) ? "resize" : "move", rc<uintptr_t>(WINDOW.get()));
+-            return;
++        const auto PMONITOR = WINDOW->m_monitor.lock();
++        if ((PMONITOR && HyprVX::activeCamera(*PMONITOR)) || HyprVX::appliedOffset(*WINDOW) != Vector2D{}) {
++            if (!isResizeMode(mode) || !target->floating()) {
++                Log::logger->log(Log::WARN, "HyprVX: blocked a compositor {} drag of {} window {:x} under a camera or world offset (FR-012, FR-009)",
++                                 isResizeMode(mode) ? "resize" : "move", target->floating() ? "floating" : "tiled", rc<uintptr_t>(WINDOW.get()));
++                return;
++            }
+         }
+     }
+ 
+@@ -307,11 +318,13 @@ void CDragStateController::dragEnd() {
+     m_forcedGrabbedCorner.reset();
+ }
+ 
+-void CDragStateController::mouseMove(const Vector2D& mousePos) {
++void CDragStateController::mouseMove(const Vector2D& screenPos) {
+     if (m_target.expired())
+         return;
+ 
+     const auto  DRAGGINGTARGET = m_target.lock();
++    // HyprVX (Feature 002): the pointer in the window's L space, as m_beginDragXY; unchanged on the stock path
++    const auto  mousePos = DRAGGINGTARGET->window() ? HyprVX::windowLocalPoint(*DRAGGINGTARGET->window(), screenPos) : screenPos;
+     static auto PDRAGTHRESHOLD = CConfigValue<Config::INTEGER>("binds:drag_threshold");
+ 
+     // Window invalid or drag begin size 0,0 meaning we rejected it.

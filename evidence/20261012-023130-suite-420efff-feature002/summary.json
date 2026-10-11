@@ -1,0 +1,17 @@
+{
+  "run_id": "20261012-023130-suite-420efff-feature002",
+  "test": "Feature 002 native suite: t_resize in forms P S at scales 1 1.25",
+  "result": "PASS",
+  "agent": "claude",
+  "git_sha": "420efffd6d0448f12c52fc5e7c03d55e7d0d4f31",
+  "note": "per-test runs listed in results.txt",
+  "artifacts": [
+    "preflight.log",
+    "results.txt",
+    "t_resize_formP_scale1.25.log",
+    "t_resize_formP_scale1.log",
+    "t_resize_formS_scale1.25.log",
+    "t_resize_formS_scale1.log"
+  ],
+  "not_run": []
+}

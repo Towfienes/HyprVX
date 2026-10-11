@@ -1,7 +1,9 @@
 // Property tests for core/include/hyprvx/core/CameraMath.hpp, written from
-// specs/001-native-spatial-camera/contracts/transform-contract.md v1.1 (invariants 1-7).
+// specs/001-native-spatial-camera/contracts/transform-contract.md v1.1 (invariants 1-7) and
+// specs/002-multi-window-drift-mvp/contracts/transform-contract.md v1.2 (invariants 8-10, world offset).
 // Expected values come from an independent long double oracle or hand-computed dyadic values.
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
@@ -288,4 +290,71 @@ TEST(CameraMathTest, V1CameraIsTheContractWithZeroMonitorOrigin) {
         ASSERT_EQ(camera.position().y, expectedAnchor.origin.y) << describe(seed, i, c, {}, a);
         ASSERT_EQ(camera.zoom(), expectedAnchor.zoom) << describe(seed, i, c, {}, a);
     }
+}
+
+// Invariant 8: the offset camera draws a window at L exactly where the camera draws L + O, and inverts consistently.
+TEST(CameraMathTest, OffsetCameraEqualsForwardOfTheOffsetBox) {
+    const auto seed = testSeed();
+    Random rng(seed);
+    for (int i = 0; i < kCases; ++i) {
+        // Every seventh case uses the identity camera, where a non-zero offset must still move the window.
+        const cm::Vec M = rng.point();
+        const cm::CameraState c = (i % 7 == 0) ? cm::identityFor(M) : cm::CameraState{rng.point(), rng.zoom()};
+        const cm::Vec O = rng.point();
+        const cm::Vec L = rng.point();
+        const double magnitude = std::max({std::fabs(L.x), std::fabs(L.y), std::fabs(O.x), std::fabs(O.y), std::fabs(c.origin.x),
+                                           std::fabs(c.origin.y), std::fabs(M.x), std::fabs(M.y)});
+        const auto drawn = cm::forward(cm::offsetCamera(c, O), M, L);
+        const auto expected = cm::forward(c, M, {L.x + O.x, L.y + O.y});
+        ASSERT_NEAR(drawn.x, expected.x, tolerance(magnitude) * 4) << describe(seed, i, c, M, L);
+        ASSERT_NEAR(drawn.y, expected.y, tolerance(magnitude) * 4) << describe(seed, i, c, M, L);
+        const cm::Vec S = rng.point();
+        const auto local = cm::inverse(cm::offsetCamera(c, O), M, S);
+        const auto world = cm::inverse(c, M, S);
+        ASSERT_NEAR(local.x + O.x, world.x, tolerance(std::max(magnitude, std::fabs(world.x))) * 4) << describe(seed, i, c, M, S);
+        ASSERT_NEAR(local.y + O.y, world.y, tolerance(std::max(magnitude, std::fabs(world.y))) * 4) << describe(seed, i, c, M, S);
+        ASSERT_EQ(cm::offsetCamera(c, O).zoom, c.zoom) << describe(seed, i, c, M, L);
+    }
+    // Hand value: P = (100, 50), z = 0.5, M = (0, 0), O = (300, -20), L = (10, 10): screen (105, -30).
+    const auto S = cm::forward(cm::offsetCamera({{100.0, 50.0}, 0.5}, {300.0, -20.0}), {0.0, 0.0}, {10.0, 10.0});
+    EXPECT_EQ(S.x, 105.0);
+    EXPECT_EQ(S.y, -30.0);
+}
+
+// Invariant 9: a zero offset returns the camera exactly, so identity with O = 0 stays identity (no render work, FR-003).
+TEST(CameraMathTest, ZeroOffsetReturnsTheCameraExactly) {
+    const auto seed = testSeed();
+    Random rng(seed);
+    for (int i = 0; i < kCases; ++i) {
+        const cm::Vec M = rng.point();
+        const cm::CameraState c = (i % 5 == 0) ? cm::identityFor(M) : cm::CameraState{rng.point(), rng.zoom()};
+        const auto same = cm::offsetCamera(c, {0.0, 0.0});
+        ASSERT_EQ(same.origin.x, c.origin.x) << describe(seed, i, c, M, {});
+        ASSERT_EQ(same.origin.y, c.origin.y) << describe(seed, i, c, M, {});
+        ASSERT_EQ(same.zoom, c.zoom) << describe(seed, i, c, M, {});
+        ASSERT_EQ(cm::isIdentity(same, M), cm::isIdentity(c, M)) << describe(seed, i, c, M, {});
+    }
+    static_assert(cm::isIdentity(cm::offsetCamera(cm::identityFor({3.0, 4.0}), {0.0, 0.0}), {3.0, 4.0}));
+}
+
+// Invariant 10: a window moved by worldDelta(c, d) is drawn d further on screen (a dragged window follows the pointer).
+TEST(CameraMathTest, WorldDeltaFollowsTheScreenDelta) {
+    const auto seed = testSeed();
+    Random rng(seed);
+    for (int i = 0; i < kCases; ++i) {
+        const cm::Vec M = rng.point();
+        const cm::CameraState c = (i % 7 == 0) ? cm::identityFor(M) : cm::CameraState{rng.point(), rng.zoom()};
+        const cm::Vec W = rng.point();
+        const cm::Vec d = {rng.coordinate() / 100.0, rng.coordinate() / 100.0};
+        const auto delta = cm::worldDelta(c, d);
+        const auto before = cm::forward(c, M, W);
+        const auto after = cm::forward(c, M, {W.x + delta.x, W.y + delta.y});
+        const double magnitude = std::max({std::fabs(W.x), std::fabs(W.y), std::fabs(c.origin.x), std::fabs(c.origin.y), std::fabs(M.x),
+                                           std::fabs(M.y), std::fabs(before.x), std::fabs(before.y)});
+        ASSERT_NEAR(after.x - before.x, d.x, tolerance(magnitude) * 4) << describe(seed, i, c, M, W);
+        ASSERT_NEAR(after.y - before.y, d.y, tolerance(magnitude) * 4) << describe(seed, i, c, M, W);
+    }
+    // Hand value: z = 0.25 turns a screen drag of (8, -2) into a world move of (32, -8).
+    constexpr auto delta = cm::worldDelta({{5.0, 6.0}, 0.25}, {8.0, -2.0});
+    static_assert(delta.x == 32.0 && delta.y == -8.0);
 }

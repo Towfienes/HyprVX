@@ -1,0 +1,42 @@
+{
+  "run_id": "20261011-200945-formP-ad37e93-t_x11",
+  "test": "t_x11",
+  "result": "BLOCKED",
+  "agent": "claude",
+  "git_sha": "ad37e938912ab4ec16f6ca5f24b9c6017986c62f",
+  "note": "pointer driver z05-main.steps did not complete",
+  "artifacts": [
+    "build-info-patched.json",
+    "expected.txt",
+    "identity-main.cmds",
+    "identity-main.input.json",
+    "identity-main.json",
+    "identity-main.points.json",
+    "identity-main.steps.json",
+    "identity-menu.cmds",
+    "identity-menu.input.json",
+    "identity-menu.json",
+    "identity-menu.points.json",
+    "identity-menu.steps.json",
+    "identity.png",
+    "main.clients.json",
+    "menu.clients.json",
+    "preflight.log",
+    "session.log",
+    "setup-main.json",
+    "setup-menu.json",
+    "setup.png",
+    "vp.jsonl",
+    "w.jsonl",
+    "x.jsonl",
+    "xdisplay.txt",
+    "z05-main.cmds",
+    "z05-main.json",
+    "z05-main.points.json",
+    "z05-menu.json",
+    "z05.png"
+  ],
+  "not_run": [
+    "pointer driver z05-main.steps did not complete"
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "run_id": "20261011-201406-suite-4616a58-feature002",
+  "test": "Feature 002 native suite: t_multi t_input_mw t_stale_mw t_x11 t_resize in forms P at scales 1 1.25",
+  "result": "PASS",
+  "agent": "claude",
+  "git_sha": "4616a58988190524fc083ed03437f47928848b05",
+  "note": "per-test runs listed in results.txt",
+  "artifacts": [
+    "preflight.log",
+    "results.txt",
+    "t_input_mw_formP_scale1.25.log",
+    "t_input_mw_formP_scale1.log",
+    "t_multi_formP_scale1.25.log",
+    "t_multi_formP_scale1.log",
+    "t_resize_formP_scale1.25.log",
+    "t_resize_formP_scale1.log",
+    "t_stale_mw_formP_scale1.25.log",
+    "t_stale_mw_formP_scale1.log",
+    "t_x11_formP_scale1.25.log",
+    "t_x11_formP_scale1.log"
+  ],
+  "not_run": []
+}

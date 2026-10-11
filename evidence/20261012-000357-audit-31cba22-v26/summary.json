@@ -1,0 +1,16 @@
+{
+  "run_id": "20261012-000357-audit-31cba22-v26",
+  "test": "V-26 host-safety audit of Feature 002 nested sessions since 2026-10-11 19:00",
+  "result": "PASS",
+  "agent": "claude",
+  "git_sha": "31cba220de5fbc671ac77bcce8aa189a3494e1ac",
+  "note": "read-only; session markers, host config mtimes, hyprland package, plugin calls in the repository",
+  "artifacts": [
+    "host_state.txt",
+    "nested_sessions.json",
+    "plugin_calls_outside_nested.txt",
+    "plugin_load_calls.txt",
+    "preflight.log"
+  ],
+  "not_run": []
+}
