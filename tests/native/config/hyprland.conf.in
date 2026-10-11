@@ -84,6 +84,8 @@ windowrule = match:class ^(hyprvx-testclient-b)$, float on, move 960 560
 # (WM_CLASS hyprvx-x11client), both floating at fixed positions. No Feature 001 test starts them.
 windowrule = match:class ^(hyprvx-testclient-c)$, float on, move 520 320
 windowrule = match:class ^(hyprvx-x11client)$, float on, move 240 160
+# Second X11 client of the T042 fallback case (its menu has no WM_TRANSIENT_FOR).
+windowrule = match:class ^(hyprvx-x11client-y)$, float on, move 40 380
 
 # Compositor move drag without a modifier: hyprvx-vpointer has no keyboard, so the side button (BTN_SIDE, 275) stands
 # in for Super+LMB (same movewindow mouse bind and drag controller). Only t_drag_scope.sh presses it.

@@ -6,8 +6,12 @@
 # palettes) and >= 20 pointer moves over each reach it ("main"/"menu" events, X window-local) at inverse(S) - (L + O)
 # +-1. The DISPLAY comes only from `nested.sh xdisplay` (the verified compositor's XWayland). Setup validity: with
 # offset 0 at identity the main window is at L and the menu at L + (100,80), else BLOCKED.
-# HVX_X11_POLICY=1 (T042) adds the policy case: with the policy loaded and Drift on, the menu takes its parent's offset
-# by itself (override-redirect inheritance, research R9).
+# HVX_X11_POLICY=1 (default; 0 skips it) adds the policy case (T042) (research R9): the policy is loaded, Drift is on, the X11 window gets
+# O = (300,100) through the policy itself (Super + left drag by O at z = 1; the move drag is T048) and each camera
+# state through the Drift controls (pointer at (0,0), hyprvx:reset, zoom z, pan -P z). Every new menu must then take
+# its parent's offset by itself (WM_TRANSIENT_FOR). A second X11 client whose menu has no parent (--menu-parent no)
+# checks the fallback: the menu takes the offset of the focused X11 window of its client. If the policy move drag is not
+# available yet (the drag leaves the image unchanged), the policy case is recorded NOT RUN with the reason.
 set -euo pipefail
 source "$(dirname -- "${BASH_SOURCE[0]}")/lib.sh"
 SIZE="${HVX_OUTPUT_SIZE:-1280x800}"
@@ -101,12 +105,26 @@ MENU_W=$(world "$MENU_L" "$O")
 SAMPLE_W=$(python3 -I -c "import sys; x,y,w,h = map(float, sys.argv[1].split(',')); print('%r,%r,90,70' % (x, y))" "$MAIN_W")
 # run_states PREFIX DEV_MENU_OFFSET(1|0): per camera state, the main window's input with the menu closed, then the menu
 # mapped (a new window): captured, both boxes judged, and the menu's input (it holds the pointer grab).
+CAMERA_MODE=dev
+set_camera() { # TAG PX PY Z
+    if [[ $CAMERA_MODE == dev ]]; then
+        hvx_nested dev camera "$2" "$3" "$4" > /dev/null || hvx_die_blocked "$1: dev camera rejected"
+        return
+    fi
+    printf 'move 0 0\n' > "$HVX_EVID/$1-home.cmds"
+    hvx_pointer_run "$1-home.steps" vp "$HVX_EVID/$1-home.cmds" x w
+    {
+        hvx_dispatch hyprvx:reset
+        hvx_dispatch hyprvx:zoom "$4"
+        hvx_dispatch hyprvx:pan "$(python3 -I -c "print(-$2 * $4)")" "$(python3 -I -c "print(-$3 * $4)")"
+    } > "$HVX_EVID/$1.controls.reply" 2>&1 || true
+}
 run_states() {
     local pre=$1 dev_menu=$2 st tag px py z menu
     for st in "${STATES[@]}"; do
         read -r tag px py z <<< "$st"
         tag="$pre$tag"
-        hvx_nested dev camera "$px" "$py" "$z" > /dev/null || hvx_die_blocked "$tag: dev camera rejected"
+        set_camera "$tag" "$px" "$py" "$z"
         hvx_x11_ready x w
         pointer_check "$tag" main "$px" "$py" "$z" "$MAIN_W" "$SAMPLE_W" || result=FAIL
         menu=$(map_menu "$tag")
@@ -126,18 +144,51 @@ run_states() {
 hvx_nested dev offset "$ADDR_X" "$ox" "$oy" > /dev/null || hvx_die_blocked "dev offset rejected for the X11 window"
 run_states "" 1
 
-if [[ ${HVX_X11_POLICY:-0} == 1 ]]; then
-    # Policy case (T042): Drift on; each new menu must take its parent's world offset by itself (research R9).
+if [[ ${HVX_X11_POLICY:-1} == 1 ]]; then
     hvx_nested dev panic > /dev/null || true
     [[ $HVX_FORM == S ]] || hvx_plugin_load || hvx_die_blocked "policy plugin did not load"
-    hvx_dispatch hyprvx:on > "$HVX_EVID/policy-on.reply" || true
-    hvx_nested dev offset "$ADDR_X" "$ox" "$oy" > /dev/null || hvx_die_blocked "dev offset rejected (policy case)"
-    run_states policy- 0
-    hvx_dispatch hyprvx:off > /dev/null || true
+    hvx_vkeyboard_start kb
+    hvx_dispatch hyprvx:on > "$HVX_EVID/policy-on.reply" 2>&1 || true
+    capture policy-before
+    # O through the policy: Super + left drag from the X11 window's centre by O at identity (O += d / z, z = 1).
+    read -r MCX MCY < <(python3 -I -c "import sys; x,y,w,h = map(float, sys.argv[1].split(',')); print(round(x + w/2), round(y + h/2))" "$MAIN_L")
+    printf 'move %s %s\ndown\nmove %s %s\nmove %s %s\nup\n' "$MCX" "$MCY" $((MCX + ox / 2)) $((MCY + oy / 2)) \
+        $((MCX + ox)) $((MCY + oy)) > "$HVX_EVID/policy-move.cmds"
+    hvx_key kb down KEY_LEFTMETA
+    hvx_pointer_run policy-move.steps vp "$HVX_EVID/policy-move.cmds" x w
+    hvx_key kb up KEY_LEFTMETA
+    capture policy-moved
+    if hvx_differs policy-move-validity "$HVX_EVID/policy-moved.png" "$HVX_EVID/policy-before.png"; then
+        CAMERA_MODE=policy
+        run_states policy- 0
+        # Fallback: a second X11 client whose menu has no WM_TRANSIENT_FOR; it is focused (mapped last) and gets
+        # O = (300,100) the same way; its menu must take the focused window's offset.
+        set_camera policy-fb-cam 0 0 1
+        hvx_x11client_start y 400x300 --menu 100,80,160,120 --menu-parent no --class hyprvx-x11client-y
+        hvx_x11_ready y w
+        clients fb
+        read -r ADDR_Y YX YY YW YH < <(python3 -I "$GEOM" client "$HVX_EVID/fb.clients.json" hyprvx-x11client-y) || hvx_die_blocked "no second X11 client"
+        Y_L="$YX,$YY,$YW,$YH"
+        read -r YCX YCY < <(python3 -I -c "import sys; x,y,w,h = map(float, sys.argv[1].split(',')); print(round(x + w/2), round(y + h/2))" "$Y_L")
+        printf 'move %s %s\ndown\nmove %s %s\nup\n' "$YCX" "$YCY" $((YCX + ox)) $((YCY + oy)) > "$HVX_EVID/fb-move.cmds"
+        hvx_key kb down KEY_LEFTMETA
+        hvx_pointer_run fb-move.steps vp "$HVX_EVID/fb-move.cmds" y w
+        hvx_key kb up KEY_LEFTMETA
+        hvx_client_cmd y menu
+        hvx_wait_for "$HVX_EVID/y.jsonl" '"ev": "menu_map"' || hvx_die_blocked "parentless menu never mapped"
+        hvx_x11_ready y w
+        hvx_nested capture "$HVX_EVID/fb.png" || hvx_die_blocked "capture fb failed"
+        bbox fb-main 0 0 1 "$Y_L" "$O" main || result=FAIL
+        bbox fb-menu 0 0 1 "$((YX + 100)),$((YY + 80)),160,120" "$O" popup || result=FAIL
+        hvx_client_cmd y unmenu
+    else
+        HVX_NOT_RUN+=("policy case (T042, R9 inheritance): the policy move drag is not available yet (T048); Super + drag left the image unchanged")
+    fi
+    hvx_dispatch hyprvx:off > /dev/null 2>&1 || true
 fi
 
 hvx_nested dev panic > /dev/null || true
 hvx_stop >> "$HVX_EVID/session.log" 2>&1 || hvx_die_blocked "session did not stop"
 hvx_finish "$result" "T-X11 X11 window and override-redirect menu with a world offset (V-07)" \
-    "form $HVX_FORM; O $O; policy case ${HVX_X11_POLICY:-0}; display $(cat "$HVX_EVID/xdisplay.txt"); output $SIZE scale $SCALE"
+    "form $HVX_FORM; O $O; policy case ${HVX_X11_POLICY:-1}; display $(cat "$HVX_EVID/xdisplay.txt"); output $SIZE scale $SCALE"
 [[ $result == PASS ]]

@@ -54,6 +54,11 @@ namespace HyprVXPolicy {
     // plugin:hyprvx:zoom_step (> 1; 1.1 if the configured value is not).
     double zoomStep();
 
+    // ---- window policy (Windows.cpp) ----
+    // Offsets set when windows open: override-redirect inheritance (R9); spawn placement (R6) later.
+    void initWindows();
+    void shutdownWindows();
+
     // ---- built-in inputs (Input.cpp) ----
     void initInput();
     void shutdownInput();

@@ -1,11 +1,12 @@
 // hyprvx-x11client: deterministic X11 (XWayland) client for HyprVX native tests (contracts/test-tooling.md 1.4 4c).
 //
-//   hyprvx-x11client --size WxH --title T --log PATH --control FIFO [--menu X,Y,W,H] [--class C]
+//   hyprvx-x11client --size WxH --title T --log PATH --control FIFO [--menu X,Y,W,H] [--menu-parent yes|no] [--class C]
 //
 // Content as the Wayland test client (section 4): background RGB(32,32,32), 1 px grid every 50 px RGB(64,64,64),
 // 16x16 corner markers TL red, TR green, BL blue, BR magenta. --menu prepares an override-redirect window with the popup
 // palette (test-tooling 1.3), WM_TRANSIENT_FOR = the main window, mapped at main-window-relative X,Y by the control
-// command "menu" and unmapped by "unmenu". Like a real X11 menu, the mapped menu grabs the pointer (owner_events off),
+// command "menu" and unmapped by "unmenu"; --menu-parent no leaves WM_TRANSIENT_FOR unset (a menu without a parent,
+// Feature 002 T042 fallback case). Like a real X11 menu, the mapped menu grabs the pointer (owner_events off),
 // so the X server reports pointer events relative to it: Hyprland routes the pointer of an override-redirect popup
 // menu to the focused window's surface (XWayland surface wantsFocus() is false), and XWayland turns that surface's
 // local coordinates into root coordinates. Control: "redraw", "menu", "unmenu", "quit". Logs (JSON lines): enter,
@@ -63,6 +64,7 @@ struct State {
     std::string       logPath, controlPath;
     int               menuX = 0, menuY = 0, menuW = 0, menuH = 0;
     bool              hasMenu = false;
+    bool              menuParent = true;
     FILE*             log = nullptr;
     xcb_connection_t* conn = nullptr;
     xcb_screen_t*     screen = nullptr;
@@ -279,12 +281,16 @@ void parseArgs(State& s, int argc, char** argv) {
             if (std::sscanf(v, "%d,%d,%d,%d", &s.menuX, &s.menuY, &s.menuW, &s.menuH) != 4 || s.menuW < 2 * kMarker || s.menuH < 2 * kMarker)
                 die(2, "--menu must be X,Y,W,H");
             s.hasMenu = true;
+        } else if (a == "--menu-parent") {
+            if (std::strcmp(v, "yes") && std::strcmp(v, "no"))
+                die(2, "--menu-parent must be yes or no");
+            s.menuParent = !std::strcmp(v, "yes");
         } else {
             die(2, "unknown argument " + a);
         }
     }
     if (s.logPath.empty() || s.controlPath.empty())
-        die(2, "usage: hyprvx-x11client --size WxH --title T --log PATH --control FIFO [--menu X,Y,W,H] [--class C]");
+        die(2, "usage: hyprvx-x11client --size WxH --title T --log PATH --control FIFO [--menu X,Y,W,H] [--menu-parent yes|no] [--class C]");
 }
 
 } // namespace
@@ -336,7 +342,8 @@ int main(int argc, char** argv) {
         s.menu.h = s.menuH;
         s.menu.palette = &kPopupPalette;
         createWindow(s, s.menu, true);
-        xcb_change_property(s.conn, XCB_PROP_MODE_REPLACE, s.menu.id, XCB_ATOM_WM_TRANSIENT_FOR, XCB_ATOM_WINDOW, 32, 1, &s.main.id);
+        if (s.menuParent)
+            xcb_change_property(s.conn, XCB_PROP_MODE_REPLACE, s.menu.id, XCB_ATOM_WM_TRANSIENT_FOR, XCB_ATOM_WINDOW, 32, 1, &s.main.id);
         const xcb_atom_t type = atom(s, "_NET_WM_WINDOW_TYPE");
         const xcb_atom_t popupMenu = atom(s, "_NET_WM_WINDOW_TYPE_POPUP_MENU");
         xcb_change_property(s.conn, XCB_PROP_MODE_REPLACE, s.menu.id, type, XCB_ATOM_ATOM, 32, 1, &popupMenu);

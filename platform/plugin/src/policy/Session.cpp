@@ -273,6 +273,7 @@ void HyprVXPolicy::initSession(HANDLE handle) {
         syncMechanism();
     }));
     initCamera(handle);
+    initWindows();
     initInput();
     Log::logger->log(Log::INFO, "[hyprvx] Drift policy loaded (form {}); Drift is OFF", HYPRVX_FORM_NAME);
 }
@@ -283,6 +284,7 @@ void HyprVXPolicy::shutdownSession() {
     // Unload acts as panic while the mechanism is still in place: every camera identity, every offset 0 (dev offsets
     // included, mechanism-api resetWindowOffsets).
     shutdownInput();
+    shutdownWindows();
     shutdownCamera();
     g_session->listeners.clear();
     g_session->model.panic();
