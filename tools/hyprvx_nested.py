@@ -302,6 +302,21 @@ def start(args):
         }
         write_private(session_file(), data)
         verify(data)
+        hyprctl = Path(data["binary"]).with_name("hyprctl")
+        # Fixed-size headless output (config rule HVX-1); the host-sized Wayland output is disabled by the config.
+        # It is created before waiting for exec-once: Hyprland emits its start event (which runs exec-once) on the
+        # first rendered frame (src/render/Renderer.cpp), and the headless output renders without depending on the
+        # host delivering frames to the nested window (it does not while the host output is locked or hidden).
+        # The request socket (.socket.sock) may appear after .socket2.sock; only "cannot connect" is retried.
+        create_deadline = time.monotonic() + 30
+        while True:
+            reply = subprocess.run([str(hyprctl), "--instance", signature, "output", "create", "headless", OUTPUT],
+                                   env=nested_env(data), capture_output=True, text=True).stdout.strip()
+            if reply == "ok" or not reply.startswith("Couldn't connect") or time.monotonic() > create_deadline:
+                break
+            time.sleep(0.05)
+        if reply != "ok":
+            raise Failed(f"could not create the {OUTPUT} headless output: {reply!r}")
         # Efb5099 always posts a timed ".conf format" notice for legacy configs; it would make captures time-dependent.
         # The config's exec-once marker appears in the callback that posts it; a hyprctl request sent after the marker
         # is handled after that callback. Dismissing damages the notice region on the next frame (ready rule).
@@ -311,16 +326,10 @@ def start(args):
             time.sleep(0.05)
         if not marker.exists():
             raise Failed("nested compositor never ran exec-once (startup marker missing)")
-        hyprctl = Path(data["binary"]).with_name("hyprctl")
         reply = subprocess.run([str(hyprctl), "--instance", signature, "dismissnotify"], env=nested_env(data),
                                capture_output=True, text=True).stdout.strip()
         if reply != "ok":
             raise Failed(f"could not dismiss startup notifications: {reply!r}")
-        # Fixed-size headless output (config rule HVX-1); the host-sized Wayland output is disabled by the config.
-        reply = subprocess.run([str(hyprctl), "--instance", signature, "output", "create", "headless", OUTPUT],
-                               env=nested_env(data), capture_output=True, text=True).stdout.strip()
-        if reply != "ok":
-            raise Failed(f"could not create the {OUTPUT} headless output: {reply!r}")
         output_deadline = time.monotonic() + 10
         while time.monotonic() < output_deadline:
             monitors = subprocess.run([str(hyprctl), "--instance", signature, "-j", "monitors"], env=nested_env(data),
@@ -345,6 +354,8 @@ def start(args):
                 os.killpg(launcher.pid, signal.SIGKILL)
                 launcher.wait()
         session_file().unlink(missing_ok=True)
+        for inner in (runtime / "hypr").glob("*/hyprland.log*") if (runtime / "hypr").is_dir() else []:
+            shutil.copy2(inner, session / inner.name)  # keep the nested compositor's own log for diagnosis
         shutil.rmtree(runtime, ignore_errors=True)
         print(f"nested start failed; logs kept in {session}", file=sys.stderr)
         raise
