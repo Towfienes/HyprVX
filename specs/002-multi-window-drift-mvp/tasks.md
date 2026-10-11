@@ -68,16 +68,16 @@ description: "Task list for Feature 002 — Multi-Window Drift MVP (Option A), C
 
 ### Test tools and harness (test-tooling 1.4)
 
-- [ ] T009 [P] Add `scroll DX DY` to `tools/vpointer/main.cpp` (§4a)
-- [ ] T010 [P] Add `wl_keyboard` (`kb_enter`, `kb_leave`, `key`, `modifiers`) and pointer `axis` logging to `tools/testclient/main.cpp` (§4); existing log lines unchanged
-- [ ] T011 [P] Implement `tools/vkeyboard/main.cpp` (`hyprvx-vkeyboard`, §4b): `zwp_virtual_keyboard_v1`, xkbcommon US keymap, `down`/`up`/`tap KEY`, same nested-only refusal as vpointer; CMake target `hyprvx_vkeyboard` under `HYPRVX_WITH_WAYLAND_PLATFORM`
-- [ ] T012 [P] Implement `tools/x11client/main.cpp` (`hyprvx-x11client`, §4c, xcb): markers, pointer/key logs per window, `drawn` lines, `--menu` override-redirect child with WM_TRANSIENT_FOR; CMake target `hyprvx_x11client`
-- [ ] T013 Add to `tools/hyprvx_nested.py` and `scripts/nested.sh` (§7):
+- [x] T009 [P] Add `scroll DX DY` to `tools/vpointer/main.cpp` (§4a)
+- [x] T010 [P] Add `wl_keyboard` (`kb_enter`, `kb_leave`, `key`, `modifiers`) and pointer `axis` logging to `tools/testclient/main.cpp` (§4); existing log lines unchanged
+- [x] T011 [P] Implement `tools/vkeyboard/main.cpp` (`hyprvx-vkeyboard`, §4b): `zwp_virtual_keyboard_v1`, xkbcommon US keymap, `down`/`up`/`tap KEY`, same nested-only refusal as vpointer; CMake target `hyprvx_vkeyboard` under `HYPRVX_WITH_WAYLAND_PLATFORM`
+- [x] T012 [P] Implement `tools/x11client/main.cpp` (`hyprvx-x11client`, §4c, xcb): markers, pointer/key logs per window, `drawn` lines, `--menu` override-redirect child with WM_TRANSIENT_FOR; CMake target `hyprvx_x11client`
+- [x] T013 Add to `tools/hyprvx_nested.py` and `scripts/nested.sh` (§7):
   - `plugin load PATH`;
   - `xdisplay`: only a lock-file PID equal to the verified compositor or one of its children, else exit 3;
   - `run --x11`.
   Extend `tests/native/harness/test_identity_refusal.sh` with refusal cases for `xdisplay`, `plugin load` on an unverified session, and vkeyboard on a foreign display (V-03).
-- [ ] T014 Add the window rule for `hyprvx-x11client` to `tests/native/config/hyprland.conf.in` (§5). Add these helpers to `tests/native/lib.sh`:
+- [x] T014 Add the window rule for `hyprvx-x11client` to `tests/native/config/hyprland.conf.in` (§5). Add these helpers to `tests/native/lib.sh`:
   - `HVX_FORM` handling;
   - plugin load with sha256 into evidence;
   - `hvx_vkeyboard_start`, `hvx_x11client_start`;
@@ -94,24 +94,24 @@ description: "Task list for Feature 002 — Multi-Window Drift MVP (Option A), C
 
 ### Tests (written before the patches are judged; dev offsets via `hyprvx-dev offset`)
 
-- [ ] T016 [P] [US2] Write `tests/native/t_multi.sh` (T-MULTI): three floating clients with distinct dev offsets at z ∈ {0.25, 0.5, 1, 2}, each bbox ± 2 px of `forwardBox(L + O)`, scales 1 and 1.25; plus a `--layer TOP` client that stays byte-identical in its region while camera and offsets change (FR-013 with offsets)
-- [ ] T017 [P] [US3] Write `tests/native/t_input_mw.sh` (T-INPUT-MW): pointer local ± 1 on offset windows, their popup and subsurface, ≥ 20 points per state; click focus; no event on empty canvas; a pointer constraint held by a client stays in force across a camera/offset change (spec edge case; recorded NOT RUN with the reason if the test client cannot hold one)
-- [ ] T018 [P] [US2] Write `tests/native/t_stale_mw.sh` (T-STALE-MW): 50 random camera/offset states, three windows, partial-damage vs forced full-damage capture identical
-- [ ] T019 [P] [US3] Write `tests/native/t_x11.sh` (T-X11): X11 window with a dev offset, bbox ± 2 px and pointer local ± 1 at scales 1 and 1.25; its override-redirect menu with the same dev offset drawn attached and receiving input (policy inheritance is tested in T042)
-- [ ] T020 [P] [US4] Write `tests/native/t_resize.sh` (T-RESIZE) mechanism part: with a non-identity camera, a floating border drag (and Hyprland's resize bind) resizes by `worldDelta` ± 1, a tiled border drag changes nothing and logs once
+- [x] T016 [P] [US2] Write `tests/native/t_multi.sh` (T-MULTI): three floating clients with distinct dev offsets at z ∈ {0.25, 0.5, 1, 2}, each bbox ± 2 px of `forwardBox(L + O)`, scales 1 and 1.25; plus a `--layer TOP` client that stays byte-identical in its region while camera and offsets change (FR-013 with offsets)
+- [x] T017 [P] [US3] Write `tests/native/t_input_mw.sh` (T-INPUT-MW): pointer local ± 1 on offset windows, their popup and subsurface, ≥ 20 points per state; click focus; no event on empty canvas; a pointer constraint held by a client stays in force across a camera/offset change (spec edge case; recorded NOT RUN with the reason if the test client cannot hold one)
+- [x] T018 [P] [US2] Write `tests/native/t_stale_mw.sh` (T-STALE-MW): 50 random camera/offset states, three windows, partial-damage vs forced full-damage capture identical
+- [x] T019 [P] [US3] Write `tests/native/t_x11.sh` (T-X11): X11 window with a dev offset, bbox ± 2 px and pointer local ± 1 at scales 1 and 1.25; its override-redirect menu with the same dev offset drawn attached and receiving input (policy inheritance is tested in T042)
+- [x] T020 [P] [US4] Write `tests/native/t_resize.sh` (T-RESIZE) mechanism part: with a non-identity camera, a floating border drag (and Hyprland's resize bind) resizes by `worldDelta` ± 1, a tiled border drag changes nothing and logs once
 
 ### Implementation
 
-- [ ] T021 Author `patches/hyprland/0010-*.patch`:
+- [x] T021 Author `patches/hyprland/0010-*.patch`:
   - update the vendored `src/hyprvx/CameraMath.hpp` to equal the core header byte for byte;
   - add offset storage and `setWindowOffset`/`windowOffset`/`contentOffset`/`resetWindowOffsets` (`contracts/mechanism-api.md`);
   - per-window offset camera hint in `renderWorkspaceWindows`, only when the camera is not identity or `O ≠ 0`;
   - culling (`visibleOnMonitor`) and damage (`damageWindow`, `damageSurface`, offset change) on `L + O`;
   - fullscreen ignores offsets.
-- [ ] T022 Author `patches/hyprland/0011-*.patch`: offsets in `windowAt`, `windowSurfaceAt`, `surfaceLocalAt`, the `mouseMoveUnified` fallback, warps and constraints, `checkInputOnDecos`, and popup reposition/unconstrain (research R8). Any seam outside this list is a stop condition, recorded with file:line in `integration-log.md` before it is added.
-- [ ] T023 Author `patches/hyprland/0012-*.patch`: floating resize drags through the camera (`worldDelta`, anchor on `L + O`); tiled resize blocked and logged once per drag; move drags stay blocked under camera or offset (FR-012)
-- [ ] T024 Author `patches/hyprland/0013-*.patch`: dev control 1.2 (`offset`, `state.offsets`, `panic` resets offsets)
-- [ ] T025 `scripts/check-single-transform.sh` PASS on 0001–0013. Build `patched` and run T016–T020 plus Feature 001's `run_sprint1.sh` and `run_phase2.sh` (regression, identity captures byte-identical to the Feature 001 baseline). Debug until V-04..V-07 and the mechanism part of V-20 PASS, and record each run in `integration-log.md`.
+- [x] T022 Author `patches/hyprland/0011-*.patch`: offsets in `windowAt`, `windowSurfaceAt`, `surfaceLocalAt`, the `mouseMoveUnified` fallback, warps and constraints, `checkInputOnDecos`, and popup reposition/unconstrain (research R8). Any seam outside this list is a stop condition, recorded with file:line in `integration-log.md` before it is added.
+- [x] T023 Author `patches/hyprland/0012-*.patch`: floating resize drags through the camera (`worldDelta`, anchor on `L + O`); tiled resize blocked and logged once per drag; move drags stay blocked under camera or offset (FR-012)
+- [x] T024 Author `patches/hyprland/0013-*.patch`: dev control 1.2 (`offset`, `state.offsets`, `panic` resets offsets)
+- [x] T025 `scripts/check-single-transform.sh` PASS on 0001–0013. Build `patched` and run T016–T020 plus Feature 001's `run_sprint1.sh` and `run_phase2.sh` (regression, identity captures byte-identical to the Feature 001 baseline). Debug until V-04..V-07 and the mechanism part of V-20 PASS, and record each run in `integration-log.md`.
 
 **Checkpoint**: the mechanism draws and hit-tests offset windows correctly with no policy.
 

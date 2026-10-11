@@ -10,10 +10,10 @@ Native tests take `HVX_FORM=P|S`; until Phase 9 they run in form P (or with the 
 | V-01 | L2 | Transform 1.2 unit tests: invariants 8–10 (seeded, ≥ 10⁴ cases) plus all 1.1 invariants | PASS | `~/.local/share/hyprvx/evidence/claude/20261011-192636-unit-488cd21-f002_unit/` (fresh build of a copy; ctest 326/326; CameraMath + DriftModel 39/39 for seeds default and 987654321; mutants 2/2 killed for 1.2: offsetCamera sign, worldDelta multiply) |
 | V-02 | L2 | `DriftModel` unit tests (transitions, idempotence, cameras, offsets, drags, spawn, mechanismOffset) | PASS | `~/.local/share/hyprvx/evidence/claude/20261011-192636-unit-488cd21-f002_unit/` (26 DriftModel tests in the same run; mutants 4/4 killed: panic clears offsets, mechanismOffset ignores unmapped, enable in DRIFT not a no-op, move ignores zoom) |
 | V-03 | L4 | Identity refusal of the new tools and harness commands (vkeyboard, `xdisplay`, `plugin load`) | NOT RUN | — |
-| V-04 | L5 | T-MULTI: three offset windows ± 2 px at z ∈ {0.25, 0.5, 1, 2}, scales 1 and 1.25; top layer unchanged | NOT RUN | — |
-| V-05 | L5b | T-INPUT-MW: pointer local ± 1 on offset windows, popup, subsurface; click focus; empty canvas silent | NOT RUN | — |
-| V-06 | L5 | T-STALE-MW: 50 random camera/offset states, partial = full damage | NOT RUN | — |
-| V-07 | L5/L5b | T-X11: X11 window and override-redirect menu with offset, bbox ± 2 px, pointer ± 1 | NOT RUN | — |
+| V-04 | L5 | T-MULTI: three offset windows ± 2 px at z ∈ {0.25, 0.5, 1, 2}, scales 1 and 1.25; top layer unchanged | PASS | `~/.local/share/hyprvx/evidence/claude/20261011-201406-suite-4616a58-feature002/` (form P, scales 1 and 1.25; runs `…-formP-4616a58-t_multi`; 15 window boxes per scale, all within ± 2 px; TOP layer region byte-identical) |
+| V-05 | L5b | T-INPUT-MW: pointer local ± 1 on offset windows, popup, subsurface; click focus; empty canvas silent | PASS | `~/.local/share/hyprvx/evidence/claude/20261011-201406-suite-4616a58-feature002/` (form P, scales 1 and 1.25; `…-t_input_mw`: max local error 0.0013; pointer-constraint case NOT RUN: `hyprvx-testclient` cannot hold a constraint, recorded in each run's `not_run`) |
+| V-06 | L5 | T-STALE-MW: 50 random camera/offset states, partial = full damage | PASS | `~/.local/share/hyprvx/evidence/claude/20261011-201406-suite-4616a58-feature002/` (form P, scales 1 and 1.25; `…-t_stale_mw`: 50/50 states partial = full damage) |
+| V-07 | L5/L5b | T-X11: X11 window and override-redirect menu with offset, bbox ± 2 px, pointer ± 1 | PASS | `~/.local/share/hyprvx/evidence/claude/20261011-201406-suite-4616a58-feature002/` (form P, scales 1 and 1.25; `…-t_x11`: main window and override-redirect menu, bbox and pointer within tolerance, 3 states) |
 | V-08 | L5 | T-DRIFT-OFF ×3: capture = stock, `hyprctl clients` unchanged, no `movewindow*`, re-entry restores | NOT RUN | — |
 | V-09 | L5 | T-PANIC-DRIFT 10/10: first capture after panic = stock | NOT RUN | — |
 | V-10 | L5 | T-IDEMP: on/off twice, panic while OFF, special workspace keeps OFF | NOT RUN | — |
@@ -26,7 +26,7 @@ Native tests take `HVX_FORM=P|S`; until Phase 9 they run in form P (or with the 
 | V-17 | L5b | T-SCROLL: scroll reaches the window; Super + scroll zooms and the client gets nothing | NOT RUN | — |
 | V-18 | L5 | T-FULLSCREEN: fullscreen in Drift = stock fullscreen capture; leaving restores the Drift view | NOT RUN | — |
 | V-19 | L5 | T-MOVE: drag d at z → bbox moves d ± 1, O by d/z, `L` unchanged, no `movewindow*` | NOT RUN | — |
-| V-20 | L5 | T-RESIZE: floating border drag / resize bind by worldDelta ± 1; tiled blocked, one log line | NOT RUN | — |
+| V-20 | L5 | T-RESIZE: floating border drag / resize bind by worldDelta ± 1; tiled blocked, one log line | NOT RUN | mechanism part PASS (T025): `~/.local/share/hyprvx/evidence/claude/20261011-201406-suite-4616a58-feature002/` `…-t_resize`, and Phase 2 regression `t_drag_scope` `~/.local/share/hyprvx/evidence/claude/20261011-222405-patched-a1736a9-phase2/`; judged with the policy at T049 |
 | V-21 | L5 | T-DRAG-ABORT: panic, off, client quit, workspace change during a drag; no stuck grab | NOT RUN | — |
 | V-22 | L5 | T-SPAWN: mapped in Drift centred ± 2 px; mapped when OFF as stock | NOT RUN | — |
 | V-23 | L5 | Form P/S parity: every Feature 002 capture byte-identical between forms, scales 1 and 1.25 | NOT RUN | — |
