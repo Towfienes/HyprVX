@@ -1,0 +1,19 @@
+{
+  "run_id": "20261011-192636-unit-488cd21-f002_unit",
+  "test": "Feature 002 V-01 transform 1.2 and V-02 DriftModel unit tests",
+  "result": "PASS",
+  "agent": "claude",
+  "git_sha": "488cd214066c6407c98908f2bb59b7da297b679b",
+  "note": "100% tests passed out of 326; seeds default and 987654321; mutants 6/6",
+  "artifacts": [
+    "build.log",
+    "configure.log",
+    "core_tests_seed_987654321.log",
+    "core_tests_seed_default.log",
+    "ctest.log",
+    "mutation.log",
+    "preflight.log",
+    "source-status.txt"
+  ],
+  "not_run": []
+}

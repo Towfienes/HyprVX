@@ -23,19 +23,22 @@ filter='CameraMathTest.*:DriftModelTest.*'
 "$work/build/hyprvx_core_tests" --gtest_filter="$filter" > "$HVX_EVID/core_tests_seed_default.log" 2>&1 || result=FAIL
 HYPRVX_TEST_SEED=987654321 "$work/build/hyprvx_core_tests" --gtest_filter="$filter" > "$HVX_EVID/core_tests_seed_987654321.log" 2>&1 || result=FAIL
 
-# file | sed expression | what the mutant breaks
+# file ;; sed expression ;; what the mutant breaks
 mutants=(
-    'core/include/hyprvx/core/CameraMath.hpp|s/{{c.origin.x - O.x, c.origin.y - O.y}, c.zoom}/{{c.origin.x + O.x, c.origin.y + O.y}, c.zoom}/|offsetCamera adds the offset'
-    'core/include/hyprvx/core/CameraMath.hpp|s/return {d.x \/ c.zoom, d.y \/ c.zoom};/return {d.x * c.zoom, d.y * c.zoom};/|worldDelta multiplies by the zoom'
-    'core/src/DriftModel.cpp|s/^void DriftModel::panic() {$/void DriftModel::panic() {\n    offsets_.clear();/|panic clears stored offsets'
-    'core/src/DriftModel.cpp|s/return mapped \&\& scene \&\& \*scene == workspace/return scene \&\& *scene == workspace/|mechanismOffset ignores unmapped windows'
-    'core/src/DriftModel.cpp|s/    if (s.mode == Mode::Entering || s.mode == Mode::Drift)/    if (s.mode == Mode::Entering)/|enable in DRIFT is not a no-op'
-    'core/src/DriftModel.cpp|s/return setOffset(drag_->window, {drag_->startOffset.x + world.x, drag_->startOffset.y + world.y});/return setOffset(drag_->window, {drag_->startOffset.x + delta.x, drag_->startOffset.y + delta.y});/|move drag ignores the zoom'
+    'core/include/hyprvx/core/CameraMath.hpp;;s/{{c.origin.x - O.x, c.origin.y - O.y}, c.zoom}/{{c.origin.x + O.x, c.origin.y + O.y}, c.zoom}/;;offsetCamera adds the offset'
+    'core/include/hyprvx/core/CameraMath.hpp;;s/return {d.x \/ c.zoom, d.y \/ c.zoom};/return {d.x * c.zoom, d.y * c.zoom};/;;worldDelta multiplies by the zoom'
+    'core/src/DriftModel.cpp;;s/^void DriftModel::panic() {$/void DriftModel::panic() {\n    offsets_.clear();/;;panic clears stored offsets'
+    'core/src/DriftModel.cpp;;s/return mapped \&\& scene \&\& \*scene == workspace/return scene \&\& *scene == workspace/;;mechanismOffset ignores unmapped windows'
+    'core/src/DriftModel.cpp;;s/    if (s.mode == Mode::Entering || s.mode == Mode::Drift)/    if (s.mode == Mode::Entering)/;;enable in DRIFT is not a no-op'
+    'core/src/DriftModel.cpp;;s/return setOffset(drag_->window, {drag_->startOffset.x + world.x, drag_->startOffset.y + world.y});/return setOffset(drag_->window, {drag_->startOffset.x + delta.x, drag_->startOffset.y + delta.y});/;;move drag ignores the zoom'
 )
 killed=0
 : > "$HVX_EVID/mutation.log"
 for entry in "${mutants[@]}"; do
-    IFS='|' read -r file expr what <<< "$entry"
+    file=${entry%%;;*}
+    rest=${entry#*;;}
+    expr=${rest%;;*}
+    what=${rest##*;;}
     mdir=$(mktemp -d "$work/mutant-XXXX")
     cp -a "$work/src" "$mdir/src"
     sed -i "$expr" "$mdir/src/$file"

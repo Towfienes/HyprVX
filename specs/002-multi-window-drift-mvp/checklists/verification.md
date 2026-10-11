@@ -7,8 +7,8 @@ Native tests take `HVX_FORM=P|S`; until Phase 9 they run in form P (or with the 
 
 | ID | Level | Check | Status | Artifact |
 |---|---|---|---|---|
-| V-01 | L2 | Transform 1.2 unit tests: invariants 8–10 (seeded, ≥ 10⁴ cases) plus all 1.1 invariants | NOT RUN | — |
-| V-02 | L2 | `DriftModel` unit tests (transitions, idempotence, cameras, offsets, drags, spawn, mechanismOffset) | NOT RUN | — |
+| V-01 | L2 | Transform 1.2 unit tests: invariants 8–10 (seeded, ≥ 10⁴ cases) plus all 1.1 invariants | PASS | `~/.local/share/hyprvx/evidence/claude/20261011-192636-unit-488cd21-f002_unit/` (fresh build of a copy; ctest 326/326; CameraMath + DriftModel 39/39 for seeds default and 987654321; mutants 2/2 killed for 1.2: offsetCamera sign, worldDelta multiply) |
+| V-02 | L2 | `DriftModel` unit tests (transitions, idempotence, cameras, offsets, drags, spawn, mechanismOffset) | PASS | `~/.local/share/hyprvx/evidence/claude/20261011-192636-unit-488cd21-f002_unit/` (26 DriftModel tests in the same run; mutants 4/4 killed: panic clears offsets, mechanismOffset ignores unmapped, enable in DRIFT not a no-op, move ignores zoom) |
 | V-03 | L4 | Identity refusal of the new tools and harness commands (vkeyboard, `xdisplay`, `plugin load`) | NOT RUN | — |
 | V-04 | L5 | T-MULTI: three offset windows ± 2 px at z ∈ {0.25, 0.5, 1, 2}, scales 1 and 1.25; top layer unchanged | NOT RUN | — |
 | V-05 | L5b | T-INPUT-MW: pointer local ± 1 on offset windows, popup, subsurface; click focus; empty canvas silent | NOT RUN | — |

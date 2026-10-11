@@ -54,9 +54,9 @@ description: "Task list for Feature 002 — Multi-Window Drift MVP (Option A), C
 
 ### Transform contract 1.2 and the policy model (no compositor)
 
-- [ ] T005 Add the invariant tests 8–10 of `contracts/transform-contract.md` 1.2 to `tests/unit/test_camera_math.cpp` (seeded, ≥ 10⁴ cases) and see them fail to compile or fail before the implementation
-- [ ] T006 Implement `offsetCamera` and `worldDelta` in `core/include/hyprvx/core/CameraMath.hpp` (constexpr, no other change); T005 and all existing tests pass
-- [ ] T007 Write `tests/unit/test_drift_model.cpp` from `data-model.md` before the model exists. It covers:
+- [X] T005 Add the invariant tests 8–10 of `contracts/transform-contract.md` 1.2 to `tests/unit/test_camera_math.cpp` (seeded, ≥ 10⁴ cases) and see them fail to compile or fail before the implementation
+- [X] T006 Implement `offsetCamera` and `worldDelta` in `core/include/hyprvx/core/CameraMath.hpp` (constexpr, no other change); T005 and all existing tests pass
+- [X] T007 Write `tests/unit/test_drift_model.cpp` from `data-model.md` before the model exists. It covers:
   - every transition, and idempotence ("`enable` while `ENTERING` or `DRIFT`, and `disable`/`panic` while `OFF` or `EXITING`, are no-ops");
   - an invalid entering result going to OFF;
   - per-workspace cameras ("`validate` with limits [0.1, 2.0]"; "special workspaces never get a camera");
@@ -64,7 +64,7 @@ description: "Task list for Feature 002 — Multi-Window Drift MVP (Option A), C
   - drags (`MOVE: O = startOffset + Δ/z`, `PAN: P = startP − Δ/z`, ending on release, leaving DRIFT, panic, window close, scene workspace change);
   - `spawnOffset = centre(visibleWorldRect(C)) − centre(L)`;
   - `mechanismOffset` being 0 outside a DRIFT scene.
-- [ ] T008 Implement `core/include/hyprvx/core/DriftModel.hpp` and `core/src/DriftModel.cpp` (pure C++20, uses only `CameraMath`, no Hyprland types), add them to `hyprvx_core` in `CMakeLists.txt`; T007 passes; ctest all green (V-01, V-02)
+- [X] T008 Implement `core/include/hyprvx/core/DriftModel.hpp` and `core/src/DriftModel.cpp` (pure C++20, uses only `CameraMath`, no Hyprland types), add them to `hyprvx_core` in `CMakeLists.txt`; T007 passes; ctest all green (V-01, V-02)
 
 ### Test tools and harness (test-tooling 1.4)
 
