@@ -77,23 +77,26 @@ printf '%s\n%s\n%s\n' "$before" "$after_move" "$after_resize" > "$HVX_EVID/geome
 [[ $before != missing && $before == "$after_move" && $before == "$after_resize" ]] || { echo "geometry changed while non-identity" >&2; result=FAIL; }
 
 # Identity control: the same drags must act on the stock path. Pressing inside the window centre (540,400) / on the
-# right border grab area and dragging.
-hvx_nested dev panic > /dev/null || hvx_die_blocked "panic failed"
-hvx_capture identity client
-id_before=$(geometry id_before)
-printf 'move 540 400\ndown 275\nmove 590 430\nmove 640 460\nup 275\n' | steps id_move_drag
-id_after_move=$(geometry id_after_move)
-printf '%s\n%s\n' "$id_before" "$id_after_move" > "$HVX_EVID/identity-geometry.txt"
-[[ $id_before != missing && $id_after_move != "$id_before" ]] \
-    || hvx_die_blocked "identity control: the side-button move drag did not move the window (setup invalid)"
-BORDER_X=$(python3 -I -c "import json,sys; g=json.loads(sys.argv[1]); print(g['at'][0] + g['size'][0] + 8)" "$id_after_move")
-BORDER_Y=$(python3 -I -c "import json,sys; g=json.loads(sys.argv[1]); print(g['at'][1] + g['size'][1] // 2)" "$id_after_move")
-printf 'move %s %s\ndown\nmove %s %s\nmove %s %s\nup\n' "$BORDER_X" "$BORDER_Y" $((BORDER_X + 30)) "$BORDER_Y" \
-    $((BORDER_X + 60)) "$BORDER_Y" | steps id_resize_drag
-id_after_resize=$(geometry id_after_resize)
-echo "$id_after_resize" >> "$HVX_EVID/identity-geometry.txt"
-[[ $id_after_resize != "$id_after_move" ]] \
-    || hvx_die_blocked "identity control: the border resize drag did not resize the window (setup invalid)"
+# right border grab area and dragging. It validates the "unchanged" results above, so it runs only if they passed: a
+# FAIL already stands, and the window it moved would put the control's press positions elsewhere.
+if [[ $result == PASS ]]; then
+    hvx_nested dev panic > /dev/null || hvx_die_blocked "panic failed"
+    hvx_capture identity client
+    id_before=$(geometry id_before)
+    printf 'move 540 400\ndown 275\nmove 590 430\nmove 640 460\nup 275\n' | steps id_move_drag
+    id_after_move=$(geometry id_after_move)
+    printf '%s\n%s\n' "$id_before" "$id_after_move" > "$HVX_EVID/identity-geometry.txt"
+    [[ $id_before != missing && $id_after_move != "$id_before" ]] \
+        || hvx_die_blocked "identity control: the side-button move drag did not move the window (setup invalid)"
+    BORDER_X=$(python3 -I -c "import json,sys; g=json.loads(sys.argv[1]); print(g['at'][0] + g['size'][0] + 8)" "$id_after_move")
+    BORDER_Y=$(python3 -I -c "import json,sys; g=json.loads(sys.argv[1]); print(g['at'][1] + g['size'][1] // 2)" "$id_after_move")
+    printf 'move %s %s\ndown\nmove %s %s\nmove %s %s\nup\n' "$BORDER_X" "$BORDER_Y" $((BORDER_X + 30)) "$BORDER_Y" \
+        $((BORDER_X + 60)) "$BORDER_Y" | steps id_resize_drag
+    id_after_resize=$(geometry id_after_resize)
+    echo "$id_after_resize" >> "$HVX_EVID/identity-geometry.txt"
+    [[ $id_after_resize != "$id_after_move" ]] \
+        || hvx_die_blocked "identity control: the border resize drag did not resize the window (setup invalid)"
+fi
 
 hvx_stop >> "$HVX_EVID/session.log" 2>&1 || hvx_die_blocked "session did not stop"
 cp "$SESSION_DIR/hyprland.log" "$HVX_EVID/nested-hyprland.log" 2> /dev/null || hvx_die_blocked "nested log not kept"
