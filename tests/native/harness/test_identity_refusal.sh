@@ -10,6 +10,8 @@
 # on the intact fake session `xdisplay` accepts only a lock file holding the compositor's PID (or a direct child's)
 # and `plugin load` refuses a session whose binary is outside the agent prefix (it would use a foreign hyprctl).
 # hyprvx-vkeyboard and hyprvx-x11client (path in $1/$2, built by tests/native/lib.sh) refuse foreign displays.
+# Feature 003 (test-tooling 1.5, V-02): an interactive (L6) session refuses `capture`, and `start --interactive` renders
+# a config whose only change is the enabled WAYLAND-1 rule. `hvxtest` goes through `run` (refused above).
 # No real compositor is started and the host session is never contacted (no X server is ever connected).
 set -euo pipefail
 readonly repo="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)"
@@ -119,6 +121,23 @@ try:
     check("intact session without its own XWayland lock: xdisplay exits 3", r.returncode == 3, f"exit {r.returncode}: {r.stdout} {r.stderr.strip()}")
     r = harness_run("run", "--x11", "--", "touch", str(marker_file))
     check("intact session without its own XWayland lock: run --x11 exits 3", r.returncode == 3, r.stderr.strip())
+
+    # Interactive (L6) session: captures are refused on an otherwise intact session.
+    write(dict(good, interactive=True))
+    shot = root / "interactive.png"
+    r = harness_run("capture", str(shot))
+    check("interactive session: capture refused (exit 1, no file)", r.returncode == 1 and not shot.exists() and "interactive" in r.stderr,
+          f"exit {r.returncode}: {r.stderr.strip()}")
+    # start --interactive renders the template with only the WAYLAND-1 rule changed.
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("hn", repo / "tools/hyprvx_nested.py")
+    hn = importlib.util.module_from_spec(spec); spec.loader.exec_module(hn)
+    normal, inter = root / "normal.conf", root / "inter.conf"
+    hn.render_config(normal, (1280, 800), "1"); hn.render_config(inter, (1280, 800), "1", True)
+    a, b = normal.read_text().splitlines(), inter.read_text().splitlines()
+    diff = [(x, y) for x, y in zip(a, b) if x != y]
+    check("render_config --interactive changes only the WAYLAND-1 rule", len(a) == len(b) and diff == [(hn.INTERACTIVE_RULE_OFF, hn.INTERACTIVE_RULE_ON)], repr(diff))
+    write(good)
 
     check("nothing ran for any refused command", not marker_file.exists())
     check("fake compositor never signalled", server.poll() is None and not signalled.exists())

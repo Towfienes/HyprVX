@@ -230,10 +230,20 @@ def resolve_binary(variant, explicit):
     return binary, info
 
 
-def render_config(path, size, scale):
+INTERACTIVE_RULE_OFF = "monitor = WAYLAND-1, disable"
+INTERACTIVE_RULE_ON = "monitor = WAYLAND-1, preferred, auto, 1"
+
+
+def render_config(path, size, scale, interactive=False):
     width, height = size
     text = CONFIG_TEMPLATE.read_text()
     text = text.replace("@WIDTH@", str(width)).replace("@HEIGHT@", str(height)).replace("@SCALE@", scale)
+    if interactive:
+        # L6 (Feature 003 T011): the nested window on the host is the only output, so a human can use the real trackpad on
+        # it. No headless output is created and captures are refused in this mode.
+        if text.count(INTERACTIVE_RULE_OFF) != 1:
+            raise Failed("config template has no single WAYLAND-1 disable rule")
+        text = text.replace(INTERACTIVE_RULE_OFF, INTERACTIVE_RULE_ON)
     path.write_text(text)
 
 
@@ -260,7 +270,7 @@ def start(args):
     for name in ("config", "state", "cache"):
         (session / name).mkdir(mode=0o700)
     config = session / "hyprland.conf"
-    render_config(config, args.size, args.scale)
+    render_config(config, args.size, args.scale, args.interactive)
 
     env = os.environ.copy()
     env.pop("HYPRLAND_INSTANCE_SIGNATURE", None)
@@ -301,6 +311,7 @@ def start(args):
             "wayland_display": display, "runtime_directory": str(runtime), "compositor_pid": pid,
             "process_start": process_start(pid), "launcher_pid": launcher.pid, "launcher_start": launcher_start,
             "session_directory": str(session), "size": list(args.size), "scale": args.scale, "children": [],
+            "interactive": bool(args.interactive),
         }
         write_private(session_file(), data)
         verify(data)
@@ -318,6 +329,10 @@ def start(args):
                                capture_output=True, text=True).stdout.strip()
         if reply != "ok":
             raise Failed(f"could not dismiss startup notifications: {reply!r}")
+        if args.interactive:
+            print(f"nested {args.variant} ready (interactive, no headless output, captures refused): {signature} on {display}; "
+                  f"pid={pid}; session={session}")
+            return EXIT_OK
         # Fixed-size headless output (config rule HVX-1); the host-sized Wayland output is disabled by the config.
         # It is created after exec-once, as in Sprint 1: created earlier, the cursor starts centred on HVX-1 and is
         # drawn into every capture (GATE-A frames then differ from the Sprint 1 baseline by the cursor sprite).
@@ -468,6 +483,8 @@ def dispatch(args):
 
 def capture(args):
     data = verify(read_session())
+    if data.get("interactive"):
+        raise Failed("captures are refused in an interactive (L6) session")
     path = Path(args.path)
     kind = "ppm" if path.suffix == ".ppm" else "png"
     return subprocess.run(["grim", "-t", kind, "-o", OUTPUT, str(path)], env=nested_env(data)).returncode
@@ -566,6 +583,7 @@ def main(argv):
     p.add_argument("--scale", default="1")
     p.add_argument("--binary")
     p.add_argument("--lock-timeout", type=int, default=3600)
+    p.add_argument("--interactive", action="store_true", help="L6 only: keep the visible nested window, no headless output")
     p.set_defaults(handler=start)
     p = commands.add_parser("run")
     p.add_argument("--background", action="store_true")
