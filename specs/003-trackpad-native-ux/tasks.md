@@ -70,7 +70,7 @@ description: "Task list for Feature 003 — Trackpad-Native Drift UX, Claude Cod
 
 ### Policy skeleton
 
-- [ ] T015 Add `platform/plugin/src/policy/Gesture.cpp` and declarations in `Plugin.hpp`: listeners for `input.mouse.axis` (finger source only), `gesture.swipe.*`, `gesture.pinch.*`; config values `plugin:hyprvx:pan_factor` (1.0, "finite, > 0"), `plugin:hyprvx:glide` (0.5, "finite, in [0, 1]"), `plugin:hyprvx:glide_min_speed` (100, "finite, ≥ 0"), each "invalid value → default, one log line"; `shutdownGesture()` on unload. Every target is `PassThrough` for now; listeners return at once when no monitor is in Drift and no session is open. Build forms P and S; run `t_plugin_inert.sh` (no regression)
+- [X] T015 Add `platform/plugin/src/policy/Gesture.cpp` and declarations in `Plugin.hpp`: listeners for `input.mouse.axis` (finger source only), `gesture.swipe.*`, `gesture.pinch.*`; config values `plugin:hyprvx:pan_factor` (1.0, "finite, > 0"), `plugin:hyprvx:glide` (0.5, "finite, in [0, 1]"), `plugin:hyprvx:glide_min_speed` (100, "finite, ≥ 0"), each "invalid value → default, one log line"; `shutdownGesture()` on unload. Every target is `PassThrough` for now; listeners return at once when no monitor is in Drift and no session is open. Build forms P and S; run `t_plugin_inert.sh` (no regression)
 
 ---
 
