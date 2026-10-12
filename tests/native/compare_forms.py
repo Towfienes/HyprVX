@@ -12,6 +12,11 @@ For every (test, scale) present in both suites, every capture (*.png) that both 
 byte-identical (sha256). Excluded, with the reason recorded in the output:
   - t_ws_anim control-early.png: a frame in the middle of a workspace animation with Drift OFF, so its content
     depends on the capture time, not on the delivery form.
+  - Feature 003 glide captures: t_glide c1/c2/c3/c7.png (the end of a glide) and t_glide_stop
+    {scroll,click,key,workspace}-{a,b}.png (a glide interrupted mid-way). Where a glide ends depends on the frame
+    times (the last step below stopSpeed) and where an interrupt lands on its timing; two form P runs of the same
+    plugin source already differ (T039 record). Each run judges them itself: +-2 px of expectedGlide, and two captures
+    300 ms apart identical after an interrupt.
   - t_plugin_inert p<N>-<plugin>-*.png: named after the plugin under test (form P loads P, form S loads S and S-dev), so
     the two runs have no common name; each is judged 0 px against reference.png of its own run, and the two
     reference.png are compared here, which makes them equal across forms by transitivity.
@@ -25,6 +30,11 @@ from pathlib import Path
 import sys
 
 EXCLUDED = {("t_ws_anim", "control-early.png"): "mid-animation frame with Drift OFF (timing-dependent)"}
+_GLIDE_END = "end of a glide: position depends on frame times (judged in-test, +-2 px of expectedGlide)"
+_GLIDE_STOP = "glide interrupted mid-way: position depends on the interrupt time (judged in-test: still picture)"
+EXCLUDED.update({("t_glide", f"c{i}.png"): _GLIDE_END for i in (1, 2, 3, 7)})
+EXCLUDED.update({("t_glide_stop", f"{case}-{ab}.png"): _GLIDE_STOP
+                 for case in ("scroll", "click", "key", "workspace") for ab in ("a", "b")})
 EVIDENCE = Path.home() / ".local/share/hyprvx/evidence/claude"
 
 
