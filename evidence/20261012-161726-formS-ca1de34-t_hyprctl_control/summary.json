@@ -1,0 +1,16 @@
+{
+  "run_id": "20261012-161726-formS-ca1de34-t_hyprctl_control",
+  "test": "t_hyprctl_control",
+  "result": "BLOCKED",
+  "agent": "claude",
+  "git_sha": "ca1de34c4730de2d56b295bba869345863c6708d",
+  "note": "nested stock session did not start",
+  "artifacts": [
+    "build-info-stock.json",
+    "preflight.log",
+    "session.log"
+  ],
+  "not_run": [
+    "nested stock session did not start"
+  ]
+}
