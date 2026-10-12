@@ -76,6 +76,8 @@ hvx_analyze end-vs-start diff "$HVX_EVID/end.png" --reference "$HVX_EVID/start.p
     || fail "2: the camera did not return exactly after the symmetric 3-finger gestures"
 clients_state after
 cmp -s "$HVX_EVID/before.state" "$HVX_EVID/after.state" || fail "2: a 3-finger gesture in Drift changed a window (close, float or fullscreen)"
+# The socket2 logger writes asynchronously: give any action event of the Drift phase time to arrive before cutting.
+sleep 1
 drift_lines=$(wc -l < "$HVX_EVID/events.log")
 head -n "$drift_lines" "$HVX_EVID/events.log" | grep -E '^(fullscreen|closewindow|changefloatingmode|activespecial|activespecialv2)>>' \
     > "$HVX_EVID/drift-actions.log" || true
@@ -101,11 +103,20 @@ hvx_dispatch hyprvx:off > "$HVX_EVID/off.reply" 2>&1 || true
 tp_run focus-a2 "move 290 200" "click" "move 480 300"
 ctl_from=$(wc -l < "$HVX_EVID/events.log")
 ctl_events() { tail -n +"$((ctl_from + 1))" "$HVX_EVID/events.log" | grep -c "^$1>>" || true; }
+# ctl_seen EV: the socket2 logger writes asynchronously, so wait up to 3 s for the event after the control gesture.
+ctl_seen() {
+    local i
+    for i in $(seq 1 30); do
+        (($(ctl_events "$1") >= 1)) && return 0
+        sleep 0.1
+    done
+    return 1
+}
 swipe 3 0 -10
-(($(ctl_events fullscreen) >= 1)) || hvx_die_blocked "control: 3 up made no fullscreen event with Drift off (check vacuous)"
+ctl_seen fullscreen || hvx_die_blocked "control: 3 up made no fullscreen event with Drift off (check vacuous)"
 hvx_dispatch fullscreen > "$HVX_EVID/ctl-fs-off.reply" 2>&1 || true
 swipe 3 -10 0
-(($(ctl_events changefloatingmode) >= 1)) || hvx_die_blocked "control: 3 left made no floating change with Drift off (check vacuous)"
+ctl_seen changefloatingmode || hvx_die_blocked "control: 3 left made no floating change with Drift off (check vacuous)"
 swipe 3 0 10
 clients_state ctl-down
 (($(wc -l < "$HVX_EVID/ctl-down.state") == $(wc -l < "$HVX_EVID/before.state") - 1)) \

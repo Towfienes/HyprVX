@@ -30,6 +30,17 @@
   V3 (Features 003–009). The clone `HyprVX-v3-agy` is kept untouched as a reference.
 - V-20 / SC-005: PASS, signed by the user (Towfienes) on 2026-10-11 in `checklists/verification.md`.
 
+## Feature 003 resume point (2026-10-12, in progress)
+
+- Done with evidence: T001–T023 (V-01..V-07, V-02, V-03; US1 suite `20261012-083722-suite-5d254f9-feature003`).
+- Implemented, form P scale 1 runs PASS, archive pending: T026 pinch (t_pinch, t_cancel), T030 swipe (t_cancel, t_tp_surfaces).
+- Test fixes in flight: t_arbitrate controls wait for async socket2 events; t_tp_off uses b for the ready rule after the
+  close binding and compares the active workspace after the 4-finger swipe (the old version hung writing to a closed
+  client's FIFO; killed PID-checked, session stopped with nested.sh stop).
+- T036/T037 glide code written in Gesture.cpp/Input.cpp/Session.cpp (not yet built/tested); US4 tests t_glide,
+  t_glide_stop, t_tp_modes, t_tp_drag written. Next: build P, run US3+US4 tests, then T031/T038 suites (both scales),
+  T039 form S + parity, T040 t_fr020, T041–T048 gate (T045 L6 needs the user).
+
 ## Sprint 1 goal
 
 Prove that a real window surface is scaled and panned pixel-correctly in a nested, patched Hyprland while the
