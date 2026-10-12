@@ -53,12 +53,13 @@ tp_capture move
 tp_box move a "240,100,300,200" 1 || fail "2: a did not move by exactly (100,0) during the move drag"
 tp_box move c "520,320,300,200" 1 || fail "2: c moved during a's move drag"
 
-# 3. drag begins during a scroll sequence (a's offset from step 2 stays; judge c and b)
+# 3. drag begins during a scroll sequence (a's offset from step 2 stays; judge c and b). The pointer is on the canvas
+# point of f003_lib.sh: (480,300) is inside a's border grab area once step 2 moved a to (240,100).
 hvx_dispatch hyprvx:reset > "$HVX_EVID/reset3.reply" 2>&1 || true
 T=$(tp_next_time)
-tp_run s3a "move 480 300" "fscroll $T 10 5 0 5"
+tp_run s3a "move $TP_CANVAS_X $TP_CANVAS_Y" "fscroll $T 10 5 0 5"
 hvx_key kb down KEY_LEFTMETA
-tp_run s3b "down" "move 430 300"
+tp_run s3b "down" "move $((TP_CANVAS_X - 50)) $TP_CANVAS_Y"
 tp_run s3c "fscroll $((T + 50)) 10 5 0 5 stop"
 tp_run s3d "up"
 hvx_key kb up KEY_LEFTMETA

@@ -16,7 +16,7 @@ Make the trackpad the primary navigation of Drift Mode, entirely in the policy p
 - **Arbitration**: on a Drift monitor every 3-finger swipe and pinch is consumed before Hyprland's `gesture =`
   bindings and before client delivery; 4-finger gestures stay stock (R1, R4).
 - **Glide**: a released pan continues with exponential decay, integrated by V1 `CameraController` (closed form), driven
-  by `render.pre` only while moving, interrupted by any input or mode change (R5, R6).
+  by `render.preChecks` only while moving, interrupted by any input or mode change (R5, R6).
 - **Delivery**: no mechanism or patch change; forms P and S share the policy and must give byte-identical captures
   (R10). Test-only additions: vpointer `fscroll`, test-client gesture logging, and the `hyprvx-testinput` plugin
   (`hvxtest`) for synthetic gestures and frame counts (R9).
@@ -50,7 +50,7 @@ Make the trackpad the primary navigation of Drift Mode, entirely in the policy p
 | III Normal equivalence | PASS | Drift off consumes nothing (T-TP-OFF: captures and client logs equal to stock); the config gesture bindings are identical for every variant |
 | IV Single transform | PASS | Camera changes only via `panByScreen`, `anchorZoom` (inside `pinchCamera`) and `DriftModel`; no new equation; lint covers the new policy files |
 | V Reversibility | PASS | Trackpad input changes cameras only; offsets, `L(w)`, workspace and layout untouched; 4-finger workspace swipe is Hyprland's own action |
-| VI Performance | PASS (measurement deferred) | Event-driven listeners; glide advances on `render.pre` only while moving and stops producing frames at rest (T-GLIDE frame count) |
+| VI Performance | PASS (measurement deferred) | Event-driven listeners; glide advances on `render.preChecks` only while moving and stops producing frames at rest (T-GLIDE frame count) |
 | VII Caelestia | PASS (layers) / NOT RUN (Caelestia) | Sequences over layer surfaces pass through; no synthetic Hyprland events (the test plugin is test-only) |
 | VIII Reuse | PASS | `CameraMath`, `DriftModel`, V1 `CameraController`/`Camera` for glide; V1 `GestureNavigationAdapter` rejected with source evidence (R12) |
 | IX License | PASS | No third-party code copied; pointer-gestures XML is generated from the system package at build time (as `CMakeLists.txt:194` already does) |
@@ -73,7 +73,7 @@ specs/003-trackpad-native-ux/
 
 ```text
 core/include/hyprvx/core/GestureModel.hpp   # NEW pure model (+ core/src/GestureModel.cpp, tests/unit/test_gesture_model.cpp)
-platform/plugin/src/policy/Gesture.cpp      # NEW: scroll/gesture listeners, sessions, glide on render.pre
+platform/plugin/src/policy/Gesture.cpp      # NEW: scroll/gesture listeners, sessions, glide on render.preChecks
 platform/plugin/src/policy/Input.cpp        # glide interruption on button/key/axis; drag ends an open session
 platform/plugin/src/policy/Session.cpp      # glide stop on off/panic/workspace/monitor; "glide" in state; config values
 platform/plugin/src/policy/Plugin.hpp       # declarations
@@ -96,7 +96,7 @@ tests/native/t_tp_*.sh  run_feature003.sh   # §9 tests
 2. **Pan and arbitration (US1, US3)**: policy sessions, finger scroll pan, 3-finger consumption, 4-finger pass-through,
    cancel; tests T-TP-PAN, T-TP-WINDOW, T-TP-SUPER, T-TP-LOCK, T-ARBITRATE, T-TP-SURFACES, T-TP-OFF.
 3. **Pinch (US2)**: zoom sessions; T-PINCH, T-CANCEL.
-4. **Glide (US4)**: release velocity, glide on `render.pre`, interruption; T-GLIDE, T-GLIDE-STOP, T-TP-MODES, T-TP-DRAG.
+4. **Glide (US4)**: release velocity, glide on `render.preChecks`, interruption; T-GLIDE, T-GLIDE-STOP, T-TP-MODES, T-TP-DRAG.
 5. **Form S and parity**: the same suite in form S; P/S byte comparison; T-FR020.
 6. **Gate**: full suites (Feature 003, 002, 001) in both forms; clean-room rebuild (R1); host-safety audit; L6
    session with the user; verification checklist; merge-readiness review; STOP at the Feature 003 gate.

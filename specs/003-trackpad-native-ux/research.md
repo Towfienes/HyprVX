@@ -120,11 +120,16 @@ All source references are Hyprland `efb50993780079460b0cbed1363e2166a2de1d9f` (t
 
 ## R6. Driving glide frames without polling
 
-- **Decision**: while a glide is active, the policy listens to `render.pre` (`src/event/EventBus.hpp:134-138`,
-  emitted per monitor per frame) for the glide's monitor, advances the controller by the time since the previous
-  step (steady clock), and applies the pan. The pan changes the camera, which damages the monitor through the
-  mechanism, so the next frame is scheduled; when the glide stops nothing changes and no further frames are
-  produced (Constitution VI). The first step is triggered by the release itself.
+- **Decision**: while a glide is active, the policy listens to `render.preChecks` (`src/event/EventBus.hpp`,
+  emitted per monitor at the start of every frame attempt, before the damage check) for the glide's monitor,
+  advances the controller by the time since the previous step (steady clock), applies the pan and schedules the
+  next frame. The pan changes the camera, which damages the monitor through the mechanism, so that frame renders;
+  when the glide stops nothing changes and no further frames are produced (Constitution VI). The first step is
+  triggered by the release itself.
+- **Correction (T036, 2026-10-12)**: this decision first named `render.pre`. Hyprland emits `render.pre` only after
+  the damage check (`src/render/Renderer.cpp` renderMonitor), so a step there cannot supply the damage that keeps the
+  next frame alive: in the first T-GLIDE run a 3.5 s glide got two frames and stalled. `render.preChecks` is the same
+  point where Hyprland's animation manager ticks. The behavior requirement is unchanged.
 - **Verification**: a frame counter in the test-only plugin (R9) counts `render.pre` per monitor; the test checks
   that the count stops increasing after the glide ends.
 - **Alternatives considered**: an event-loop timer (produces wakeups with no damage); `hyprctl` from the test

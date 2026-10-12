@@ -4,7 +4,10 @@
 # consumed gesture (a Super + pinch over a, so its events would reach a if released mid-way) and of a consumed finger
 # scroll (Super + scroll over a):
 #  - the remaining events stay consumed: a logs no pinch and no scroll event from that sequence;
-#  - after the change the capture equals off-ref (Drift is off, camera identity), the compositor still answers;
+#  - after the change the capture equals off-ref (Drift is off, camera identity), the compositor still answers. For the
+#    output removal the reference is Hyprland's own window model instead: the round trip through its FALLBACK output
+#    moves the floating windows itself (Feature 002 T-MONITOR: (140,100) -> (139,99)), so each window must be drawn
+#    exactly (0 px) at the position and size `hyprctl clients` reports - the identity camera with no offsets;
 #  - the next pinch over a without Super (Drift off) reaches a (behaves as configured).
 set -euo pipefail
 source "$(dirname -- "${BASH_SOURCE[0]}")/lib.sh"
@@ -16,6 +19,25 @@ hvx_init_run "$(hvx_form_label)" t_tp_modes
 result=PASS
 fail() { echo "$*" >&2; echo "$*" >> "$HVX_EVID/failures.txt"; result=FAIL; }
 count() { grep -cE "\"ev\": \"($1)\"" "$HVX_EVID/a.jsonl" || true; }
+hl_box() { # CLASS: "x,y,w,h" of that client in Hyprland's own window model
+    hvx_hyprctl_form -j clients | python3 -I -c "
+import json, sys
+c = next(c for c in json.load(sys.stdin) if c.get('class') == sys.argv[1])
+print(','.join(str(v) for v in c['at'] + c['size']))" "$1"
+}
+off_picture() { # NAME MODE: the capture NAME is the Drift-off picture (see the header)
+    local name=$1 mode=$2 w cls box
+    if [[ $mode != output ]]; then
+        hvx_analyze "$name-vs-off" diff "$HVX_EVID/$name.png" --reference "$HVX_EVID/off-ref.png" --max-pixels 0
+        return
+    fi
+    for w in a b c; do
+        cls=hyprvx-testclient; [[ $w == a ]] || cls=hyprvx-testclient-$w
+        box=$(hl_box "$cls") || return 1
+        echo "$name $w hyprland box $box" >> "$HVX_EVID/hl-boxes.txt"
+        tp_box "$name" "$w" "$box" 0 || return 1
+    done
+}
 
 tp_setup --no-drift
 tp_run over-a "move 290 200"
@@ -48,7 +70,7 @@ for mode in off panic output; do
     (($(count 'pinch_begin|pinch_update|pinch_end') == before)) || fail "$mode: a received events of a consumed pinch"
     tp_run "$mode-p-back" "move 290 200"
     tp_capture "$mode-pinch"
-    hvx_analyze "$mode-pinch-vs-off" diff "$HVX_EVID/$mode-pinch.png" --reference "$HVX_EVID/off-ref.png" --max-pixels 0 \
+    off_picture "$mode-pinch" "$mode" \
         || fail "$mode: the capture after the change mid-pinch is not the Drift-off picture"
     # next pinch over a, Drift off: delivered
     before=$(count 'pinch_begin')
@@ -67,7 +89,7 @@ for mode in off panic output; do
     tp_run "$mode-s2" "move 290 200" "fscroll $((T + 50)) 10 5 0 5 stop"
     (($(count 'axis') == before)) || fail "$mode: a received events of a consumed scroll sequence"
     tp_capture "$mode-scroll"
-    hvx_analyze "$mode-scroll-vs-off" diff "$HVX_EVID/$mode-scroll.png" --reference "$HVX_EVID/off-ref.png" --max-pixels 0 \
+    off_picture "$mode-scroll" "$mode" \
         || fail "$mode: the capture after the change mid-scroll is not the Drift-off picture"
 done
 

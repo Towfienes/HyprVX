@@ -4,7 +4,8 @@
 #   a slow finger scroll (below glide_min_speed, so it starts no glide of its own), a click on canvas, a key press,
 #   hyprvx:off, hyprvx:panic, a workspace switch, and finally removal of the output.
 # Setup validity: right after the start the frame count must still be growing (the glide is running), else BLOCKED.
-# After each interrupt the frame count of HVX-1 stops growing within 1 s and two captures 300 ms apart are identical.
+# After each interrupt the frame count of HVX-1 stops growing within 1 s and two captures 300 ms apart are identical
+# (the workspace case takes them after returning to workspace 1, where the scene clients are visible).
 # After the output removal the compositor still answers (hyprctl) and Drift is off once the output is re-added.
 set -euo pipefail
 source "$(dirname -- "${BASH_SOURCE[0]}")/lib.sh"
@@ -28,8 +29,11 @@ start_glide() { # NAME: reset, Drift on, glide started and seen running
     f1=$(hvx_frames HVX-1)
     ((f1 > f0)) || hvx_die_blocked "$1: no glide running after the release (check vacuous)"
 }
-stopped() { # NAME: frames stop and the picture is still
+stopped() { # NAME [back]: frames stop and the picture is still; back = return to workspace 1 before the captures
     tp_wait_still "$1-still" 1 || { fail "$1: frames kept being produced after the interrupt"; return; }
+    # The scene clients live on workspace 1; on another workspace they are hidden and get no frame callbacks, so the
+    # captures (ready rule) are taken after returning. The glide must not resume there.
+    [[ ${2:-} == back ]] && hvx_dispatch workspace 1 > "$HVX_EVID/$1-back.reply" 2>&1
     tp_capture "$1-a"
     sleep 0.3
     tp_capture "$1-b"
@@ -62,8 +66,7 @@ stopped panic
 
 start_glide workspace
 hvx_dispatch workspace 2 > "$HVX_EVID/ws2.reply" 2>&1 || true
-stopped workspace
-hvx_dispatch workspace 1 > "$HVX_EVID/ws1.reply" 2>&1 || true
+stopped workspace back
 
 start_glide output
 hvx_hyprctl_form output remove HVX-1 > "$HVX_EVID/output-remove.reply" 2>&1 || true

@@ -79,7 +79,7 @@ cmp -s "$HVX_EVID/before.state" "$HVX_EVID/after.state" || fail "2: a 3-finger g
 # The socket2 logger writes asynchronously: give any action event of the Drift phase time to arrive before cutting.
 sleep 1
 drift_lines=$(wc -l < "$HVX_EVID/events.log")
-head -n "$drift_lines" "$HVX_EVID/events.log" | grep -E '^(fullscreen|closewindow|changefloatingmode|activespecial|activespecialv2)>>' \
+head -n "$drift_lines" "$HVX_EVID/events.log" | grep -E '^[0-9]+ (fullscreen|closewindow|changefloatingmode|activespecial|activespecialv2)>>' \
     > "$HVX_EVID/drift-actions.log" || true
 [[ ! -s $HVX_EVID/drift-actions.log ]] || fail "2: a 3-finger gesture in Drift triggered a compositor action (drift-actions.log)"
 
@@ -102,7 +102,7 @@ hvx_analyze ws1-camera-kept diff "$HVX_EVID/ws1-after.png" --reference "$HVX_EVI
 hvx_dispatch hyprvx:off > "$HVX_EVID/off.reply" 2>&1 || true
 tp_run focus-a2 "move 290 200" "click" "move 480 300"
 ctl_from=$(wc -l < "$HVX_EVID/events.log")
-ctl_events() { tail -n +"$((ctl_from + 1))" "$HVX_EVID/events.log" | grep -c "^$1>>" || true; }
+ctl_events() { tail -n +"$((ctl_from + 1))" "$HVX_EVID/events.log" | grep -cE "^[0-9]+ $1>>" || true; }
 # ctl_seen EV: the socket2 logger writes asynchronously, so wait up to 3 s for the event after the control gesture.
 ctl_seen() {
     local i

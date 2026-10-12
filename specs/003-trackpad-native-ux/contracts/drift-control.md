@@ -29,7 +29,7 @@ Drift, consumed events change nothing.
 - Pan end (scroll stop on both axes, or swipe end): if `plugin:hyprvx:glide > 0` and the release speed
   (`ReleaseVelocity`) is at least `glide_min_speed`, a glide starts (`Glide`); otherwise the camera stays.
 - A glide stops at once on any axis event, gesture begin, mouse button, key, `hyprvx:off`/`toggle`/`panic`,
-  workspace change on its monitor, or monitor removal. It advances only on `render.pre` of its monitor.
+  workspace change on its monitor, or monitor removal. It advances only on `render.preChecks` of its monitor (frame attempts while it moves).
 - Wheel, continuous and tilt scroll sources keep the 1.0 behavior (Super + wheel zooms; otherwise delivered).
 
 ## Config values (added)

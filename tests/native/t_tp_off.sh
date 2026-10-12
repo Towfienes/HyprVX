@@ -39,6 +39,7 @@ scene() {
     tp_capture "$p-swipe3-left"
     gesture swipe 3 "3 0 10" "$TP_CANVAS_X $TP_CANVAS_Y"
     tp_capture "$p-swipe3-down" b   # the close binding closed a; b drives the ready rule
+    TP_CLIENTS=(b c)   # a is gone: pointer_driver must not sync on it (its FIFO has no reader)
     gesture swipe 4 "4 -60 0" "$TP_CANVAS_X $TP_CANVAS_Y"
     # The new workspace has no client to drive a ready rule: compare the active workspace instead of a capture.
     hvx_hyprctl_form -j activeworkspace | python3 -I -c "import json, sys; print(json.load(sys.stdin)['id'])" > "$HVX_EVID/$p.ws"
@@ -60,6 +61,7 @@ scene stock
 for w in a b c; do [[ -f $HVX_EVID/$w.jsonl ]] && mv "$HVX_EVID/$w.jsonl" "$HVX_EVID/stock.$w.jsonl"; done
 hvx_stop >> "$HVX_EVID/stock.session.log" 2>&1 || hvx_die_blocked "stock session did not stop"
 
+TP_CLIENTS=(a b c)
 tp_setup --no-drift
 scene off
 for step in start canvas window pinch-canvas pinch-a swipe3-left swipe3-down; do

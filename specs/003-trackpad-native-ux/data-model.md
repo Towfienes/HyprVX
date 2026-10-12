@@ -36,7 +36,7 @@ open ──Drift off | panic | workspace change | monitor removed──► open 
 |---|---|---|
 | `monitor`, `workspace` | ids | from the session that started it |
 | `glide` | `Glide` | started with the release velocity and the current `GlideConfig` |
-| `lastStep` | steady-clock time | set at start; each `render.pre` of the monitor steps by now − lastStep |
+| `lastStep` | steady-clock time | set at start; each `render.preChecks` of the monitor steps by now − lastStep |
 
 - Stops on: any axis event, gesture begin, button, key, Drift off/toggle/panic, workspace change on its monitor,
   monitor removal, plugin unload, or `Glide::active() == false`.

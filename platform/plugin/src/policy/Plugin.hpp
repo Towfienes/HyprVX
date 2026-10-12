@@ -78,4 +78,8 @@ namespace HyprVXPolicy {
     double panFactor();
     // plugin:hyprvx:glide and glide_min_speed as a GlideConfig (defaults if invalid, one log line each).
     hyprvx::drift::GlideConfig glideConfig();
+    // FR-016: stops a running glide at once (inputs, mode changes, workspace change, monitor removal).
+    void stopGlide();
+    // True while a glide runs on the monitor (bookkeeping for `hyprctl hyprvx state`).
+    bool glideActive(MONITORID monitor);
 }

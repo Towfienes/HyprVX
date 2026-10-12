@@ -47,6 +47,7 @@ namespace {
 
 
     void onKey(const IKeyboard::SKeyEvent& event, Event::SCallbackInfo& info) {
+        HyprVXPolicy::stopGlide();  // Feature 003 FR-016: any key stops a glide
         if (!HyprVXPolicy::anyDrift())
             return;
         if (event.keycode != KEY_ESC || event.state != WL_KEYBOARD_KEY_STATE_PRESSED)
@@ -73,6 +74,7 @@ namespace {
     }
 
     void onButton(const IPointer::SButtonEvent& event, Event::SCallbackInfo& info) {
+        HyprVXPolicy::stopGlide();  // Feature 003 FR-016: any button stops a glide
         if (event.button != BTN_LEFT)
             return;
         if (event.state == WL_POINTER_BUTTON_STATE_RELEASED) {
