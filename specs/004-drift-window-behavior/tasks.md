@@ -14,8 +14,6 @@ description: "Task list for Feature 004 — DriftWM Window Behavior, Claude Code
 **Status**: generated 2026-10-12; analyze remediation C10 (HIGH), C5, C1, C2, C4 applied and re-analyzed (no CRITICAL/HIGH);
 **approved by the user on 2026-10-12** with the key-binding and instant-camera choices, on the condition met above.
 
-**Status**: generated 2026-10-12; needs the user's approval before `/speckit-implement`.
-
 **Tests**: REQUIRED (Constitution II).
 - Tests are written from the spec and contracts before the code they judge.
 - Every PASS needs raw evidence that is checksum-verified and archived into
@@ -44,8 +42,8 @@ description: "Task list for Feature 004 — DriftWM Window Behavior, Claude Code
 
 ## Phase 1: Setup
 
-- [ ] T001 Create `specs/004-drift-window-behavior/integration-log.md` (Feature 003 columns) and `checklists/verification.md` with V-01..V-17 all NOT RUN: V-01 unit (WindowBehavior + DriftModel group drag), V-02 identity refusal incl. new vkeyboard keys, V-03 T-SNAP, V-04 T-SNAP-OSC, V-05 T-GROUP, V-06 T-NAV, V-07 T-WB-OFF, V-08 T-PIN, V-09 P/S parity, V-10 Feature 003 regression, V-11 Feature 002 regression, V-12 Feature 001 regression, V-13 clean-room R1 + reproducibility, V-14 host-safety audit, V-15 single-transform lint incl. 0014 and WindowBehavior, V-16 GATE-A on the new patched prefix, V-17 plugin inert (both forms)
-- [ ] T002 Register `core/src/WindowBehavior.cpp` in the `hyprvx_core` sources and `tests/unit/test_window_behavior.cpp` in the unit-test target (`CMakeLists.txt`), then a fresh build + `ctest` (existing 367 tests still pass)
+- [X] T001 Create `specs/004-drift-window-behavior/integration-log.md` (Feature 003 columns) and `checklists/verification.md` with V-01..V-17 all NOT RUN: V-01 unit (WindowBehavior + DriftModel group drag), V-02 identity refusal incl. new vkeyboard keys, V-03 T-SNAP, V-04 T-SNAP-OSC, V-05 T-GROUP, V-06 T-NAV, V-07 T-WB-OFF, V-08 T-PIN, V-09 P/S parity, V-10 Feature 003 regression, V-11 Feature 002 regression, V-12 Feature 001 regression, V-13 clean-room R1 + reproducibility, V-14 host-safety audit, V-15 single-transform lint incl. 0014 and WindowBehavior, V-16 GATE-A on the new patched prefix, V-17 plugin inert (both forms)
+- [X] T002 Register `core/src/WindowBehavior.cpp` in the `hyprvx_core` sources and `tests/unit/test_window_behavior.cpp` in the unit-test target (`CMakeLists.txt`), then a fresh build + `ctest` (existing 367 tests still pass)
 
 ---
 
