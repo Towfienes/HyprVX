@@ -169,7 +169,8 @@ produced once the glide ends, and the setting 0 produces no glide.
 - Pinch combined with finger movement (rotation or translation): only scale is used; rotation is ignored; the anchor
   is the pointer position at the start of the pinch.
 - Fullscreen window on the Drift monitor: Feature 002 renders it at identity; trackpad pans and pinches are not
-  consumed while it is fullscreen, so the application gets them.
+  consumed while it is fullscreen, so the application gets them; 3-finger gestures are still consumed (no effect),
+  so no window action fires.
 - A 3-finger gesture while a Super + drag (pan or move) is in progress: the drag keeps priority; the gesture is
   consumed and ignored.
 - Invalid values from a device (non-finite deltas or scale ≤ 0): ignored, camera unchanged, one log line.
@@ -187,9 +188,11 @@ produced once the glide ends, and the setting 0 produces no glide.
   Drift Mode; with Drift off behavior and captures stay identical to stock (Constitution III).
 - **FR-002**: The decision of what a scroll sequence or gesture does (pan or zoom the canvas, deliver to a window,
   deliver to a layer surface, or leave to the compositor) MUST be made when it begins, from the surface under the
-  pointer and the modifier state at that moment, and MUST be kept until it ends or is cancelled.
-- **FR-003**: Sequences that begin over a layer surface or over a fullscreen window MUST be delivered as in stock and
-  never move the camera.
+  pointer and the modifier state at that moment, and MUST be kept until it ends or is cancelled; the monitor under
+  the pointer at begin owns the sequence until it ends.
+- **FR-003**: Sequences that begin over a layer surface or while a fullscreen window is on the scene MUST be delivered
+  as in stock and never move the camera, except 3-finger gestures on a Drift monitor, which are consumed without
+  effect (FR-010).
 
 **Pan**
 
@@ -200,8 +203,8 @@ produced once the glide ends, and the setting 0 produces no glide.
   begins and MUST NOT be delivered to any window.
 - **FR-006**: In Drift, a two-finger scroll sequence that begins over a window without Super MUST be delivered to
   that window exactly as in Normal Mode.
-- **FR-007**: In Drift, a 3-finger swipe MUST pan the canvas like a two-finger pan, if the input stack delivers
-  3-finger swipes (U4).
+- **FR-007**: In Drift, a 3-finger swipe MUST pan the canvas by the finger distance times the pan factor (content
+  follows the fingers), if the input stack delivers 3-finger swipes (U4).
 
 **Zoom**
 
@@ -213,9 +216,11 @@ produced once the glide ends, and the setting 0 produces no glide.
 **Arbitration and cancel**
 
 - **FR-010**: On a monitor in Drift, 3-finger swipes and pinches MUST NOT trigger any compositor gesture binding
-  (close, fullscreen, float, special workspace or any other 3-finger action); they are consumed by Drift navigation.
-- **FR-011**: 4-finger horizontal swipes MUST keep their configured workspace behavior in Drift; the camera of each
-  workspace is kept as in Feature 002.
+  (close, fullscreen, float, special workspace or any other 3-finger action), wherever they begin; they pan or zoom
+  the canvas, and over a layer surface, with a fullscreen window or during a Super + drag they are consumed without
+  effect.
+- **FR-011**: 4-finger (and more) swipes and pinches MUST keep their configured behavior in Drift, including the
+  workspace swipe; the camera of each workspace is kept as in Feature 002.
 - **FR-012**: A cancelled gesture MUST restore the camera to its state at the start of that gesture and MUST NOT
   start a glide.
 - **FR-013**: Leaving Drift, panic, a workspace change or loss of the monitor during a gesture or glide MUST end it
@@ -239,12 +244,13 @@ produced once the glide ends, and the setting 0 produces no glide.
   dispatchers (pan by screen distance, anchor zoom); no new camera equation (Constitution IV).
 - **FR-019**: Automated tests MUST drive scrolls and gestures only into the verified nested session (nested-only
   input; never uinput or ydotool) and MUST include a nested config that reproduces the user's 3- and 4-finger
-  bindings, so that arbitration is tested against the real conflict.
+  window-action bindings, so that arbitration is tested against the real conflict; bindings that run commands (such
+  as the host's suspend) are never copied.
 - **FR-020**: Any synthetic gesture input used for tests MUST exist only in test-only artifacts that are never part
   of a delivery form and are loaded only into verified nested sessions; delivery builds MUST refuse it (unknown
   command), like the dev control of Features 001 and 002.
-- **FR-021**: Physical-hardware validation (L6) MUST be done by a human with the real trackpad in a nested session
-  following a written checklist. It covers everything that physically reaches a nested session (two-finger pan over
+- **FR-021**: Physical-hardware validation (L6) MUST be done by a human with the real trackpad in a visible nested
+  session started by the harness, following a written checklist. It covers everything that physically reaches a nested session (two-finger pan over
   canvas and over windows, Super + two-finger pan, glide and its interruption, Drift off = stock scrolling). Physical
   pinch, 3-finger and U4 items are recorded BLOCKED (environment) with the automated nested evidence attached and
   carried forward to the first approved session with HyprVX in a compositor that owns the trackpad; the gate is signed

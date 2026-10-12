@@ -18,11 +18,12 @@ Drift, consumed events change nothing.
 | Two-finger scroll over a window, no Super | PassThrough | stock delivery (same values) |
 | Pinch (2 fingers) on empty canvas, or Super + pinch anywhere | Zoom | `C = pinchCamera(C0, M, a0, scale)` per update; `a0` = pointer at begin |
 | Pinch (2 fingers) over a window, no Super | PassThrough | stock delivery (browser zoom etc.) |
-| 3-finger swipe, anywhere | Pan | `C = panByScreen(C, delta)` per update |
+| 3-finger swipe, anywhere | Pan | `C = panByScreen(C, delta · pan_factor)` per update (content follows the fingers) |
 | 3-finger pinch, anywhere | Zoom | as pinch |
 | 4+-finger swipe or pinch | PassThrough | stock (`gesture = 4, horizontal, workspace` keeps working) |
-| Any of the above over a top/overlay layer or layer popup, or with a fullscreen window on the scene | PassThrough | stock |
-| Any of the above while a Super + drag is in progress | Ignore | consumed, no effect |
+| 3-finger swipe or pinch over a top/overlay layer or layer popup, with a fullscreen window on the scene, or during a Super + drag | Ignore | consumed, no effect (no `gesture =` binding fires) |
+| 2-finger scroll or pinch over a top/overlay layer or layer popup, or with a fullscreen window on the scene | PassThrough | stock |
+| 2-finger scroll or pinch while a Super + drag is in progress | Ignore | consumed, no effect |
 
 - Cancelled gesture (`end` with `cancelled`): camera back to its value at begin; no glide.
 - Pan end (scroll stop on both axes, or swipe end): if `plugin:hyprvx:glide > 0` and the release speed

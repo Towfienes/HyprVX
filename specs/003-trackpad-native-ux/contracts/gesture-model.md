@@ -28,16 +28,20 @@ Rules, first match wins:
 
 | # | Condition | Target |
 |---|---|---|
-| 1 | `!drift` or `layerUnderPointer` or `fullscreenScene` | `PassThrough` |
+| 1 | `!drift` | `PassThrough` |
 | 2 | `kind != Scroll` and `fingers >= 4` | `PassThrough` |
 | 3 | `kind != Scroll` and `fingers < 2` | `PassThrough` |
-| 4 | `dragActive` | `Ignore` |
+| 4 | `kind != Scroll` and `fingers == 3` and (`layerUnderPointer` or `fullscreenScene` or `dragActive`) | `Ignore` |
 | 5 | `kind == Swipe` and `fingers == 3` | `Pan` |
 | 6 | `kind == Pinch` and `fingers == 3` | `Zoom` |
-| 7 | `kind == Swipe` (2 fingers) | `PassThrough` |
-| 8 | `superHeld` | `Pan` for `Scroll`, `Zoom` for `Pinch` |
-| 9 | `windowUnderPointer` | `PassThrough` |
-| 10 | otherwise (empty canvas) | `Pan` for `Scroll`, `Zoom` for `Pinch` |
+| 7 | `layerUnderPointer` or `fullscreenScene` | `PassThrough` |
+| 8 | `dragActive` | `Ignore` |
+| 9 | `kind == Swipe` (2 fingers) | `PassThrough` |
+| 10 | `superHeld` | `Pan` for `Scroll`, `Zoom` for `Pinch` |
+| 11 | `windowUnderPointer` | `PassThrough` |
+| 12 | otherwise (empty canvas) | `Pan` for `Scroll`, `Zoom` for `Pinch` |
+
+A 3-finger gesture on a Drift monitor is never `PassThrough` (FR-010).
 
 `Scroll` ignores `fingers` (a finger-source scroll is a two-finger scroll).
 

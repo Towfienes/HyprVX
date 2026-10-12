@@ -15,7 +15,7 @@ and host safety (spec, plan, research, contracts of Feature 003)
 - [ ] CHK002 Do the "never trigger a 3-finger binding in Drift" requirement and the "layer surface / fullscreen passes through" requirement agree for a 3-finger gesture that begins over a layer surface or with a fullscreen window? [Conflict, Spec §FR-003, §FR-010]
 - [ ] CHK003 Is the set of compositor gesture bindings that must not fire defined by finger count rather than by a fixed list of actions, so that bindings the user adds later are covered? [Clarity, Spec §FR-010]
 - [ ] CHK004 Are 4-finger pinches (not only horizontal swipes) addressed in Drift? [Coverage, Spec §FR-011]
-- [ ] CHK005 Is the behavior of a 2-finger swipe (if a device reports one) specified? [Edge Case, contracts/gesture-model.md rule 7]
+- [ ] CHK005 Is the behavior of a 2-finger swipe (if a device reports one) specified? [Edge Case, contracts/gesture-model.md rule 9]
 
 ## Targeting at begin
 

@@ -70,18 +70,21 @@ All source references are Hyprland `efb50993780079460b0cbed1363e2166a2de1d9f` (t
 
 - **Decision**:
   - At `begin`, the target is decided once:
-    - not in Drift, layer under the pointer, or fullscreen on the scene → pass through;
+    - not in Drift → pass through;
     - 4 or more fingers (swipe or pinch) → pass through (workspace swipe stays stock, FR-011);
-    - a Feature 002 drag in progress → consume and ignore;
-    - 3 fingers → consume (swipe = pan, pinch = zoom), wherever it begins (FR-010);
-    - 2-finger pinch: Super held or empty canvas → zoom; over a window without Super → pass through.
+    - 3 fingers → always consumed (FR-010): over a layer, with a fullscreen window or during a Feature 002 drag it is
+      ignored; otherwise swipe = pan, pinch = zoom (checklist CHK002: a pass-through 3-finger gesture over the bar
+      would run the user's "close" binding in Drift);
+    - 2-finger pinch: layer or fullscreen → pass through; drag in progress → ignore; Super held or empty canvas →
+      zoom; over a window without Super → pass through.
+  - The full ordered table is `contracts/gesture-model.md` `decideTarget`.
   - Pinch: `scale` in `SPinchUpdateEvent` is cumulative from the gesture start (libinput semantics,
     `IPointer.hpp:70-75`). Each update sets the scene camera to
     `anchorZoom(C0, M, a0, z0 · scale, [0.1, 2.0])`, where `C0`, `z0` are the camera at begin and `a0` the pointer
     at begin. Absolute from the start camera means no drift from rounding and makes cancel exact. Rotation and the
     pinch's translation delta are ignored.
-  - Swipe (3 fingers): `screenDelta = +delta` (libinput reports finger motion; content follows the fingers,
-    independent of natural scrolling).
+  - Swipe (3 fingers): `screenDelta = +delta · pan_factor` (libinput reports finger motion; content follows the
+    fingers, independent of natural scrolling; the touchpad scroll factor does not apply to swipes).
   - `end` with `cancelled = true` → the camera is set back to `C0`; no glide.
   - A consumed gesture keeps being consumed until its end even if Drift is turned off meanwhile (otherwise Hyprland
     would get an `update`/`end` without a `begin`); after the monitor leaves Drift no camera change is applied.
