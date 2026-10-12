@@ -26,8 +26,3 @@ SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-Parts of patches/hyprland/ and platform/plugin/src/mechanism/ are derived from
-Hyprland (https://github.com/hyprwm/Hyprland, BSD 3-Clause License,
-Copyright (c) 2022-2026, vaxerski); see
-docs/THIRD_PARTY.md for every third-party source and its notice.

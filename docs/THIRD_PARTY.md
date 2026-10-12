@@ -62,6 +62,13 @@ Do not copy source code based only on assumptions about its license.
   verified nested compositor (test-tooling 1.4 §4b). The complete original notice stays in the vendored XML.
 - Compatibility: permissive with the project's eventual license provided the notice stays with distributed copies.
 
+## Hyprland-derived parts of the repository
+
+The patch series `patches/hyprland/` and the copied function bodies in `platform/plugin/src/mechanism/` are derived
+from Hyprland (https://github.com/hyprwm/Hyprland, commit `efb50993780079460b0cbed1363e2166a2de1d9f`), licensed under
+the BSD 3-Clause License, "Copyright (c) 2022-2026, vaxerski". Redistributions keep that notice. HyprVX's own code is
+BSD 3-Clause as well (`LICENSE`).
+
 ## Hyprland function bodies in the delivery spike plugin (Feature 001 Phase 2, T066)
 
 - Source: Hyprland upstream `efb50993780079460b0cbed1363e2166a2de1d9f` with the HyprVX patch series 0001–0009
