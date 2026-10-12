@@ -43,8 +43,8 @@
 - After T045: T044 host-safety audit (covers the L6 session; the lint part is done), T046 records and quickstart,
   T047 merge-readiness review, T048 Feature 003 gate (user approval).
 - Decided (user, 2026-10-12, DV3-18): continue HyprVX on the master plan; phantomat is a reference only (Phase 5
-  navigation/search UX, Phase 8 linked screens, fullscreen/X11/popup test cases; BSD-3 attribution; copying code needs
-  approval). See `docs/v3/EXTERNAL_PROJECTS_REVIEW.md`.
+  navigation/search UX, Phase 8 linked screens, fullscreen/X11/popup test cases; the user is phantomat's author, no attribution;
+  copying code needs approval). See `docs/v3/EXTERNAL_PROJECTS_REVIEW.md`.
 
 ## Sprint 1 goal
 

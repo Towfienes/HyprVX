@@ -330,8 +330,9 @@ policy) and all gates are unchanged.
 Status: accepted (user, 2026-10-12).
 
 After a read-only review (`docs/v3/EXTERNAL_PROJECTS_REVIEW.md`) of phantomat, hypr-canvas and infinity-land, HyprVX
-continues on the master plan. phantomat (BSD-3-Clause) is a reference for Phase 5 navigation/search UX, Phase 8 linked
-screens and fullscreen/X11/popup test cases. Copying code needs the user's separate approval and keeps phantomat's
-BSD-3 notice in THIRD_PARTY. Roadmap, architecture, Constitution V and U-1..U-6 are unchanged; phantomat's
+continues on the master plan. phantomat is a reference for Phase 5 navigation/search UX, Phase 8 linked screens and
+fullscreen/X11/popup test cases. The user states they are phantomat's author, so no attribution is required for it;
+copying code needs the user's approval. Code that phantomat inherited from hyprland-scroll-overview (yayuuu, Hypr
+team) keeps their BSD-3 notice if copied. Roadmap, architecture, Constitution V and U-1..U-6 are unchanged; phantomat's
 mutate-and-restore model (the §C5 fallback) is not adopted.
 

@@ -40,8 +40,9 @@ Decision (user, 2026-10-12, DV3-18): continue HyprVX on the master plan; use pha
 
 ## What HyprVX takes from phantomat (reference only)
 
-Ideas and test cases only. Any copied code needs the user's approval first, and must keep phantomat's BSD-3
-copyright and license notice (THIRD_PARTY record).
+The user states they are phantomat's author: no attribution is required for it, and copying code needs the user's
+approval. Code phantomat inherited from hyprland-scroll-overview (yayuuu, Hypr team) keeps their BSD-3 notice if it is
+ever copied.
 
 - Phase 5 (DriftWM window behavior): type-to-find navigator, nearest-window-in-direction rules
   (`docs/window-rules.md`), frame/fit, recent windows, minimap, undo of moves.
