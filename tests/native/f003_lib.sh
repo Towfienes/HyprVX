@@ -123,7 +123,8 @@ x, y, px, py, z, w, h = map(float, sys.argv[1:])
 print('%.6g,%.6g,%.6g,%.6g' % ((x - px) * z, (y - py) * z, w * z, h * z))" "$x" "$y" "$2" "$3" "$4" "$TP_W" "$TP_H"
 }
 
-# tp_scene_ok NAME PX PY Z TOL: every window that lies fully on the output is at its drawn box under (P, z); windows
+# tp_scene_ok NAME PX PY Z TOL: every window that lies fully on the logical output (SIZE / SCALE) is at its drawn box
+# under (P, z); windows
 # partly off the output are recorded as not judged. Exit 1 if a judged window is off.
 tp_scene_ok() {
     local name=$1 px=$2 py=$3 z=$4 tol=$5 win box ok=0 vis
@@ -131,8 +132,8 @@ tp_scene_ok() {
         box=$(tp_drawn "$win" "$px" "$py" "$z")
         vis=$(python3 -I -c "
 import sys
-x, y, w, h = map(float, sys.argv[1].split(',')); W, H = map(float, sys.argv[2].split('x'))
-print(1 if x >= 2 and y >= 2 and x + w <= W - 2 and y + h <= H - 2 else 0)" "$box" "$SIZE")
+x, y, w, h = map(float, sys.argv[1].split(',')); W, H = (float(v) / float(sys.argv[3]) for v in sys.argv[2].split('x'))
+print(1 if x >= 2 and y >= 2 and x + w <= W - 2 and y + h <= H - 2 else 0)" "$box" "$SIZE" "$SCALE")
         if [[ $vis == 1 ]]; then
             tp_box "$name" "$win" "$box" "$tol" || ok=1
         else
