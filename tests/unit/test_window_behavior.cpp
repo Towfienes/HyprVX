@@ -178,7 +178,7 @@ TEST(WindowBehaviorSnap, NearestTargetWinsThenPreviousTargetThenLowerId) {
     expectDelta(snapMove(movingA(), {25.0, 0.0}, others, 0.25, SnapSettings{}, SnapState{}), 88.0, 0.0);
     // Same tie with a previous x target C whose snapped coordinate is far away (hold fails: |25 - 1000| > 128) -> C.
     SnapState previous;
-    previous.x = {true, 3, 1000.0};
+    previous.x = {true, false, 3, 1000.0};
     expectDelta(snapMove(movingA(), {25.0, 0.0}, others, 0.25, SnapSettings{}, previous), -38.0, 0.0);
 }
 
@@ -261,31 +261,26 @@ struct OneAxisOracle {
     }
 };
 
-// Runs a path of candidate x values and checks (a) every result equals the oracle, (b) no alternation: within a run of
-// steps in one direction the state changes at most once (with one target there is one snap or one release per run).
+// Runs a path of candidate x values and checks (a) every result equals the oracle, so state changes happen only at the
+// contract's snap and release points, and (b) no alternation: the state never changes on two consecutive steps (FR-004).
+// A run in one direction may contain one snap and one release (in, then out of the band).
 void checkPath(const std::vector<double>& path, double zoom, double attach, double release, const char* label) {
     const std::vector<WorldBox> others{box(2, 200.0, 0.0)};
     OneAxisOracle oracle{attach, release};
     SnapState state;
-    bool previousAttached = false;
-    int direction = 0, changesInRun = 0, changes = 0;
+    bool previousAttached = false, previousChanged = false;
+    int changes = 0;
     for (std::size_t i = 0; i < path.size(); ++i) {
         const auto r = snapMove(movingA(), {path[i], 0.0}, others, zoom, SnapSettings{}, state);
         state = r.state;
         const double expected = oracle.step(path[i]);
         ASSERT_NEAR(r.delta.x, expected, kEps) << label << " step " << i << " u=" << path[i];
-        if (i > 0) {
-            const int d = path[i] > path[i - 1] ? 1 : -1;
-            if (d != direction) {
-                direction = d;
-                changesInRun = 0;
-            }
-            if (state.x.attached != previousAttached) {
-                ++changesInRun;
-                ++changes;
-                ASSERT_LE(changesInRun, 1) << label << " alternation at step " << i << " u=" << path[i];
-            }
+        const bool changed = i > 0 && state.x.attached != previousAttached;
+        if (changed) {
+            ++changes;
+            ASSERT_FALSE(previousChanged) << label << " alternation at step " << i << " u=" << path[i];
         }
+        previousChanged  = changed;
         previousAttached = state.x.attached;
     }
     EXPECT_GE(changes, 10) << label;
@@ -341,7 +336,7 @@ TEST(WindowBehaviorSnap, DeterministicForTheSameInput) {
 TEST(WindowBehaviorSnap, DisabledInvalidOrNonFiniteReturnsTheCandidate) {
     const std::vector<WorldBox> others{box(2, 200.0, 0.0)};
     SnapState held;
-    held.x = {true, 2, 88.0};
+    held.x = {true, false, 2, 88.0};
     auto unchanged = [&](const SnapResult& r, double x, double y) {
         EXPECT_EQ(r.delta.x, x);
         EXPECT_EQ(r.delta.y, y);
