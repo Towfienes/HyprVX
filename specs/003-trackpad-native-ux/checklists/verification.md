@@ -26,9 +26,9 @@ they run in form P.
 | V-16 | L5b | T-TP-DRAG | PASS | `~/.local/share/hyprvx/evidence/claude/20261012-092548-suite-37aa805-feature003/` (forms P and S, scales 1 and 1.25; per-test runs in results.txt; `sha256sum -c` OK for the suite and all 56 runs) |
 | V-17 | L5 | Form P/S parity over all Feature 003 captures | PASS | `compare_forms.py` on the suite above: 140/140 identical; 36 excluded with reasons (12 per-plugin t_plugin_inert images; 24 glide end/interrupt images, timing-dependent: two form P runs of the same source differ) |
 | V-18 | L1/L4 | T-FR020: delivery builds refuse `hvxtest`; no `hvxtest` in delivery plugins | PASS | `~/.local/share/hyprvx/evidence/claude/20261012-094227-patched-749c5be-t_fr020/` (9 checks incl. positive controls; `sha256sum -c` OK) |
-| V-19 | L5 | Feature 002 regression (both forms, Feature 003 plugin) | NOT RUN | — |
-| V-20 | L5 | Feature 001 regression (Sprint 1 + Phase 2, both forms) | NOT RUN | — |
-| V-21 | L1 | Clean-room rebuild and reproducibility (R1) | NOT RUN | — |
+| V-19 | L5 | Feature 002 regression (both forms, Feature 003 plugin) | PASS | `~/.local/share/hyprvx/evidence/claude/20261012-101647-suite-cf97aee-feature002/` (88/88 both forms and scales; `sha256sum -c` OK; first run 749c5be BLOCKED 1/88 by a pointer-driver read race, fixed in cf97aee) |
+| V-20 | L5 | Feature 001 regression (Sprint 1 + Phase 2, both forms) | PASS | `~/.local/share/hyprvx/evidence/claude/20261012-100245-regP-749c5be-sprint1/`, `…-100644-regP-749c5be-phase2/`, `…-100742-regS-749c5be-sprint1/`, `…-101144-regS-749c5be-phase2/` (`sha256sum -c` OK incl. 48 child runs) |
+| V-21 | L1 | Clean-room rebuild and reproducibility (R1) | PASS | `~/.local/share/hyprvx/evidence/claude/20261012-111722-suite-cf97aee-feature003/` (clean-room build A, no ccache, 56/56); build B at the same path byte-identical for all 5 plugins; captures equal to the 37aa805 suite (140/140 per form) |
 | V-22 | L1 | Single-transform lint incl. the new policy and core files | PASS | `~/.local/share/hyprvx/evidence/claude/20261012-094235-static-749c5be-f002_static/` (policy + form S mechanism 20 files; GestureModel findings = reviewed list of one zoom-level line; planted violation reported; `sha256sum -c` OK) |
 | V-23 | L4 | Host-safety audit of every Feature 003 nested session (incl. L6) | NOT RUN | — |
 | V-24 | L6 | L6 physical checklist, human-signed; pinch / 3-finger / 4-finger-in-Drift / U4 items BLOCKED (environment) by design | NOT AUTOMATABLE | — |

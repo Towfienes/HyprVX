@@ -1,0 +1,33 @@
+{
+  "run_id": "20261012-102138-formP-cf97aee-t_plugin_inert",
+  "test": "T-PLUGIN-INERT plugin load/unload inert with Drift OFF (T015)",
+  "result": "PASS",
+  "agent": "claude",
+  "git_sha": "cf97aee25ed670e549493bf73904dcddfd330289",
+  "note": "form P; plugins: P/hyprvx-drift-P.so; output 1600x1000 scale 1.25",
+  "artifacts": [
+    "build-info-patched.json",
+    "client.jsonl",
+    "nested-hyprland.log",
+    "p1-P-loaded-diff.json",
+    "p1-P-loaded.clients.json",
+    "p1-P-loaded.png",
+    "p1-P-loaded.state.json",
+    "p1-P-unloaded-diff.json",
+    "p1-P-unloaded.clients.json",
+    "p1-P-unloaded.png",
+    "p1-P-unloaded.state.json",
+    "p1-P.build-info.json",
+    "p1-P.hyprvx-state.txt",
+    "p1-P.plugin.sha256",
+    "plugin-lifecycle.txt",
+    "plugin-load.log",
+    "preflight.log",
+    "reference.clients.json",
+    "reference.png",
+    "reference.state.json",
+    "session.log",
+    "top.jsonl"
+  ],
+  "not_run": []
+}

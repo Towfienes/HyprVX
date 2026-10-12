@@ -30,16 +30,21 @@
   V3 (Features 003–009). The clone `HyprVX-v3-agy` is kept untouched as a reference.
 - V-20 / SC-005: PASS, signed by the user (Towfienes) on 2026-10-11 in `checklists/verification.md`.
 
-## Feature 003 resume point (2026-10-12, in progress)
+## Feature 003 resume point (2026-10-12): STOPPED at T045 (L6, needs the user)
 
-- Done with evidence: T001–T023 (V-01..V-07, V-02, V-03; US1 suite `20261012-083722-suite-5d254f9-feature003`).
-- Implemented, form P scale 1 runs PASS, archive pending: T026 pinch (t_pinch, t_cancel), T030 swipe (t_cancel, t_tp_surfaces).
-- Test fixes in flight: t_arbitrate controls wait for async socket2 events; t_tp_off uses b for the ready rule after the
-  close binding and compares the active workspace after the 4-finger swipe (the old version hung writing to a closed
-  client's FIFO; killed PID-checked, session stopped with nested.sh stop).
-- T036/T037 glide code written in Gesture.cpp/Input.cpp/Session.cpp (not yet built/tested); US4 tests t_glide,
-  t_glide_stop, t_tp_modes, t_tp_drag written. Next: build P, run US3+US4 tests, then T031/T038 suites (both scales),
-  T039 form S + parity, T040 t_fr020, T041–T048 gate (T045 L6 needs the user).
+- Done with archived evidence: T001–T041, T043 (T042 checklist written). Plugin code final at `789c75c`; branch head
+  after the records. V-01..V-22 PASS (see `specs/003-trackpad-native-ux/checklists/verification.md`):
+  full suite 56/56 (`20261012-092548-suite-37aa805-feature003`), parity P/S 140/140, T-FR020, Feature 002
+  regression 88/88 (`20261012-101647-suite-cf97aee-feature002`), Feature 001 regression P and S, R1 clean-room
+  56/56 with two byte-identical builds (`20261012-111722-suite-cf97aee-feature003`).
+- **Next: T045, the L6 session with the user** (`checklists/l6-physical.md`, items H1–H10 two fingers only; B1–B6
+  BLOCKED by the environment). Claude starts `nested.sh start --variant patched --interactive`, loads plugin P,
+  three test windows, Drift on; the user performs and signs. Claude does not sign for the user.
+- After T045: T044 host-safety audit (covers the L6 session; the lint part is done), T046 records and quickstart,
+  T047 merge-readiness review, T048 Feature 003 gate (user approval).
+- Pending user decision (2026-10-12): an external-project evaluation (phantomat, hypr-canvas, infinity-land) was
+  reported; the recommendation is to continue HyprVX and use phantomat as a reference only. No direction change has
+  been made; the user decides.
 
 ## Sprint 1 goal
 

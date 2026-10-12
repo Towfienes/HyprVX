@@ -83,4 +83,12 @@ stalled on `render.pre`) was fixed in the product (`789c75c`), and the test expe
 
 ## Results (appended after the runs)
 
-_Pending: clean-room build A, `run_feature003.sh` on it, build B, comparison (V-21)._
+- Clean-room build A from a fresh worktree at `cf97aee`, without ccache: 5 plugins, 0 warnings, patched prefix
+  `d291f743b864`, `sources_dirty` false. Then `run_feature003.sh`: **PASS 56/56**
+  (`20261012-111722-suite-cf97aee-feature003`; `sha256sum -c` OK for the suite and all 56 runs).
+- Build B (worktree removed and re-added at the same path): all 5 plugins **byte-identical** to A (V-21).
+- Captures: form P vs S 140/140 identical; suite A vs the earlier `37aa805` suite 140/140 identical per form
+  (glide end/interrupt captures excluded with the reasons in `compare_forms.py`).
+- Form S built at a different path differs only in the `__FILE__` strings of the copied bodies. Proof: S rebuilt
+  from the main checkout has the earlier hash, and the `strings` diff against B is the two source paths only.
+- The findings above (written before these runs) stand. No result changed them.

@@ -477,3 +477,19 @@ Production safety: host Hyprland and Caelestia untouched; no plugin loaded; no p
   Verdict: ready for one small, unit-test-only task with an explicit work order; first handoff reviewed line by line.
 - Ended (user, 2026-10-12): the trial was stopped before WO-01 started (clone branch still `4d4aaac`). Claude Code is
   the only agent for all remaining V3 work (DV3-15 in full); DV3-17 is marked ended in the master plan.
+
+## Feature 003 at T045 (2026-10-12)
+
+- Branch `v3/003-trackpad-native-ux`; plugin code final at `789c75c` (glide steps on `render.preChecks`; R6
+  corrected). T001–T041 and T043 done with archived evidence; V-01..V-22 PASS. `dev` still `15f75b0`; nothing pushed.
+- Product defect found and fixed during implementation: glide stalled on `render.pre` (emitted after Hyprland's
+  damage check). Test defects fixed: a vacuous socket2 negative check (t_arbitrate; all archives re-checked), hidden
+  clients captured, a setup point in a border grab area, the output round-trip comparison, a closed client's FIFO,
+  and a pointer-driver read race (1/88 BLOCKED in the first Feature 002 regression run).
+- Waiting for the user at T045 (L6 with the real trackpad). Pinch, 3/4-finger and U4 items are BLOCKED by the
+  nested environment by design (user decision 2026-10-12); their automated evidence is V-10..V-12.
+- External evaluation reported to the user (read only, nothing installed): phantomat (plugin, 0.56, mutates
+  floating/workspace and restores: the §C5 fallback HyprVX rejected), hypr-canvas (alpha, single camera, no tests),
+  infinity-land (Hyprland 0.51.1 fork, one day of commits). Recommendation: continue HyprVX, reference phantomat.
+  Awaiting the user's decision.
+
