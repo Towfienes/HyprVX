@@ -228,9 +228,22 @@ namespace {
         const std::string_view REQUEST = in;
         if (REQUEST != "hyprvx" && !REQUEST.starts_with("hyprvx "))
             return "";
-        if (REQUEST != "hyprvx state")
+        if (REQUEST == "hyprvx state")
+            return stateJSON();
+        // A host with a Lua config cannot reach the hyprvx:* dispatchers (hl.dispatch takes Lua dispatchers only,
+        // efb5099 LuaBindingsDispatcherUtils.cpp:128), so the control actions are hyprctl subcommands too.
+        SDispatchResult result;
+        if (REQUEST == "hyprvx on")
+            result = on({});
+        else if (REQUEST == "hyprvx off")
+            result = off({});
+        else if (REQUEST == "hyprvx toggle")
+            result = toggle({});
+        else if (REQUEST == "hyprvx panic")
+            result = panic({});
+        else
             return "err:invalid";
-        return stateJSON();
+        return result.success ? "ok" : result.error;
     }
 }
 
