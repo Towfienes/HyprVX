@@ -11,24 +11,24 @@ they run in form P.
 | V-01 | L2 | `GestureModel` unit tests (`tests/unit/test_gesture_model.cpp`, contract gesture-model 1.0), two seeds | PASS | `~/.local/share/hyprvx/evidence/claude/20261012-080650-unit-84ea21b-f003_unit/` (fresh build of a copy; ctest 367/367; 41 GestureModel tests with the default seed and 987654321; mutants 9/9 killed) |
 | V-02 | L1/L4 | Identity refusal of `fscroll`, `hvxtest` and `--interactive` (no capture) outside a verified session | PASS | `~/.local/share/hyprvx/evidence/claude/20261012-081012-static-ac78519-f002_static/` (`static_evidence.sh`, labelled with its Feature 002 IDs: `v03-identity-refusal.log` incl. interactive capture refused and `render_config --interactive` changing only the WAYLAND-1 rule; `hvxtest` is sent only through `run`, refused for every tampered session; `v03-vpointer-refusal.log` with an `fscroll` script never sent) |
 | V-03 | L4 | GATE-A after the gesture-binding config change: stock determinism, baseline hash unchanged | PASS | `~/.local/share/hyprvx/evidence/claude/20261012-081153-stock-f0ee8b0-gate_a/` (3 stock sessions pixel-identical; `stock1..3.png` sha256 `6d7f6bd6bf1bf49e…` = the Feature 002 baseline, so the new `gesture =` lines parse without a config error bar) |
-| V-04 | L5 | T-TP-PAN | PASS (form P) | `~/.local/share/hyprvx/evidence/claude/20261012-083722-suite-5d254f9-feature003/` (scales 1 and 1.25; per-test runs in results.txt); form S at T039 |
-| V-05 | L5b | T-TP-WINDOW | PASS (form P) | `~/.local/share/hyprvx/evidence/claude/20261012-083722-suite-5d254f9-feature003/` (scales 1 and 1.25; per-test runs in results.txt); form S at T039 |
-| V-06 | L5b | T-TP-SUPER | PASS (form P) | `~/.local/share/hyprvx/evidence/claude/20261012-083722-suite-5d254f9-feature003/` (scales 1 and 1.25; per-test runs in results.txt); form S at T039 |
-| V-07 | L5b | T-TP-LOCK | PASS (form P) | `~/.local/share/hyprvx/evidence/claude/20261012-083722-suite-5d254f9-feature003/` (scales 1 and 1.25; per-test runs in results.txt); form S at T039 |
-| V-08 | L5b | T-TP-SURFACES (scroll and 3-finger parts) | PARTIAL (scroll part PASS, form P) | `~/.local/share/hyprvx/evidence/claude/20261012-083722-suite-5d254f9-feature003/` (scales 1 and 1.25); gesture part at T029/T031 |
-| V-09 | L5 | T-TP-OFF (scroll, pinch, 3/4-finger parts) | PARTIAL (scroll part PASS, form P) | `~/.local/share/hyprvx/evidence/claude/20261012-083722-suite-5d254f9-feature003/` (scales 1 and 1.25); gesture part at T029/T031 |
-| V-10 | L5 | T-PINCH | NOT RUN | — |
-| V-11 | L5 | T-CANCEL (pinch and 3-finger swipe) | NOT RUN | — |
-| V-12 | L5b | T-ARBITRATE | NOT RUN | — |
-| V-13 | L5 | T-GLIDE | NOT RUN | — |
-| V-14 | L5 | T-GLIDE-STOP (incl. output removal) | NOT RUN | — |
-| V-15 | L5b | T-TP-MODES (incl. output removal) | NOT RUN | — |
-| V-16 | L5b | T-TP-DRAG | NOT RUN | — |
-| V-17 | L5 | Form P/S parity over all Feature 003 captures | NOT RUN | — |
-| V-18 | L1/L4 | T-FR020: delivery builds refuse `hvxtest`; no `hvxtest` in delivery plugins | NOT RUN | — |
+| V-04 | L5 | T-TP-PAN | PASS | `~/.local/share/hyprvx/evidence/claude/20261012-092548-suite-37aa805-feature003/` (forms P and S, scales 1 and 1.25; per-test runs in results.txt; `sha256sum -c` OK for the suite and all 56 runs) |
+| V-05 | L5b | T-TP-WINDOW | PASS | `~/.local/share/hyprvx/evidence/claude/20261012-092548-suite-37aa805-feature003/` (forms P and S, scales 1 and 1.25; per-test runs in results.txt; `sha256sum -c` OK for the suite and all 56 runs) |
+| V-06 | L5b | T-TP-SUPER | PASS | `~/.local/share/hyprvx/evidence/claude/20261012-092548-suite-37aa805-feature003/` (forms P and S, scales 1 and 1.25; per-test runs in results.txt; `sha256sum -c` OK for the suite and all 56 runs) |
+| V-07 | L5b | T-TP-LOCK | PASS | `~/.local/share/hyprvx/evidence/claude/20261012-092548-suite-37aa805-feature003/` (forms P and S, scales 1 and 1.25; per-test runs in results.txt; `sha256sum -c` OK for the suite and all 56 runs) |
+| V-08 | L5b | T-TP-SURFACES (scroll and 3-finger parts) | PASS | `~/.local/share/hyprvx/evidence/claude/20261012-092548-suite-37aa805-feature003/` (forms P and S, scales 1 and 1.25; per-test runs in results.txt; `sha256sum -c` OK for the suite and all 56 runs) |
+| V-09 | L5 | T-TP-OFF (scroll, pinch, 3/4-finger parts) | PASS | `~/.local/share/hyprvx/evidence/claude/20261012-092548-suite-37aa805-feature003/` (forms P and S, scales 1 and 1.25; per-test runs in results.txt; `sha256sum -c` OK for the suite and all 56 runs) |
+| V-10 | L5 | T-PINCH | PASS | `~/.local/share/hyprvx/evidence/claude/20261012-092548-suite-37aa805-feature003/` (forms P and S, scales 1 and 1.25; per-test runs in results.txt; `sha256sum -c` OK for the suite and all 56 runs) |
+| V-11 | L5 | T-CANCEL (pinch and 3-finger swipe) | PASS | `~/.local/share/hyprvx/evidence/claude/20261012-092548-suite-37aa805-feature003/` (forms P and S, scales 1 and 1.25; per-test runs in results.txt; `sha256sum -c` OK for the suite and all 56 runs) |
+| V-12 | L5b | T-ARBITRATE | PASS | `~/.local/share/hyprvx/evidence/claude/20261012-092548-suite-37aa805-feature003/` (forms P and S, scales 1 and 1.25; per-test runs in results.txt; `sha256sum -c` OK for the suite and all 56 runs); the Drift-phase socket2 check was vacuous before 789c75c (timestamp prefix), every earlier archive re-checked |
+| V-13 | L5 | T-GLIDE | PASS | `~/.local/share/hyprvx/evidence/claude/20261012-092548-suite-37aa805-feature003/` (forms P and S, scales 1 and 1.25; per-test runs in results.txt; `sha256sum -c` OK for the suite and all 56 runs) |
+| V-14 | L5 | T-GLIDE-STOP (incl. output removal) | PASS | `~/.local/share/hyprvx/evidence/claude/20261012-092548-suite-37aa805-feature003/` (forms P and S, scales 1 and 1.25; per-test runs in results.txt; `sha256sum -c` OK for the suite and all 56 runs) |
+| V-15 | L5b | T-TP-MODES (incl. output removal) | PASS | `~/.local/share/hyprvx/evidence/claude/20261012-092548-suite-37aa805-feature003/` (forms P and S, scales 1 and 1.25; per-test runs in results.txt; `sha256sum -c` OK for the suite and all 56 runs); output case judged against Hyprland's own `clients` boxes (its FALLBACK round trip moves windows) |
+| V-16 | L5b | T-TP-DRAG | PASS | `~/.local/share/hyprvx/evidence/claude/20261012-092548-suite-37aa805-feature003/` (forms P and S, scales 1 and 1.25; per-test runs in results.txt; `sha256sum -c` OK for the suite and all 56 runs) |
+| V-17 | L5 | Form P/S parity over all Feature 003 captures | PASS | `compare_forms.py` on the suite above: 140/140 identical; 36 excluded with reasons (12 per-plugin t_plugin_inert images; 24 glide end/interrupt images, timing-dependent: two form P runs of the same source differ) |
+| V-18 | L1/L4 | T-FR020: delivery builds refuse `hvxtest`; no `hvxtest` in delivery plugins | PASS | `~/.local/share/hyprvx/evidence/claude/20261012-094227-patched-749c5be-t_fr020/` (9 checks incl. positive controls; `sha256sum -c` OK) |
 | V-19 | L5 | Feature 002 regression (both forms, Feature 003 plugin) | NOT RUN | — |
 | V-20 | L5 | Feature 001 regression (Sprint 1 + Phase 2, both forms) | NOT RUN | — |
 | V-21 | L1 | Clean-room rebuild and reproducibility (R1) | NOT RUN | — |
-| V-22 | L1 | Single-transform lint incl. the new policy and core files | NOT RUN | — |
+| V-22 | L1 | Single-transform lint incl. the new policy and core files | PASS | `~/.local/share/hyprvx/evidence/claude/20261012-094235-static-749c5be-f002_static/` (policy + form S mechanism 20 files; GestureModel findings = reviewed list of one zoom-level line; planted violation reported; `sha256sum -c` OK) |
 | V-23 | L4 | Host-safety audit of every Feature 003 nested session (incl. L6) | NOT RUN | — |
 | V-24 | L6 | L6 physical checklist, human-signed; pinch / 3-finger / 4-finger-in-Drift / U4 items BLOCKED (environment) by design | NOT AUTOMATABLE | — |

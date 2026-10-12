@@ -62,7 +62,7 @@ description: "Task list for Feature 003 — Trackpad-Native Drift UX, Claude Cod
 
 - [X] T008 [P] Add `fscroll T0 DT N DX DY [stop]` to `tools/vpointer/main.cpp` per test-tooling 1.5 §4a (axis → axis_source(finger) → frame per axis, explicit times, optional stop, limits with an `error` line)
 - [X] T009 [P] Add pointer-gestures binding and the swipe/pinch, `axis_source`, `axis_stop` and `axis_value120` log lines to `tools/testclient/main.cpp` per test-tooling 1.5 §4 (existing lines unchanged)
-- [ ] T010 [P] Implement the test-only plugin in `tools/testinput/src/main.cpp`: hyprctl command `hvxtest` (`gesture swipe|pinch begin|update|end …` calling `g_pInputManager->onSwipe*/onPinch*` with the given fields and range checks; `frames <monitor>` from a `render.pre` counter), per test-tooling 1.5 §8
+- [X] T010 [P] Implement the test-only plugin in `tools/testinput/src/main.cpp`: hyprctl command `hvxtest` (`gesture swipe|pinch begin|update|end …` calling `g_pInputManager->onSwipe*/onPinch*` with the given fields and range checks; `frames <monitor>` from a `render.pre` counter), per test-tooling 1.5 §8
 - [X] T011 Add `start --interactive` to `tools/hyprvx_nested.py` / `scripts/nested.sh`: same verified session, but the Wayland output (the visible nested window) stays enabled and no headless output is created, for L6 only; captures are refused in this mode. Let `plugin load` accept `plugin/testinput-*` paths. Keep every identity rule
 - [X] T012 Extend `tests/native/harness/test_identity_refusal.sh` and `tests/native/static_evidence.sh`: `fscroll` and `hvxtest` refused outside a verified session, `--interactive` refuses captures; run it (V-02)
 - [X] T013 Add the gesture bindings of test-tooling 1.5 §5 to `tests/native/config/hyprland.conf.in` (`gesture = 3, down, close`, `gesture = 3, up, fullscreen`, `gesture = 3, left, float`, `gesture = 4, horizontal, workspace`; never a command binding) and re-run `tests/native/gate_a_stock_determinism.sh`; the baseline hash must be unchanged (V-03)
@@ -102,13 +102,13 @@ description: "Task list for Feature 003 — Trackpad-Native Drift UX, Claude Cod
 
 ### Tests
 
-- [ ] T024 [P] [US2] Write `tests/native/t_pinch.sh` (T-PINCH): `hvxtest gesture pinch` at three anchors with scales 0.5, 2, 0.01 and 50; anchor world point fixed ± 1 px, zoom = clamp(z0·s); Super + pinch over a window zooms; pinch over a window without Super: client logs the pinch, capture unchanged
-- [ ] T025 [P] [US2] Write `tests/native/t_cancel.sh` (T-CANCEL) pinch part: a pinch ended with `cancelled 1` gives a capture byte-identical to the one before it, and no glide (frame count stops)
+- [X] T024 [P] [US2] Write `tests/native/t_pinch.sh` (T-PINCH): `hvxtest gesture pinch` at three anchors with scales 0.5, 2, 0.01 and 50; anchor world point fixed ± 1 px, zoom = clamp(z0·s); Super + pinch over a window zooms; pinch over a window without Super: client logs the pinch, capture unchanged
+- [X] T025 [P] [US2] Write `tests/native/t_cancel.sh` (T-CANCEL) pinch part: a pinch ended with `cancelled 1` gives a capture byte-identical to the one before it, and no glide (frame count stops)
 
 ### Implementation
 
-- [ ] T026 [US2] Implement gesture sessions for pinch in `platform/plugin/src/policy/Gesture.cpp`: `decideTarget(Pinch, fingers, ctx)` at begin; cancel every event of a consumed gesture until its end; Zoom sets `model().setCamera(workspace, pinchCamera(C0, M, a0, scale))` per update; cancelled end restores `C0`; consumed gestures stay consumed after the monitor leaves Drift, without camera changes
-- [ ] T027 [US2] Run T024–T025 in form P at scales 1 and 1.25; archive (V-10, pinch part of V-11)
+- [X] T026 [US2] Implement gesture sessions for pinch in `platform/plugin/src/policy/Gesture.cpp`: `decideTarget(Pinch, fingers, ctx)` at begin; cancel every event of a consumed gesture until its end; Zoom sets `model().setCamera(workspace, pinchCamera(C0, M, a0, scale))` per update; cancelled end restores `C0`; consumed gestures stay consumed after the monitor leaves Drift, without camera changes
+- [X] T027 [US2] Run T024–T025 in form P at scales 1 and 1.25; archive (V-10, pinch part of V-11)
 
 ---
 
@@ -119,13 +119,13 @@ description: "Task list for Feature 003 — Trackpad-Native Drift UX, Claude Cod
 
 ### Tests
 
-- [ ] T028 [P] [US3] Write `tests/native/t_arbitrate.sh` (T-ARBITRATE): ≥ 20 3-finger swipes (down, up, left, right) and 3-finger pinches in Drift over canvas, over a window and over the layer surface; window count, fullscreen and floating unchanged (`hyprctl clients -j`), no fullscreen/special events (socket2), camera as specified; Drift-off control performs each bound action; 4-finger horizontal swipe switches the workspace in both modes and each workspace keeps its camera
-- [ ] T029 [US3] Extend `tests/native/t_cancel.sh` (3-finger swipe cancel), `tests/native/t_tp_surfaces.sh` (3-finger over the layer and with fullscreen: consumed, nothing moves, no binding acts) and `tests/native/t_tp_off.sh` (pinches and 3/4-finger gestures with Drift off: captures and client logs equal to stock, bindings act)
+- [X] T028 [P] [US3] Write `tests/native/t_arbitrate.sh` (T-ARBITRATE): ≥ 20 3-finger swipes (down, up, left, right) and 3-finger pinches in Drift over canvas, over a window and over the layer surface; window count, fullscreen and floating unchanged (`hyprctl clients -j`), no fullscreen/special events (socket2), camera as specified; Drift-off control performs each bound action; 4-finger horizontal swipe switches the workspace in both modes and each workspace keeps its camera
+- [X] T029 [US3] Extend `tests/native/t_cancel.sh` (3-finger swipe cancel), `tests/native/t_tp_surfaces.sh` (3-finger over the layer and with fullscreen: consumed, nothing moves, no binding acts) and `tests/native/t_tp_off.sh` (pinches and 3/4-finger gestures with Drift off: captures and client logs equal to stock, bindings act)
 
 ### Implementation
 
-- [ ] T030 [US3] Implement swipe sessions and the 3/4-finger rules in `platform/plugin/src/policy/Gesture.cpp`: 3-finger swipe Pan applies `model().pan(monitor, delta·pan_factor)`; a swipe ended with `cancelled` restores the camera at begin (`C0`) and starts no glide (FR-012); `Ignore` targets cancel every event and change nothing; 4+ fingers pass through untouched
-- [ ] T031 [US3] Run T028–T029 (and re-run T024–T025, T016–T021) in form P at scales 1 and 1.25; archive (V-12, full V-08, V-09, V-11)
+- [X] T030 [US3] Implement swipe sessions and the 3/4-finger rules in `platform/plugin/src/policy/Gesture.cpp`: 3-finger swipe Pan applies `model().pan(monitor, delta·pan_factor)`; a swipe ended with `cancelled` restores the camera at begin (`C0`) and starts no glide (FR-012); `Ignore` targets cancel every event and change nothing; 4+ fingers pass through untouched
+- [X] T031 [US3] Run T028–T029 (and re-run T024–T025, T016–T021) in form P at scales 1 and 1.25; archive (V-12, full V-08, V-09, V-11)
 
 ---
 
@@ -136,23 +136,23 @@ description: "Task list for Feature 003 — Trackpad-Native Drift UX, Claude Cod
 
 ### Tests
 
-- [ ] T032 [P] [US4] Write `tests/native/t_glide.sh` (T-GLIDE): `fscroll` releases at 1000 and 3000 px/s with glide 0.5 and 1.0; final displacement = `expectedGlide` ± 2 px; `hvx_frames` constant over 500 ms after the end; glide 0, a release below `glide_min_speed` and a 60 ms rest before the stop: no movement after the stop; a 3-finger swipe release glides too
-- [ ] T033 [P] [US4] Write `tests/native/t_glide_stop.sh` (T-GLIDE-STOP): during a glide, a finger scroll, a click, a key, `hyprvx:off`, panic and a workspace switch each stop it (two captures one frame apart identical; frame count stops); removing the glide's output (`hyprctl output remove`, as Feature 002 `t_monitor.sh`) leaves the compositor alive with Drift OFF and no further camera change
-- [ ] T034 [P] [US4] Write `tests/native/t_tp_modes.sh` (T-TP-MODES): Drift off, panic and removal of the owning output in the middle of a consumed pinch and a consumed scroll: remaining events stay consumed (no client logs them), capture after OFF equals stock, the compositor stays alive, next gesture behaves as configured
-- [ ] T035 [P] [US4] Write `tests/native/t_tp_drag.sh` (T-TP-DRAG): finger scroll, pinch and 3-finger swipe during a Super + drag (pan and move) change neither the camera nor the dragged window; a drag beginning during a scroll sequence ends that sequence's camera effect
+- [X] T032 [P] [US4] Write `tests/native/t_glide.sh` (T-GLIDE): `fscroll` releases at 1000 and 3000 px/s with glide 0.5 and 1.0; final displacement = `expectedGlide` ± 2 px; `hvx_frames` constant over 500 ms after the end; glide 0, a release below `glide_min_speed` and a 60 ms rest before the stop: no movement after the stop; a 3-finger swipe release glides too
+- [X] T033 [P] [US4] Write `tests/native/t_glide_stop.sh` (T-GLIDE-STOP): during a glide, a finger scroll, a click, a key, `hyprvx:off`, panic and a workspace switch each stop it (two captures one frame apart identical; frame count stops); removing the glide's output (`hyprctl output remove`, as Feature 002 `t_monitor.sh`) leaves the compositor alive with Drift OFF and no further camera change
+- [X] T034 [P] [US4] Write `tests/native/t_tp_modes.sh` (T-TP-MODES): Drift off, panic and removal of the owning output in the middle of a consumed pinch and a consumed scroll: remaining events stay consumed (no client logs them), capture after OFF equals stock, the compositor stays alive, next gesture behaves as configured
+- [X] T035 [P] [US4] Write `tests/native/t_tp_drag.sh` (T-TP-DRAG): finger scroll, pinch and 3-finger swipe during a Super + drag (pan and move) change neither the camera nor the dragged window; a drag beginning during a scroll sequence ends that sequence's camera effect
 
 ### Implementation
 
-- [ ] T036 [US4] Implement glide in `platform/plugin/src/policy/Gesture.cpp`: pan sessions feed `ReleaseVelocity` with the screen deltas; at a non-cancelled end with `live`, `Glide::start(v, cfg)` with `cfg` from the config values; while active, a `render.pre` listener (registered only while gliding) steps by the steady-clock time since the last step and applies `model().pan` + `sync(true)`; unregister when the glide ends
-- [ ] T037 [US4] Wire glide interruption and session closing: `Input.cpp` (button, key, any axis event; a Feature 002 drag start sets the open session's `live = false`), `Session.cpp` (`hyprvx:off`/`toggle`/`panic`, workspace change on the glide's monitor, monitor removal, unload; `"glide"` per monitor in `hyprctl hyprvx state`), and gesture begin in `Gesture.cpp`
-- [ ] T038 [US4] Run T032–T035 (and the US1–US3 tests again) in form P at scales 1 and 1.25; archive (V-13..V-16)
+- [X] T036 [US4] Implement glide in `platform/plugin/src/policy/Gesture.cpp`: pan sessions feed `ReleaseVelocity` with the screen deltas; at a non-cancelled end with `live`, `Glide::start(v, cfg)` with `cfg` from the config values; while active, a `render.pre` listener (registered only while gliding) steps by the steady-clock time since the last step and applies `model().pan` + `sync(true)`; unregister when the glide ends
+- [X] T037 [US4] Wire glide interruption and session closing: `Input.cpp` (button, key, any axis event; a Feature 002 drag start sets the open session's `live = false`), `Session.cpp` (`hyprvx:off`/`toggle`/`panic`, workspace change on the glide's monitor, monitor removal, unload; `"glide"` per monitor in `hyprctl hyprvx state`), and gesture begin in `Gesture.cpp`
+- [X] T038 [US4] Run T032–T035 (and the US1–US3 tests again) in form P at scales 1 and 1.25; archive (V-13..V-16)
 
 ---
 
 ## Phase 7: Delivery form S and parity
 
-- [ ] T039 Build forms S and S-dev of the policy plugin and `testinput-S`; run every Feature 003 test in form S at scales 1 and 1.25; compare all captures with form P using `tests/native/compare_forms.py` (byte-identical; exclusions only with a reason) (V-17)
-- [ ] T040 [P] Write and run `tests/native/t_fr020.sh` (T-FR020): the form S plugin alone and `patched-nodev` + form P plugin answer `unknown request` to `hvxtest`; `strings` finds no `hvxtest` in either delivery plugin (V-18)
+- [X] T039 Build forms S and S-dev of the policy plugin and `testinput-S`; run every Feature 003 test in form S at scales 1 and 1.25; compare all captures with form P using `tests/native/compare_forms.py` (byte-identical; exclusions only with a reason) (V-17)
+- [X] T040 [P] Write and run `tests/native/t_fr020.sh` (T-FR020): the form S plugin alone and `patched-nodev` + form P plugin answer `unknown request` to `hvxtest`; `strings` finds no `hvxtest` in either delivery plugin (V-18)
 
 ---
 

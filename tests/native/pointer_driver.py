@@ -36,9 +36,20 @@ class Blocked(Exception):
 
 
 def read_lines(path):
-    # Complete records only: the writer may be in the middle of its last line (no newline yet).
+    # Complete records only: the writer may be in the middle of its last line (no newline yet). A read racing the
+    # append can also see the last newline-terminated record before its bytes (Feature 003 T041: JSONDecodeError at
+    # char 0); that last record is left for the next poll. An unparsable record before the last is a real error.
     with open(path, encoding="utf-8") as f:
-        return [json.loads(line) for line in f if line.endswith("\n") and line.strip()]
+        raw = [line for line in f if line.endswith("\n") and line.strip()]
+    records = []
+    for i, line in enumerate(raw):
+        try:
+            records.append(json.loads(line))
+        except json.JSONDecodeError:
+            if i == len(raw) - 1:
+                break
+            raise
+    return records
 
 
 def wait_for(predicate, timeout, what):
