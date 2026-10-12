@@ -165,7 +165,7 @@ description: "Task list for Feature 003 — Trackpad-Native Drift UX, Claude Cod
 - [X] T045 L6 session with the user: start `nested.sh start --variant patched --interactive`, load the form P plugin, turn Drift on with three test windows; the user performs `checklists/l6-physical.md` with the real trackpad and records each item and the signature; Claude records the result honestly (V-24, NOT AUTOMATABLE; the BLOCKED items stay BLOCKED)
 - [X] T046 Update `checklists/verification.md` (V-01..V-24 with archive paths and `sha256sum -c` results), `integration-log.md` (incl. the delegation-trial outcome: defects found in review, rework, Claude effort saved or not), `.ai/CURRENT_STATE.md` and `.ai/NEXT_TASK.md`; validate `quickstart.md` by running it and correct any drift; constitution re-check of the delivered code in `plan.md`
 - [X] T047 Merge-readiness review: every commit since `142d2d0` (branch point) reviewed (including integrated delegated commits), every PASS backed by archived evidence, `git rev-parse dev == 15f75b0`, nothing pushed, no `AGY_EXPERIMENT.md` on this branch
-- [ ] T048 **Feature 003 gate**: present the evidence, the signed L6 checklist with its BLOCKED items, the delegation-trial outcome and the open items. STOP for the user's approval before merging into `v3/spec-foundation` or starting any later feature.
+- [X] T048 **Feature 003 gate**: present the evidence, the signed L6 checklist with its BLOCKED items, the delegation-trial outcome and the open items. STOP for the user's approval before merging into `v3/spec-foundation` or starting any later feature.
 
 ---
 
