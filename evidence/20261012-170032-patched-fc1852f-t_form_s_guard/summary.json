@@ -1,0 +1,27 @@
+{
+  "run_id": "20261012-170032-patched-fc1852f-t_form_s_guard",
+  "test": "T-FORM-S-GUARD form S refused on the HyprVX patched build",
+  "result": "PASS",
+  "agent": "claude",
+  "git_sha": "fc1852f636b8edc2cc34240519cc966302b0b996",
+  "note": "plugin loaded: no; output 1280x800 scale 1",
+  "artifacts": [
+    "after-diff.json",
+    "after.png",
+    "after.state.json",
+    "build-info-patched.json",
+    "client.jsonl",
+    "load-result.txt",
+    "load.out",
+    "nested-hyprland.log",
+    "on.reply",
+    "plugin-load.log",
+    "preflight.log",
+    "reference.png",
+    "reference.state.json",
+    "refusal-lines.txt",
+    "session.log",
+    "zoom.reply"
+  ],
+  "not_run": []
+}
