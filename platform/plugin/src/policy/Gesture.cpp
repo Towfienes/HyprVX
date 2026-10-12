@@ -3,7 +3,8 @@
 // (contracts/gesture-model.md) and consumed through the cancellable event bus before keybinds, `gesture =` bindings
 // and client delivery. Camera changes go only through DriftModel and CameraMath (Constitution IV).
 //
-// Implemented: finger-source scroll sequences (T022). Gestures pass through until T026/T030; glide is T036.
+// Implemented: finger-source scroll sequences (T022), pinch gestures (T026). Swipes pass through until T030; glide is
+// T036.
 
 #include "policy/Plugin.hpp"
 #include "policy/Mechanism.hpp"
@@ -84,9 +85,11 @@ namespace {
         return ctx;
     }
 
-    SSession openSession(drift::InputKind kind, unsigned fingers) {
+    SSession openSession(drift::InputKind kind, unsigned fingers, PHLMONITOR* monitorOut = nullptr) {
         PHLMONITOR monitor;
         const auto CTX = beginContext(monitor);
+        if (monitorOut)
+            *monitorOut = monitor;
         SSession   session;
         session.target = drift::decideTarget(kind, fingers, CTX);
         if (monitor) {
@@ -121,6 +124,66 @@ namespace {
         const cammath::Vec SCREEN = axis == 0 ? cammath::Vec{0.0, D} : cammath::Vec{D, 0.0};
         if (HyprVXPolicy::model().pan(session.monitor, SCREEN) == drift::Status::Ok)
             HyprVXPolicy::sync(true);
+    }
+
+    // A swipe or pinch from begin to end: the session plus what a zoom and a cancel need (research R4).
+    struct SGesture {
+        bool                 open = false;
+        drift::InputKind     kind = drift::InputKind::Pinch;
+        SSession             session;
+        cammath::Vec         origin;  // monitor origin M
+        cammath::CameraState start;   // scene camera at begin (cancel restores it)
+        cammath::Vec         anchor;  // pointer at begin (pinch anchor)
+    };
+    SGesture g_gesture;
+
+    void beginGesture(drift::InputKind kind, unsigned fingers, Event::SCallbackInfo& info) {
+        g_gesture = {};
+        if (!HyprVXPolicy::anyDrift())
+            return;  // passes through; update/end see a closed gesture
+        PHLMONITOR monitor;
+        g_gesture.session = openSession(kind, fingers, &monitor);
+        g_gesture.open    = true;
+        g_gesture.kind    = kind;
+        if (monitor) {
+            g_gesture.origin = HyprVX::monitorOrigin(*monitor);
+            g_gesture.start  = HyprVXPolicy::model().monitorCamera(monitor->m_id, g_gesture.origin);
+        }
+        const auto POS   = g_pInputManager->getMouseCoordsInternal();
+        g_gesture.anchor = {POS.x, POS.y};
+        if (g_gesture.session.target != drift::Target::PassThrough)
+            info.cancelled = true;
+    }
+
+    // True when this update/end belongs to an open, consumed gesture of KIND (it is then cancelled).
+    bool consumed(drift::InputKind kind, Event::SCallbackInfo& info) {
+        if (!g_gesture.open || g_gesture.kind != kind || g_gesture.session.target == drift::Target::PassThrough)
+            return false;
+        info.cancelled = true;
+        return true;
+    }
+
+    void setSceneCamera(const cammath::CameraState& camera) {
+        if (HyprVXPolicy::model().setCamera(g_gesture.session.workspace, camera))
+            HyprVXPolicy::sync(true);
+    }
+
+    void onPinchBegin(const IPointer::SPinchBeginEvent& event, Event::SCallbackInfo& info) {
+        beginGesture(drift::InputKind::Pinch, event.fingers, info);
+    }
+
+    // Absolute from the begin camera (cumulative libinput scale), anchored at the begin pointer (FR-008).
+    void onPinchUpdate(const IPointer::SPinchUpdateEvent& event, Event::SCallbackInfo& info) {
+        if (!consumed(drift::InputKind::Pinch, info) || g_gesture.session.target != drift::Target::Zoom || !stillLive(g_gesture.session))
+            return;
+        setSceneCamera(drift::pinchCamera(g_gesture.start, g_gesture.origin, g_gesture.anchor, event.scale));
+    }
+
+    void onPinchEnd(const IPointer::SPinchEndEvent& event, Event::SCallbackInfo& info) {
+        if (consumed(drift::InputKind::Pinch, info) && event.cancelled && g_gesture.session.target == drift::Target::Zoom &&
+            stillLive(g_gesture.session))
+            setSceneCamera(g_gesture.start);  // FR-012
+        g_gesture = {};
     }
 
     // Finger-source scroll sequences (FR-002, FR-004..FR-006). Wheel, continuous and tilt sources are Feature 002's.
@@ -172,15 +235,16 @@ void HyprVXPolicy::initGesture(HANDLE handle) {
     g_listeners.push_back(bus.gesture.swipe.begin.listen([](IPointer::SSwipeBeginEvent, Event::SCallbackInfo& info) { onGesture(info); }));
     g_listeners.push_back(bus.gesture.swipe.update.listen([](IPointer::SSwipeUpdateEvent, Event::SCallbackInfo& info) { onGesture(info); }));
     g_listeners.push_back(bus.gesture.swipe.end.listen([](IPointer::SSwipeEndEvent, Event::SCallbackInfo& info) { onGesture(info); }));
-    g_listeners.push_back(bus.gesture.pinch.begin.listen([](IPointer::SPinchBeginEvent, Event::SCallbackInfo& info) { onGesture(info); }));
-    g_listeners.push_back(bus.gesture.pinch.update.listen([](IPointer::SPinchUpdateEvent, Event::SCallbackInfo& info) { onGesture(info); }));
-    g_listeners.push_back(bus.gesture.pinch.end.listen([](IPointer::SPinchEndEvent, Event::SCallbackInfo& info) { onGesture(info); }));
+    g_listeners.push_back(bus.gesture.pinch.begin.listen([](IPointer::SPinchBeginEvent e, Event::SCallbackInfo& info) { onPinchBegin(e, info); }));
+    g_listeners.push_back(bus.gesture.pinch.update.listen([](IPointer::SPinchUpdateEvent e, Event::SCallbackInfo& info) { onPinchUpdate(e, info); }));
+    g_listeners.push_back(bus.gesture.pinch.end.listen([](IPointer::SPinchEndEvent e, Event::SCallbackInfo& info) { onPinchEnd(e, info); }));
 }
 
 void HyprVXPolicy::shutdownGesture() {
     g_listeners.clear();
     g_tracker.reset();
-    g_scroll = {};
+    g_scroll  = {};
+    g_gesture = {};
     g_panFactor.reset();
     g_glide.reset();
     g_glideMinSpeed.reset();
