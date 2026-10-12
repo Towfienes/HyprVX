@@ -42,9 +42,9 @@
   three test windows, Drift on; the user performs and signs. Claude does not sign for the user.
 - After T045: T044 host-safety audit (covers the L6 session; the lint part is done), T046 records and quickstart,
   T047 merge-readiness review, T048 Feature 003 gate (user approval).
-- Pending user decision (2026-10-12): an external-project evaluation (phantomat, hypr-canvas, infinity-land) was
-  reported; the recommendation is to continue HyprVX and use phantomat as a reference only. No direction change has
-  been made; the user decides.
+- Decided (user, 2026-10-12, DV3-18): continue HyprVX on the master plan; phantomat is a reference only (Phase 5
+  navigation/search UX, Phase 8 linked screens, fullscreen/X11/popup test cases; BSD-3 attribution; copying code needs
+  approval). See `docs/v3/EXTERNAL_PROJECTS_REVIEW.md`.
 
 ## Sprint 1 goal
 

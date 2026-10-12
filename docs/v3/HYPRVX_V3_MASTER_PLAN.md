@@ -550,6 +550,11 @@ Effort là khoảng thô theo đơn vị *focused engineering-weeks*, độ tin 
   **Đã chấm dứt (user, 2026-10-12)** trước khi Antigravity bắt đầu WO-01 (nhánh clone vẫn ở `4d4aaac`, không có
   commit nào): WO-01 bị hủy, T005–T006 về lại Claude; DV3-15 (Claude Code là agent duy nhất) áp dụng trở lại toàn bộ.
   Clone `HyprVX-v3-agy` được giữ nguyên làm tham chiếu, không đồng bộ nữa.
+- **DV3-18** Dự án tham khảo bên ngoài (user, 2026-10-12, sau đánh giá chỉ đọc `docs/v3/EXTERNAL_PROJECTS_REVIEW.md`):
+  tiếp tục HyprVX theo Master Plan; `phantomat` (BSD-3) chỉ là tài liệu tham khảo cho UX điều hướng/tìm kiếm (Phase 5),
+  liên kết màn hình (Phase 8) và các ca test fullscreen/X11/popup. Sao chép code cần user duyệt riêng và phải giữ
+  thông báo bản quyền BSD-3 (THIRD_PARTY). Không đổi roadmap, kiến trúc, Constitution V hay acceptance U-1..U-6;
+  `hypr-canvas` và `infinity-land` không được dùng.
 
 **Còn mở:**
 - License toàn dự án (D010 của V1). `CameraMath.hpp` đã chốt BSD-3-Clause (DV3-10).

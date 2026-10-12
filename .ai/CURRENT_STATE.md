@@ -491,5 +491,5 @@ Production safety: host Hyprland and Caelestia untouched; no plugin loaded; no p
 - External evaluation reported to the user (read only, nothing installed): phantomat (plugin, 0.56, mutates
   floating/workspace and restores: the §C5 fallback HyprVX rejected), hypr-canvas (alpha, single camera, no tests),
   infinity-land (Hyprland 0.51.1 fork, one day of commits). Recommendation: continue HyprVX, reference phantomat.
-  Awaiting the user's decision.
+  Decided by the user (DV3-18): continue HyprVX; phantomat is a reference only.
 
