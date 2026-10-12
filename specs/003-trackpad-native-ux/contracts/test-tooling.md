@@ -26,7 +26,8 @@ fscroll T0 DT N DX DY [stop]
 - Sends N finger-source axis frames at event times `T0, T0+DT, …` (milliseconds, the request `time` field), each with
   value `(DX, DY)` per frame. For each non-zero axis it sends `axis`, then `axis_source(finger)` (Hyprland rebuilds
   the pending event on `axis`, research R9), then `frame`.
-- With `stop`, it then sends `axis_stop` for both axes at time `T0 + N·DT` and a `frame`.
+- With `stop`, it then sends `axis_stop` at time `T0 + N·DT` for each axis that moved (non-zero value) and a `frame`
+  (a stop keeps that axis's previous source in Hyprland, so an axis that never moved would arrive with the wheel source).
 - Limits: `1 ≤ N ≤ 200`, `0 ≤ DT ≤ 1000`, `|DX|, |DY| ≤ 500`, finite; otherwise an `error` line and nothing is sent.
 - Logs `done` like the other commands, with the parameters.
 - Same identity refusal as the other commands (nested display only).

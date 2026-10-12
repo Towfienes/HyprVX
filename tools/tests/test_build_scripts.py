@@ -72,13 +72,19 @@ class BuildScriptTest(unittest.TestCase):
         result = subprocess.run(["bash", str(SCRIPT), "--form", "P", "--dev", "--dry-run"], env=env, capture_output=True, text=True)
         self.assertEqual(result.returncode, 2)
         self.assertIn("--dev applies to form S only", result.stderr)
+        result = subprocess.run(["bash", str(SCRIPT), "--form", "S", "--dev", "--testinput", "--dry-run"], env=env,
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("--dev and --testinput are exclusive", result.stderr)
 
     @unittest.skipUnless(SCRIPT.name == "build-plugin.sh", "plugin build script only")
     def test_plugin_dry_run_plans_each_form(self):
         env = os.environ | {"HYPRVX_AGENT": "codex"}
         cases = {("P",): ("/prefix/", "plugin/P/hyprvx-drift-P.so", "-DHYPRVX_PLUGIN_DEV=OFF"),
                  ("S",): ("/prefix/stock", "plugin/S/hyprvx-drift-S.so", "-DHYPRVX_PLUGIN_DEV=OFF"),
-                 ("S", "--dev"): ("/prefix/stock", "plugin/S-dev/hyprvx-drift-S.so", "-DHYPRVX_PLUGIN_DEV=ON")}
+                 ("S", "--dev"): ("/prefix/stock", "plugin/S-dev/hyprvx-drift-S.so", "-DHYPRVX_PLUGIN_DEV=ON"),
+                 ("P", "--testinput"): ("/prefix/", "plugin/testinput-P/hyprvx-testinput-P.so", "-DHYPRVX_TESTINPUT_FORM=P"),
+                 ("S", "--testinput"): ("/prefix/stock", "plugin/testinput-S/hyprvx-testinput-S.so", "-DHYPRVX_TESTINPUT_FORM=S")}
         for args, (prefix, output, dev) in cases.items():
             with self.subTest(args=args):
                 result = subprocess.run(["bash", str(SCRIPT), "--form", *args, "--dry-run"], env=env, capture_output=True, text=True)
@@ -86,7 +92,11 @@ class BuildScriptTest(unittest.TestCase):
                 self.assertIn(prefix, result.stdout)
                 self.assertIn(output, result.stdout)
                 self.assertIn(dev, result.stdout)
-                self.assertIn(f"-DHYPRVX_PLUGIN_FORM={args[0]}", result.stdout)
+                if "--testinput" in args:
+                    self.assertIn("tools/testinput", result.stdout)
+                    self.assertNotIn("HYPRVX_PLUGIN_FORM", result.stdout)
+                else:
+                    self.assertIn(f"-DHYPRVX_PLUGIN_FORM={args[0]}", result.stdout)
                 self.assertIn("MemoryMax=6G", result.stdout)
                 self.assertIn("heavy.lock", result.stdout)
                 self.assertIn("MemAvailable >= 6.5 GiB", result.stdout)
