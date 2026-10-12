@@ -1,0 +1,38 @@
+{
+  "run_id": "20261012-091115-formP-39e0bd5-t_glide_stop",
+  "test": "t_glide_stop",
+  "result": "BLOCKED",
+  "agent": "claude",
+  "git_sha": "39e0bd5b91c1b6397440fe885322e26bfcf6ac6c",
+  "note": "scroll: no glide running after the release (check vacuous)",
+  "artifacts": [
+    ".tp_time",
+    "a.jsonl",
+    "b.jsonl",
+    "build-info-patched.json",
+    "build-info-plugin.json",
+    "build-info-testinput.json",
+    "c.jsonl",
+    "home.cmds",
+    "home.steps.json",
+    "kb.jsonl",
+    "keywords.log",
+    "on-scroll.reply",
+    "on.reply",
+    "plugin-load.log",
+    "plugin.sha256",
+    "preflight.log",
+    "reset-scroll.reply",
+    "scroll-pointer.cmds",
+    "scroll-pointer.steps.json",
+    "scroll-start.cmds",
+    "scroll-start.steps.json",
+    "session.log",
+    "testinput-load.log",
+    "testinput.sha256",
+    "vp.jsonl"
+  ],
+  "not_run": [
+    "scroll: no glide running after the release (check vacuous)"
+  ]
+}

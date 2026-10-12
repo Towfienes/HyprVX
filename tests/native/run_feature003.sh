@@ -9,7 +9,7 @@ set -uo pipefail
 here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$here/lib.sh"
 set +e  # lib.sh enables errexit; a failing test must be recorded, not end the suite
-DEFAULT_TESTS="t_plugin_inert t_tp_pan t_tp_window t_tp_super t_tp_lock t_tp_surfaces t_tp_off"
+DEFAULT_TESTS="t_plugin_inert t_tp_pan t_tp_window t_tp_super t_tp_lock t_tp_surfaces t_tp_off t_pinch t_cancel t_arbitrate t_glide t_glide_stop t_tp_modes t_tp_drag"
 TESTS=(${HVX_TESTS:-$DEFAULT_TESTS})
 FORMS=(${HVX_FORMS:-P S})
 SCALES=(${HVX_SCALES:-1 1.25})
