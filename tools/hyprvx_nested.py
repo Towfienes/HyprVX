@@ -231,7 +231,9 @@ def resolve_binary(variant, explicit):
 
 
 INTERACTIVE_RULE_OFF = "monitor = WAYLAND-1, disable"
-INTERACTIVE_RULE_ON = "monitor = WAYLAND-1, preferred, auto, 1"
+# L6 (T045): the nested window's pointer is invisible with Hyprland's hardware cursor through the wayland backend, so
+# the interactive session draws a software cursor (set at start; a runtime keyword did not take effect).
+INTERACTIVE_RULE_ON = "monitor = WAYLAND-1, preferred, auto, 1\ncursor {\n    no_hardware_cursors = true\n}"
 
 
 def render_config(path, size, scale, interactive=False):
