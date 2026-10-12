@@ -29,6 +29,8 @@ fscroll T0 DT N DX DY [stop]
 - With `stop`, it then sends `axis_stop` at time `T0 + N·DT` for each axis that moved (non-zero value) and a `frame`
   (a stop keeps that axis's previous source in Hyprland, so an axis that never moved would arrive with the wheel source).
 - Limits: `1 ≤ N ≤ 200`, `0 ≤ DT ≤ 1000`, `|DX|, |DY| ≤ 500`, finite; otherwise an `error` line and nothing is sent.
+- `fstop T v|h|vh` sends `axis_stop` for those axes at event time `T` and a `frame` (a release after a rest, for
+  T-GLIDE); the axes must have moved with `fscroll` before.
 - Logs `done` like the other commands, with the parameters.
 - Same identity refusal as the other commands (nested display only).
 

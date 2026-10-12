@@ -4,7 +4,8 @@
 //
 // Commands, one per line: "move X Y" (absolute, logical px), "down [BUTTON]", "up [BUTTON]", "click [BUTTON]",
 // "scroll DX DY" (wheel units: one detent = value120 120; positive DY scrolls down; test-tooling 1.4 4a),
-// "fscroll T0 DT N DX DY [stop]" (finger source, explicit event times; Feature 003 test-tooling 1.5 4a), "quit".
+// "fscroll T0 DT N DX DY [stop]" and "fstop T v|h|vh" (finger source, explicit event times; Feature 003 test-tooling
+// 1.5 4a), "quit".
 // Each command is followed by a frame request and a roundtrip, then a "done" log line, so the compositor has
 // processed it (and sent any pointer events) before the line is written. Launch it only through scripts/nested.sh run;
 // it refuses any display that is not a private /tmp/hvx-* runtime dir served by an agent-prefix Hyprland binary.
@@ -145,6 +146,22 @@ void handleCommand(State& s, const std::string& line) {
             button(s, code, !std::strcmp(word, "down"));
         }
         logLine(s, "\"seq\": %" PRIu64 ", \"ev\": \"done\", \"cmd\": \"%s\", \"button\": %u", ++s.seq, word, code);
+    } else if (line.rfind("fstop ", 0) == 0) {
+        // A separate finger scroll stop at event time T for the given axes (v, h or vh), e.g. a release after a rest
+        // (Feature 003 test-tooling 1.5 4a). The axes must have moved with fscroll before (the stop keeps their source).
+        unsigned t = 0;
+        char     axesArg[4] = {};
+        if (std::sscanf(line.c_str(), "fstop %u %3s", &t, axesArg) != 2 ||
+            (std::strcmp(axesArg, "v") && std::strcmp(axesArg, "h") && std::strcmp(axesArg, "vh"))) {
+            logLine(s, "\"ev\": \"error\", \"message\": \"fstop needs a time and v, h or vh\"");
+            return;
+        }
+        if (std::strchr(axesArg, 'v'))
+            zwlr_virtual_pointer_v1_axis_stop(s.pointer, t, WL_POINTER_AXIS_VERTICAL_SCROLL);
+        if (std::strchr(axesArg, 'h'))
+            zwlr_virtual_pointer_v1_axis_stop(s.pointer, t, WL_POINTER_AXIS_HORIZONTAL_SCROLL);
+        finish(s);
+        logLine(s, "\"seq\": %" PRIu64 ", \"ev\": \"done\", \"cmd\": \"fstop\", \"t\": %u, \"axes\": \"%s\"", ++s.seq, t, axesArg);
     } else if (line.rfind("fscroll ", 0) == 0) {
         // Finger-source scroll sequence with explicit event times (Feature 003 test-tooling 1.5 §4a):
         //   fscroll T0 DT N DX DY [stop]

@@ -96,18 +96,16 @@ tp_capture ws1-after
 hvx_analyze ws1-camera-kept diff "$HVX_EVID/ws1-after.png" --reference "$HVX_EVID/ws1-before.png" --max-pixels 0 \
     || fail "3: workspace 1 did not keep its camera across the 4-finger switch"
 
-# Control: Drift off, the same bindings act.
+# Control: Drift off, the same bindings act (judged on socket2 events after this point, and on the window count).
 hvx_dispatch hyprvx:off > "$HVX_EVID/off.reply" 2>&1 || true
 tp_run focus-a2 "move 290 200" "click" "move 480 300"
+ctl_from=$(wc -l < "$HVX_EVID/events.log")
+ctl_events() { tail -n +"$((ctl_from + 1))" "$HVX_EVID/events.log" | grep -c "^$1>>" || true; }
 swipe 3 0 -10
-clients_state ctl-up
-grep -q '^hyprvx-testclient \(True\|true\) [12]' "$HVX_EVID/ctl-up.state" \
-    || hvx_die_blocked "control: 3 up did not make a fullscreen with Drift off (check vacuous)"
+(($(ctl_events fullscreen) >= 1)) || hvx_die_blocked "control: 3 up made no fullscreen event with Drift off (check vacuous)"
 hvx_dispatch fullscreen > "$HVX_EVID/ctl-fs-off.reply" 2>&1 || true
 swipe 3 -10 0
-clients_state ctl-left
-grep -q '^hyprvx-testclient \(False\|false\) ' "$HVX_EVID/ctl-left.state" \
-    || hvx_die_blocked "control: 3 left did not change a's floating state with Drift off (check vacuous)"
+(($(ctl_events changefloatingmode) >= 1)) || hvx_die_blocked "control: 3 left made no floating change with Drift off (check vacuous)"
 swipe 3 0 10
 clients_state ctl-down
 (($(wc -l < "$HVX_EVID/ctl-down.state") == $(wc -l < "$HVX_EVID/before.state") - 1)) \

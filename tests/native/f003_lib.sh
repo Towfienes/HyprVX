@@ -67,10 +67,14 @@ for s in json.load(open(sys.argv[1]))['steps']:
 }
 
 # tp_next_time [GAP_MS]: advances the event time base by 10 s (or GAP_MS) and prints it, so a sequence never falls
-# inside the 200 ms idle window of the previous one.
+# inside the 200 ms idle window of the previous one. The counter lives in a file, so `T=$(tp_next_time)` (a subshell)
+# still advances it.
 tp_next_time() {
-    TP_TIME=$((TP_TIME + ${1:-10000}))
-    echo "$TP_TIME"
+    local f="$HVX_EVID/.tp_time" t
+    t=$(cat "$f" 2> /dev/null || echo "$TP_TIME")
+    t=$((t + ${1:-10000}))
+    echo "$t" > "$f"
+    echo "$t"
 }
 
 # tp_run NAME LINE...: vpointer commands (one per argument) through pointer_driver; events attributed per client.
@@ -100,9 +104,10 @@ for s in json.load(open(sys.argv[1]))['steps']:
             print(json.dumps(e))" "$HVX_EVID/$1.steps.json" "$2" "$3"
 }
 
-# tp_capture NAME: one capture of the scene (ready rule on client a).
+# tp_capture NAME [CLIENT]: one capture of the scene; the ready rule runs on CLIENT (default a), which must be mapped
+# and drawn (a closed client's FIFO has no reader).
 tp_capture() {
-    hvx_capture "$1" a
+    hvx_capture "$1" "${2:-a}"
 }
 
 # tp_box NAME WIN BOX TOL: measures window WIN in capture NAME against the logical drawn box BOX ("X,Y,W,H"); the
@@ -149,4 +154,28 @@ print(1 if x >= 2 and y >= 2 and x + w <= W - 2 and y + h <= H - 2 else 0)" "$bo
         return 1
     fi
     return $ok
+}
+
+# tp_wait_still NAME [TIMEOUT_S]: waits until the HVX-1 frame count stops growing for 300 ms (a glide has ended), at most
+# TIMEOUT_S seconds (default 5). Exit 1 on timeout. The counts are recorded in NAME.frames (a measurement only).
+tp_wait_still() {
+    local name=$1 deadline prev cur
+    deadline=$(($(date +%s%N) + ${2:-5} * 1000000000))
+    prev=$(hvx_frames HVX-1)
+    while (($(date +%s%N) < deadline)); do
+        sleep 0.3
+        cur=$(hvx_frames HVX-1)
+        echo "$cur" >> "$HVX_EVID/$name.frames"
+        [[ $cur == "$prev" ]] && return 0
+        prev=$cur
+    done
+    return 1
+}
+
+# tp_glide_setting VALUE: sets plugin:hyprvx:glide (BLOCKED if refused).
+tp_glide_setting() {
+    local reply
+    reply=$(hvx_hyprctl_form keyword plugin:hyprvx:glide "$1" 2>&1)
+    echo "keyword plugin:hyprvx:glide $1 -> $reply" >> "$HVX_EVID/keywords.log"
+    [[ $reply == ok ]] || hvx_die_blocked "keyword plugin:hyprvx:glide $1 refused: $reply"
 }

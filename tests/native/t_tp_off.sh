@@ -38,9 +38,10 @@ scene() {
     gesture swipe 3 "3 -10 0" "$TP_CANVAS_X $TP_CANVAS_Y"
     tp_capture "$p-swipe3-left"
     gesture swipe 3 "3 0 10" "$TP_CANVAS_X $TP_CANVAS_Y"
-    tp_capture "$p-swipe3-down"
+    tp_capture "$p-swipe3-down" b   # the close binding closed a; b drives the ready rule
     gesture swipe 4 "4 -60 0" "$TP_CANVAS_X $TP_CANVAS_Y"
-    tp_capture "$p-swipe4"
+    # The new workspace has no client to drive a ready rule: compare the active workspace instead of a capture.
+    hvx_hyprctl_form -j activeworkspace | python3 -I -c "import json, sys; print(json.load(sys.stdin)['id'])" > "$HVX_EVID/$p.ws"
 }
 
 # gesture KIND FINGERS UPDATE_ARGS POINTER: pointer to POINTER, begin, 10 updates (pinch: 1), end.
@@ -61,13 +62,15 @@ hvx_stop >> "$HVX_EVID/stock.session.log" 2>&1 || hvx_die_blocked "stock session
 
 tp_setup --no-drift
 scene off
-for step in start canvas window pinch-canvas pinch-a swipe3-left swipe3-down swipe4; do
+for step in start canvas window pinch-canvas pinch-a swipe3-left swipe3-down; do
     hvx_analyze "off-$step-vs-stock" diff "$HVX_EVID/off-$step.png" --reference "$HVX_EVID/stock-$step.png" --max-pixels 0 \
         || fail "Drift off: capture '$step' differs from stock"
 done
 cmp -s "$HVX_EVID/off.a.axis" "$HVX_EVID/stock.a.axis" || fail "Drift off: a's scroll events differ from stock"
 [[ -s $HVX_EVID/stock.a.axis ]] || hvx_die_blocked "the stock session logged no scroll event for a (comparison vacuous)"
 cmp -s "$HVX_EVID/off.a.pinch" "$HVX_EVID/stock.a.pinch" || fail "Drift off: a's pinch events differ from stock"
+cmp -s "$HVX_EVID/off.ws" "$HVX_EVID/stock.ws" || fail "Drift off: the 4-finger swipe left a different workspace active than stock"
+[[ $(cat "$HVX_EVID/stock.ws") != 1 ]] || hvx_die_blocked "the 4-finger swipe did not switch the workspace in the stock session (comparison vacuous)"
 [[ -s $HVX_EVID/stock.a.pinch ]] || hvx_die_blocked "the stock session logged no pinch for a (comparison vacuous)"
 hvx_differs stock-close-acted "$HVX_EVID/stock-swipe3-down.png" "$HVX_EVID/stock-swipe3-left.png" \
     || hvx_die_blocked "the 3-finger close binding did not act in the stock session (comparison vacuous)"
