@@ -34,6 +34,16 @@ The host config is never changed (Constitution I, VII). The design target is Hyp
 compositor, where all of these gestures reach the HyprVX policy; nested sessions reproduce that situation with a
 nested config that contains the same gesture bindings and a nested-only synthetic gesture input.
 
+## Clarifications
+
+### Session 2026-10-12
+
+- Q: How does L6 cover pinch and 3-finger gestures, given that a nested session cannot receive them and the host
+  acts on 3- and 4-finger gestures? → A: Partial L6 in a nested session for everything that physically reaches it;
+  pinch, 3-finger and U4 hardware items BLOCKED (environment) with automated nested evidence, carried forward to a
+  later approved hardware session (Phase 9 or an earlier separately approved one); the gate is signed with them open.
+  No host change, no compositor outside the nested harness (FR-021).
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 — Pan the canvas with two fingers (Priority: P1)
@@ -232,9 +242,12 @@ produced once the glide ends, and the setting 0 produces no glide.
   bindings, so that arbitration is tested against the real conflict.
 - **FR-020**: Any synthetic gesture input used for tests MUST exist only in dev builds and MUST be refused by
   non-dev builds, like the dev control of Features 001 and 002.
-- **FR-021**: Physical-hardware validation (L6) MUST be done by a human with the real trackpad following a written
-  checklist; [NEEDS CLARIFICATION: how to cover pinch and 3-finger gestures in L6, given that a nested session cannot
-  receive them and the host acts on 3- and 4-finger gestures — see Assumptions].
+- **FR-021**: Physical-hardware validation (L6) MUST be done by a human with the real trackpad in a nested session
+  following a written checklist. It covers everything that physically reaches a nested session (two-finger pan over
+  canvas and over windows, Super + two-finger pan, glide and its interruption, Drift off = stock scrolling). Physical
+  pinch, 3-finger and U4 items are recorded BLOCKED (environment) with the automated nested evidence attached and
+  carried forward to the first approved session with HyprVX in a compositor that owns the trackpad; the gate is signed
+  with those items open.
 - **FR-022**: Feature 001 and Feature 002 suites MUST still pass with the feature built in (both delivery forms).
 
 ### Key Entities
@@ -278,7 +291,7 @@ produced once the glide ends, and the setting 0 produces no glide.
   stop, but no pinch, swipe or hold from the physical trackpad; 3- and 4-finger gestures made over the nested window
   are executed by the host first. During L6 in a nested session the human must not perform 3- or 4-finger gestures
   over the nested window (host actions include close window and suspend-then-hibernate).
-- **Recommended answer to the FR-021 clarification**: L6 covers in a nested session everything that can physically
+- **L6 coverage (user's answer, 2026-10-12)**: L6 covers in a nested session everything that can physically
   reach it (two-finger pan over canvas and windows, Super + two-finger pan, glide and interruption, Drift off = stock
   scrolling); physical pinch and 3-finger items are recorded BLOCKED (environment) with the automated nested evidence
   attached, and are carried forward to the first approved session with HyprVX in a compositor that owns the trackpad

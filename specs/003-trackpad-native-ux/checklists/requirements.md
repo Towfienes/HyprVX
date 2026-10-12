@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -30,6 +30,9 @@
 - [x] No implementation details leak into specification
 
 ## Notes
+
+- Iteration 2 (2026-10-12): the user answered the FR-021 question (partial L6 in nested, pinch/3-finger/U4
+  hardware items BLOCKED and carried forward); all items pass.
 
 - Iteration 1 (2026-10-12). One marker remains (FR-021: how L6 covers pinch and 3-finger gestures). It is a scope
   decision about the Phase 4 gate that only the user can make, because the alternatives to a nested session (running
