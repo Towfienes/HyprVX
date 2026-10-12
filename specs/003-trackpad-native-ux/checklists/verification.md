@@ -8,7 +8,7 @@ they run in form P.
 
 | ID | Level | Check | Status | Artifact |
 |---|---|---|---|---|
-| V-01 | L2 | `GestureModel` unit tests (`tests/unit/test_gesture_model.cpp`, contract gesture-model 1.0), two seeds | NOT RUN | — |
+| V-01 | L2 | `GestureModel` unit tests (`tests/unit/test_gesture_model.cpp`, contract gesture-model 1.0), two seeds | PASS | `~/.local/share/hyprvx/evidence/claude/20261012-080650-unit-84ea21b-f003_unit/` (fresh build of a copy; ctest 367/367; 41 GestureModel tests with the default seed and 987654321; mutants 9/9 killed) |
 | V-02 | L1/L4 | Identity refusal of `fscroll`, `hvxtest` and `--interactive` (no capture) outside a verified session | NOT RUN | — |
 | V-03 | L4 | GATE-A after the gesture-binding config change: stock determinism, baseline hash unchanged | NOT RUN | — |
 | V-04 | L5 | T-TP-PAN | NOT RUN | — |
