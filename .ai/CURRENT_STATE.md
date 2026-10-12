@@ -493,3 +493,11 @@ Production safety: host Hyprland and Caelestia untouched; no plugin loaded; no p
   infinity-land (Hyprland 0.51.1 fork, one day of commits). Recommendation: continue HyprVX, reference phantomat.
   Decided by the user (DV3-18): continue HyprVX; phantomat is a reference only.
 
+## Feature 003 at T047 (2026-10-12)
+
+- T045 L6 signed PARTIAL by the user (Towfienes): H9 PASS; H1–H8, H10 BLOCKED (nested scroll is source WHEEL:
+  aquamarine 0.15.1 drops `axis_source`/`axis_stop`; host takes Super combinations); B1–B6 BLOCKED. The interactive
+  session keeps the hardware cursor with `use_cpu_buffer = 1` (pointer invisible; a software cursor froze the window).
+- T044 V-23 PASS: marker audit (4 sessions after the 12:46 reboot wiped /tmp) plus a new archive audit (531 sessions).
+- T046 records and quickstart validated (ctest 367/367, 5 builds, lint, analyzer); constitution re-check in plan.md.
+

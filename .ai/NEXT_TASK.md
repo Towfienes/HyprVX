@@ -30,21 +30,15 @@
   V3 (Features 003–009). The clone `HyprVX-v3-agy` is kept untouched as a reference.
 - V-20 / SC-005: PASS, signed by the user (Towfienes) on 2026-10-11 in `checklists/verification.md`.
 
-## Feature 003 resume point (2026-10-12): STOPPED at T045 (L6, needs the user)
+## Feature 003 resume point (2026-10-12): T001–T046 done; T047 review, then STOP at T048
 
-- Done with archived evidence: T001–T041, T043 (T042 checklist written). Plugin code final at `789c75c`; branch head
-  after the records. V-01..V-22 PASS (see `specs/003-trackpad-native-ux/checklists/verification.md`):
-  full suite 56/56 (`20261012-092548-suite-37aa805-feature003`), parity P/S 140/140, T-FR020, Feature 002
-  regression 88/88 (`20261012-101647-suite-cf97aee-feature002`), Feature 001 regression P and S, R1 clean-room
-  56/56 with two byte-identical builds (`20261012-111722-suite-cf97aee-feature003`).
-- **Next: T045, the L6 session with the user** (`checklists/l6-physical.md`, items H1–H10 two fingers only; B1–B6
-  BLOCKED by the environment). Claude starts `nested.sh start --variant patched --interactive`, loads plugin P,
-  three test windows, Drift on; the user performs and signs. Claude does not sign for the user.
-- After T045: T044 host-safety audit (covers the L6 session; the lint part is done), T046 records and quickstart,
-  T047 merge-readiness review, T048 Feature 003 gate (user approval).
-- Decided (user, 2026-10-12, DV3-18): continue HyprVX on the master plan; phantomat is a reference only (Phase 5
-  navigation/search UX, Phase 8 linked screens, fullscreen/X11/popup test cases; the user is phantomat's author, no attribution;
-  copying code needs approval). See `docs/v3/EXTERNAL_PROJECTS_REVIEW.md`.
+- Done with archived evidence: T001–T046. V-01..V-23 PASS; V-24 L6 signed PARTIAL by the user (H9 PASS; finger-scroll
+  items BLOCKED because nested scrolls are source WHEEL in aquamarine 0.15.1; Super combinations taken by the host;
+  B1–B6 BLOCKED). research R2 corrected. All 16 cited archives and 248 child runs pass `sha256sum -c`.
+- Next: T047 merge-readiness review (commits since `142d2d0`, `dev == 15f75b0`, nothing pushed, no `AGY_EXPERIMENT.md`),
+  then **T048 Feature 003 gate: STOP for the user's approval** before merging or starting Feature 004.
+- Carried to a hardware session where HyprVX owns the trackpad: every finger-scroll/glide item, pinch, 3/4-finger, U4.
+- DV3-18 (user): continue HyprVX; phantomat is a reference only (the user is its author; no attribution needed).
 
 ## Sprint 1 goal
 

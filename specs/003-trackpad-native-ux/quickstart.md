@@ -42,7 +42,7 @@ env HYPRVX_AGENT=claude bash tests/native/gate_a_stock_determinism.sh    # after
 env HYPRVX_AGENT=claude bash tests/native/run_feature003.sh              # T-TP-* × forms P, S × scales 1, 1.25
 env HYPRVX_AGENT=claude bash tests/native/run_feature002.sh              # regression
 for F in P S; env HYPRVX_AGENT=claude HVX_REGRESSION_FORM=$F bash tests/native/run_sprint1.sh; env HYPRVX_AGENT=claude HVX_REGRESSION_FORM=$F bash tests/native/run_phase2.sh; end
-python3 -I tests/native/compare_forms.py --form-p <P suite> --form-s <S suite>
+python3 -I tests/native/compare_forms.py --suite-p <suite dir> --suite-s <suite dir> --out report.json   # one suite holds both forms
 ```
 
 Every run prints its run-id; `sha256sum -c SHA256SUMS` in each archive before citing it.
@@ -54,6 +54,11 @@ env HYPRVX_AGENT=claude bash scripts/nested.sh start --variant patched --interac
 env HYPRVX_AGENT=claude bash scripts/nested.sh plugin load ~/.cache/hyprvx/claude/plugin/P/hyprvx-drift-P.so
 env HYPRVX_AGENT=claude bash scripts/nested.sh dispatch hyprvx:on
 ```
+
+`tests/native/l6_session.sh` does the same with the three scene clients and bookkeeping through a control FIFO (T045).
+Known limits of nested L6 (T045): every scroll arrives as source WHEEL (aquamarine 0.15.1 drops `axis_source` and
+`axis_stop`), so the finger-scroll path cannot be exercised by hand there; the pointer is invisible in the nested
+window; the host takes every Super combination over it.
 
 Then follow `checklists/l6-physical.md`: two-finger pan on empty canvas, two-finger scroll over a window, Super +
 two-finger pan, fast release glides and stops, touching again stops it. **Never make 3- or 4-finger gestures over the

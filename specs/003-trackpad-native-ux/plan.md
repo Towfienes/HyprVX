@@ -56,6 +56,21 @@ Make the trackpad the primary navigation of Drift Mode, entirely in the policy p
 | IX License | PASS | No third-party code copied; pointer-gestures XML is generated from the system package at build time (as `CMakeLists.txt:194` already does) |
 | X Reproducible | PASS | Patch series unchanged; plugins and the test plugin built in fresh directories with `build-info.json` |
 
+### Constitution re-check of the delivered code (T046, 2026-10-12, plugin code `789c75c`)
+
+| Principle | Result | Evidence |
+|---|---|---|
+| I Host safety | PASS | V-23: marker audit `20261012-133748-audit-678c629-v26` (4 post-reboot sessions) and archive audit `20261012-133941-static-579af99-f003_session_audit` (531 sessions, 531 distinct nested signatures, 0 bad); host config unchanged; the L6 session used no Super key and no 3/4-finger gesture |
+| II Evidence | PASS | V-01..V-23 archived with `sha256sum -c` OK; V-24 signed PARTIAL with BLOCKED items and reasons |
+| III Normal equivalence | PASS | V-09 T-TP-OFF (captures and client logs equal to stock); L6 H9 PASS |
+| IV Single transform | PASS | V-22 lint; one reviewed zoom-level line in GestureModel (not a camera equation) |
+| V Reversibility | PASS | V-12 (no window change from 3-finger gestures), V-16 (trackpad input never changes a dragged window); `Gesture.cpp` writes cameras only (`r1-source-verification.md`) |
+| VI Performance | PASS (measurement deferred) | No frames at rest after a glide (V-13 frame counts); glide steps on `render.preChecks` only while it moves |
+| VII Caelestia | PASS (layers) / NOT RUN (Caelestia) | V-08 layer-surface parts; Caelestia itself not run in nested |
+| VIII Reuse | PASS | `CameraController` (V1) drives glide; `CameraMath::anchorZoom` drives pinch |
+| IX License | PASS | No third-party code copied (DV3-18: phantomat is a reference only) |
+| X Reproducible | PASS | V-21: two clean builds byte-identical; captures equal across builds |
+
 ## Project Structure
 
 ### Documentation (this feature)
