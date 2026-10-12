@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # Unit-test evidence run. Default suite f002: Feature 002 V-01 (transform 1.2) and V-02 (DriftModel), reusable for the R1
 # re-run (T057). Suite f003 (first argument): Feature 003 V-01 (GestureModel, contracts/gesture-model.md 1.0).
+# Suite f004: Feature 004 V-01 (WindowBehavior, contracts/window-behavior.md 1.1, and the DriftModel group drag).
 # No compositor. A fresh headless build of a copy of this checkout (mutants never touch the working tree): ctest;
 # CameraMath and DriftModel tests with the default seed and seed 987654321; and mutation checks (each mutant must be
 # applied and make the suite fail). Evidence: ~/.cache/hyprvx/<agent>/evidence/<run-id>/, archived by hvx_finish.
-# From fish: env HYPRVX_AGENT=claude bash tests/unit/run_unit_evidence.sh [f002|f003]
+# From fish: env HYPRVX_AGENT=claude bash tests/unit/run_unit_evidence.sh [f002|f003|f004]
 set -euo pipefail
 source "$(dirname -- "${BASH_SOURCE[0]}")/../native/lib.sh"
 
 suite=${1:-f002}
-case $suite in f002|f003) ;; *) echo "usage: run_unit_evidence.sh [f002|f003]" >&2; exit 2 ;; esac
+case $suite in f002|f003|f004) ;; *) echo "usage: run_unit_evidence.sh [f002|f003|f004]" >&2; exit 2 ;; esac
 hvx_init_run unit "${suite}_unit"
 cache="$HOME/.cache/hyprvx/$HYPRVX_AGENT"
 mkdir -p "$cache/build"
@@ -24,6 +25,8 @@ result=PASS
 ctest --test-dir "$work/build" --output-on-failure > "$HVX_EVID/ctest.log" 2>&1 || result=FAIL
 if [[ $suite == f003 ]]; then
     filter='GestureTarget.*:ScrollTracker.*:ReleaseVelocity.*:GlideDamping.*:ExpectedGlide.*:Glide.*:PinchCamera.*'
+elif [[ $suite == f004 ]]; then
+    filter='WindowBehavior*:DriftModelGroupDrag.*:DriftModelTest.*'
 else
     filter='CameraMathTest.*:DriftModelTest.*'
 fi
@@ -43,6 +46,20 @@ mutants=(
     'core/src/GestureModel.cpp;;s/const double targetZoom = start.zoom \* scale;/const double targetZoom = scale;/;;pinch zoom not relative to the start zoom'
     'core/src/GestureModel.cpp;;s/motion.stopSpeed = cfg.stopSpeed;/motion.stopSpeed = 50.0;/;;glide stop speed ignored'
 )
+elif [[ $suite == f004 ]]; then
+mutants=(
+    'core/src/WindowBehavior.cpp;;s/releaseBand = std::max(settings.release, band.y);/releaseBand = settings.release;/;;hold uses release only (contract 1.0 rule, alternates when zoomed out)'
+    'core/src/WindowBehavior.cpp;;s/findBox(targets, p.target) \&\& std::abs(u - p.snapped) <= releaseBand/findBox(targets, p.target) \&\& std::abs(u - p.snapped) <= attachBand/;;gap hold uses the attach band (no hysteresis)'
+    'core/src/WindowBehavior.cpp;;s/!p.aligned \&\& findBox(targets, p.target) \&\&/!p.aligned \&\& true \&\&/;;a gap snap is held after its target is gone'
+    'core/src/WindowBehavior.cpp;;s/if (err > attachBand)/if (err >= attachBand)/;;attach band boundary excluded'
+    'core/src/WindowBehavior.cpp;;s/if (!other.attached || other.aligned)/if (!other.attached)/;;an alignment follows another alignment'
+    'core/src/WindowBehavior.cpp;;s/<= tolerance/<= 2.0 * tolerance/g;;group tolerance doubled'
+    'core/src/WindowBehavior.cpp;;s/    if (!overlapOpen(a, b, 1 - axis))/    if (false)/;;groups ignore the overlap on the other axis'
+    'core/src/WindowBehavior.cpp;;s/policy.minimumZoom         = limits.min;/policy.minimumZoom         = 0.01;/;;frame zoom not clamped to the minimum'
+    'core/src/WindowBehavior.cpp;;s/policy.marginPixels        = margin \* std::min(monitorSize.x, monitorSize.y);/policy.marginPixels        = margin * std::max(monitorSize.x, monitorSize.y);/;;frame margin from the larger screen side'
+    'core/src/DriftModel.cpp;;s/            setOffset(m.window, m.startOffset);/            (void)m;/;;drag cancel does not restore the start offsets'
+    'core/src/DriftModel.cpp;;s/^        dragCancel();$/        drag_.reset();/;;drag end conditions do not restore'
+)
 else
 mutants=(
     'core/include/hyprvx/core/CameraMath.hpp;;s/{{c.origin.x - O.x, c.origin.y - O.y}, c.zoom}/{{c.origin.x + O.x, c.origin.y + O.y}, c.zoom}/;;offsetCamera adds the offset'
@@ -50,7 +67,7 @@ mutants=(
     'core/src/DriftModel.cpp;;s/^void DriftModel::panic() {$/void DriftModel::panic() {\n    offsets_.clear();/;;panic clears stored offsets'
     'core/src/DriftModel.cpp;;s/return mapped \&\& scene \&\& \*scene == workspace/return scene \&\& *scene == workspace/;;mechanismOffset ignores unmapped windows'
     'core/src/DriftModel.cpp;;s/    if (s.mode == Mode::Entering || s.mode == Mode::Drift)/    if (s.mode == Mode::Entering)/;;enable in DRIFT is not a no-op'
-    'core/src/DriftModel.cpp;;s/return setOffset(drag_->window, {drag_->startOffset.x + world.x, drag_->startOffset.y + world.y});/return setOffset(drag_->window, {drag_->startOffset.x + delta.x, drag_->startOffset.y + delta.y});/;;move drag ignores the zoom'
+    'core/src/DriftModel.cpp;;s/return applyMoveDelta(cammath::worldDelta(drag_->startCamera, delta));/return applyMoveDelta(delta);/;;move drag ignores the zoom'
 )
 fi
 killed=0
@@ -79,7 +96,8 @@ for entry in "${mutants[@]}"; do
     fi
 done
 echo "mutants killed: $killed/${#mutants[@]}" >> "$HVX_EVID/mutation.log"
-if [[ $suite == f003 ]]; then label="Feature 003 V-01 GestureModel unit tests"; else label="Feature 002 V-01 transform 1.2 and V-02 DriftModel unit tests"; fi
+if [[ $suite == f003 ]]; then label="Feature 003 V-01 GestureModel unit tests"
+elif [[ $suite == f004 ]]; then label="Feature 004 V-01 WindowBehavior and DriftModel group-drag unit tests"; else label="Feature 002 V-01 transform 1.2 and V-02 DriftModel unit tests"; fi
 hvx_finish "$result" "$label" \
     "$(grep -h 'tests passed' "$HVX_EVID/ctest.log"); seeds default and 987654321; mutants $killed/${#mutants[@]}"
 [[ $result == PASS ]]
