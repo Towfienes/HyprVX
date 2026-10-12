@@ -101,12 +101,10 @@ tests/native/t_tp_*.sh  run_feature003.sh   # §9 tests
 6. **Gate**: full suites (Feature 003, 002, 001) in both forms; clean-room rebuild (R1); host-safety audit; L6
    session with the user; verification checklist; merge-readiness review; STOP at the Feature 003 gate.
 
-## Delegation trial (Antigravity, user-requested, 2026-10-12)
+## Delegation trial (ended)
 
-Claude stays architect, integrator and acceptance owner (DV3-15 otherwise unchanged). Candidate for the first trial
-after `tasks.md` approval: the `GestureModel` unit tests and implementation (pure C++, contract-defined, verifiable
-with `ctest` alone, no compositor). Claude fetches from outside the clone, reviews the diff, rebuilds and re-runs
-`ctest` and the lint, and records the result in `integration-log.md`. Native work stays with Claude.
+The Antigravity trial (DV3-17) for `GestureModel` (WO-01) was ended by the user on 2026-10-12 before it started.
+Claude Code implements every task (DV3-15).
 
 ## Risks
 

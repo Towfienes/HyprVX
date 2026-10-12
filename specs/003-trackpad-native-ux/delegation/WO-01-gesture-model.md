@@ -1,3 +1,6 @@
+> **CANCELLED (2026-10-12, user):** the Antigravity trial was ended before this order started (the clone branch
+> `v3/agy-experiment` stayed at `4d4aaac`, no commit, no build). T005–T006 are done by Claude. Kept as a record.
+
 # Work Order WO-01 — GestureModel (Feature 003 T005–T006)
 
 **Assigned to**: Antigravity, in `/home/towfienes/Projects/HyprVX-v3-agy`, branch `v3/agy-experiment` only.

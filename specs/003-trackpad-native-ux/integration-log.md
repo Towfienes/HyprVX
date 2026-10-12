@@ -18,7 +18,7 @@ contract change, delegation handoff or gate decision. Evidence rules: `contracts
 
 | WO | Tasks | Handed to | Handoff commit(s) | Claude review result | Defects found | Claude rework | Claude re-run result | Integrated as |
 |---|---|---|---|---|---|---|---|---|
-| WO-01 | T005–T006 | Antigravity (`HyprVX-v3-agy`, `v3/agy-experiment`) | — | pending | — | — | — | — |
+| WO-01 | T005–T006 | Antigravity (`HyprVX-v3-agy`, `v3/agy-experiment`) | none (branch still `4d4aaac`) | CANCELLED before start (user, 2026-10-12) | — | — | — | not delegated; Claude does T005–T006 |
 
 ## Log
 
@@ -32,3 +32,4 @@ contract change, delegation handoff or gate decision. Evidence rules: `contracts
 | 2026-10-12 | T004 | claude | v3/003-trackpad-native-ux@4de8717+wip | — (document) | DONE | — | — | — | — | `delegation/WO-01-gesture-model.md`: T005–T006 only, three files, test-first commits, verify commands inside the clone, handoff contents; Antigravity syncs by `git fetch origin` + `git merge --no-ff` (the §O4 update rule); Claude does not run commands inside the clone |
 | 2026-10-12 | T003 | claude | v3/003-trackpad-native-ux@860cd54+wip | `python3 -I tools/tests/test_build_scripts.py <script>` ×4 | PASS | — | — | — | — | `build-plugin.sh --testinput --form P|S` (exclusive with `--dev`), `tools/testinput/CMakeLists.txt`; build-info source roots follow the built tree |
 | 2026-10-12 | T008–T010 (build) | claude | v3/003-trackpad-native-ux@860cd54+wip | `build-plugin.sh --testinput --form P` and `--form S`; cmake build of `hyprvx_testclient`, `hyprvx_vpointer` | PASS (0 warnings) | — (build) | `~/.cache/hyprvx/claude/plugin/testinput-{P,S}/` | — | — | Built only; tasks are ticked after the identity-refusal run (T012) and first native use. `fscroll` sends stops only for axes that moved (an axis_stop keeps that axis's previous source in Hyprland's virtual pointer); test-tooling 1.5 §4a updated accordingly |
+| 2026-10-12 | delegation | user | v3/003-trackpad-native-ux@552cc4f | `git ls-remote` of the clone, file scan of the clone (from outside) | ENDED | — | — | — | user | User ended the Antigravity trial and made Claude Code the only agent for all of V3. Checked before cancelling: clone branch still `4d4aaac`, no new files, no `build-agy`; nothing to preserve or integrate. WO-01 marked CANCELLED; DV3-17 marked ended; clone kept untouched |

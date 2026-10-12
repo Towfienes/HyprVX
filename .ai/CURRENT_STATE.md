@@ -475,3 +475,5 @@ Production safety: host Hyprland and Caelestia untouched; no plugin loaded; no p
   writes). The clone's `.git/config` gained `push.autoSetupRemote = true` at 06:26:26, 10 s after an `agy` CLI start
   and not from any command in its transcript; push stays blocked (`pushurl = DISABLED`, `pre-push` hook unchanged).
   Verdict: ready for one small, unit-test-only task with an explicit work order; first handoff reviewed line by line.
+- Ended (user, 2026-10-12): the trial was stopped before WO-01 started (clone branch still `4d4aaac`). Claude Code is
+  the only agent for all remaining V3 work (DV3-15 in full); DV3-17 is marked ended in the master plan.

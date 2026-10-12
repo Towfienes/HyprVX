@@ -1,5 +1,5 @@
 ---
-description: "Task list for Feature 003 — Trackpad-Native Drift UX, Claude Code lead (DV3-15) with an Antigravity delegation trial"
+description: "Task list for Feature 003 — Trackpad-Native Drift UX, Claude Code only (DV3-15; DV3-17 trial ended before it started)"
 ---
 
 # Tasks: Trackpad-Native Drift UX (Feature 003)
@@ -24,9 +24,8 @@ description: "Task list for Feature 003 — Trackpad-Native Drift UX, Claude Cod
 
 - **[P]**: parallelizable (different files, no dependency on an incomplete task).
 - **[Story]**: US1–US4 from `spec.md`. Setup, Foundational, form S and gate phases have no story label.
-- **Owner**: Claude for every task, except that T005–T006 are the **delegation-trial candidates** (Antigravity,
-  `AGY_EXPERIMENT.md`); Claude integrates them in T007. If the trial is not used or its handoff is rejected, Claude
-  does T005–T006 itself.
+- **Owner**: Claude for every task (DV3-15). The Antigravity trial (DV3-17) was ended by the user on 2026-10-12 before
+  WO-01 started; T005–T006 are Claude's, and T007 reduces to Claude's own V-01 evidence run.
 - **Ticking**: a task is ticked after its verification ran and its evidence is archived. Commits keep the trailers
   `Task:`, `Verify:`, `Result:`, `Evidence:`, `Not-run:`.
 - **Heavy jobs** (Hyprland build, nested session, plugin build against a prefix) run only under the heavy lock with the
@@ -57,7 +56,7 @@ description: "Task list for Feature 003 — Trackpad-Native Drift UX, Claude Cod
 - [X] T004 Write the Antigravity work order for T005–T006 in `specs/003-trackpad-native-ux/delegation/WO-01-gesture-model.md`: task IDs, the contract `contracts/gesture-model.md` as the only spec, the three files it may touch (`core/include/hyprvx/core/GestureModel.hpp`, `core/src/GestureModel.cpp`, `tests/unit/test_gesture_model.cpp`), verify commands (`cmake` + `ctest` in a build dir inside the clone, `bash scripts/check-single-transform.sh`), commit trailers, and what is out of bounds (`AGY_EXPERIMENT.md`). The user starts Antigravity with it; Claude never runs commands inside the clone
 - [ ] T005 [P] Write `tests/unit/test_gesture_model.cpp` from `contracts/gesture-model.md` before the implementation: the full `decideTarget` table (every rule, plus an exhaustive enumeration of `BeginContext` × kind × fingers 1–5 checking "3 fingers on a Drift monitor is never PassThrough"); `ScrollTracker` begin/continue/end per axis, idle 200 ms with wrapping times, non-finite input; `ReleaseVelocity` window 100 ms, rest 50 ms, merge of equal timestamps, ring overflow, 6000 px/s clamp; `glideDamping`, `expectedGlide`; `Glide` invariants (sum of steps = `expectedGlide` ± 0.5 px for one 10 s step, 60 Hz, 144 Hz and seeded random steps; speed never increases; `stop()`; not started → 0; invalid config → not started, no throw); `pinchCamera` anchor invariant incl. clamped zoom and invalid scale. Show that it fails (missing header or failing tests)
 - [ ] T006 Implement `core/include/hyprvx/core/GestureModel.hpp` and `core/src/GestureModel.cpp` exactly as `contracts/gesture-model.md` (namespace `hyprvx::drift`, no heap after construction, noexcept, `Glide` on V1 `hyprvx::CameraController` + `hyprvx::Camera` with the config validated before construction); T005 and every existing test pass
-- [ ] T007 Integrate T005–T006: if delegated, fetch from outside the clone (`git fetch /home/towfienes/Projects/HyprVX-v3-agy v3/agy-experiment:refs/agy/v3/agy-experiment`), review `git diff` against the contract line by line (incl. that tests were not weakened and that only the three files changed), cherry-pick the task commits (never `AGY_EXPERIMENT.md`), rebuild in a fresh build dir, re-run `ctest` and the lint, and record the review result, defects found and Claude effort in `integration-log.md`; archive V-01 from Claude's own run (unit evidence script as in Feature 002, two seeds)
+- [ ] T007 Integrate T005–T006 (delegation cancelled 2026-10-12: Claude runs V-01 on its own T005–T006; the rest of this task applies only if a delegated handoff existed): if delegated, fetch from outside the clone (`git fetch /home/towfienes/Projects/HyprVX-v3-agy v3/agy-experiment:refs/agy/v3/agy-experiment`), review `git diff` against the contract line by line (incl. that tests were not weakened and that only the three files changed), cherry-pick the task commits (never `AGY_EXPERIMENT.md`), rebuild in a fresh build dir, re-run `ctest` and the lint, and record the review result, defects found and Claude effort in `integration-log.md`; archive V-01 from Claude's own run (unit evidence script as in Feature 002, two seeds)
 
 ### Test tools and harness (test-tooling 1.5)
 
@@ -191,8 +190,7 @@ description: "Task list for Feature 003 — Trackpad-Native Drift UX, Claude Cod
 
 ### Execution order (Claude, with the trial in parallel)
 
-T001–T004 → (Antigravity: T005–T006 in its clone) while Claude does T008–T015 → T007 → US1 → US2 → US3 → US4 → T039–T040
-→ T041–T048.
+T001–T015 (T005–T006 by Claude since the trial was cancelled) → US1 → US2 → US3 → US4 → T039–T040 → T041–T048.
 
 ## Parallel Example: Phase 2 tools
 
@@ -209,7 +207,7 @@ T008 tools/vpointer/main.cpp   T009 tools/testclient/main.cpp   T010 tools/testi
 
 ## Notes
 
-- The delegation trial changes no gate and adds no approval step: Antigravity's output is input to Claude's own review
-  and runs; only Claude's runs produce evidence.
+- The delegation trial (DV3-17) was ended before it started; no Antigravity work exists. Only Claude's runs produce
+  evidence.
 - Physical pinch, 3-finger, 4-finger-in-Drift and U4 items stay BLOCKED in L6 and are listed as open at the gate.
 - `checklists/trackpad.md` items are reviewer-owned and stay unchecked unless the user reviews them.

@@ -23,12 +23,11 @@
 - **Feature 002 gate T062 approved by the user on 2026-10-12** (V-25 signed). Merged into `v3/spec-foundation`
   (`dd4f9b9`, post-merge checks PASS); see `.ai/CURRENT_STATE.md` "Feature 002 merged". No push.
 - **Feature 003 `specs/003-trackpad-native-ux/` (Phase 4, trackpad UX)**: spec, plan, contracts and `tasks.md`
-  (T001–T048) written; `tasks.md` approved by the user on 2026-10-12; `/speckit-implement` in progress (Claude), with
-  WO-01 (T005–T006, `GestureModel`) delegated to Antigravity under DV3-17. Next gate: T048 (Feature 003 gate, incl. the
+  (T001–T048) written; `tasks.md` approved by the user on 2026-10-12; `/speckit-implement` in progress (Claude), Claude only
+  (the Antigravity trial DV3-17 was ended before WO-01 started). Next gate: T048 (Feature 003 gate, incl. the
   L6 session with the user at T045).
-- Antigravity experiment (user, 2026-10-12): independent clone `/home/towfienes/Projects/HyprVX-v3-agy`, branch
-  `v3/agy-experiment`, push disabled; see `.ai/CURRENT_STATE.md` "Antigravity experiment". Claude stays the
-  integrator; Antigravity only gets small, approved Feature 003 tasks.
+- Antigravity experiment: ended by the user on 2026-10-12 before any work; Claude Code is the only agent for all of
+  V3 (Features 003–009). The clone `HyprVX-v3-agy` is kept untouched as a reference.
 - V-20 / SC-005: PASS, signed by the user (Towfienes) on 2026-10-11 in `checklists/verification.md`.
 
 ## Sprint 1 goal
