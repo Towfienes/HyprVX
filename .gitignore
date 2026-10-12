@@ -1,5 +1,6 @@
 build/
 build-v3/
+build-agy/
 cmake-build-*/
 .cache/
 *.log

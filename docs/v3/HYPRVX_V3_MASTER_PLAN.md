@@ -540,6 +540,13 @@ Effort là khoảng thô theo đơn vị *focused engineering-weeks*, độ tin 
 - **DV3-16** Phân phối production theo DV3-01 (user, 2026-10-11, cổng Feature 001): plugin chạy trên Hyprland gốc,
   vì spike plugin-hook PASS cùng bộ test visual + input. Spike chưa phải production-ready; rủi ro trong
   `specs/001-native-spatial-camera/delivery-decision.md`. Roadmap, kiến trúc C và các gate không đổi.
+- **DV3-17** Ngoại lệ thử nghiệm Antigravity cho DV3-15 (user, 2026-10-12, Feature 003): Antigravity chỉ thực hiện
+  work order được giao (lần đầu duy nhất WO-01 = T005–T006, `GestureModel` và unit test), trong clone độc lập
+  `HyprVX-v3-agy` (`--no-hardlinks`, push bị vô hiệu), không native build, không nested compositor, không đụng host.
+  Claude Code vẫn là agent điều phối, reviewer và integration owner: tự review, build và chạy lại test trước khi tích
+  hợp, và chỉ các lần chạy của Claude tạo evidence. Giao thêm task cần user đồng ý. Không phải chuyển dự án sang
+  Antigravity; roadmap, kiến trúc, Spec Kit và các gate không đổi. Kết quả (lỗi tìm thấy khi review, công sửa, quota)
+  ghi trong `specs/003-trackpad-native-ux/integration-log.md` và báo cáo ở cổng Feature 003.
 
 **Còn mở:**
 - License toàn dự án (D010 của V1). `CameraMath.hpp` đã chốt BSD-3-Clause (DV3-10).
@@ -697,7 +704,7 @@ hyprwayland-scanner: không có trong pacman → build từ tag pin (v0.4.6, đ�
 
 ## O. Quy trình cộng tác Claude Code + Codex (replan P8, duyệt 2026-10-10)
 
-> **HẾT HIỆU LỰC từ 2026-10-11 (DV3-15).** User dừng mô hình cộng tác; Claude Code là agent duy nhất. O1–O4 và O6 chỉ
+> **HẾT HIỆU LỰC từ 2026-10-11 (DV3-15).** User dừng mô hình cộng tác; Claude Code là agent duy nhất. Ngoại lệ thử nghiệm có giới hạn: DV3-17 (Antigravity, WO-01). O1–O4 và O6 chỉ
 > còn là lịch sử. Vẫn giữ như quy tắc kỹ thuật: O5 (tài nguyên máy: heavy lock, ngưỡng RAM, PSI, `MemoryMax=6G`, `-j4`),
 > layout cache `~/.cache/hyprvx/<agent>/` với `HYPRVX_AGENT=claude`, và quy tắc evidence/archive của
 > `contracts/test-tooling.md` §8. Clone `HyprVX-v3-codex` giữ nguyên làm tham chiếu lịch sử, không đồng bộ nữa.

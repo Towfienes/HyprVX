@@ -22,8 +22,10 @@
 - `tasks.md` approved by the user (2026-10-11); `/speckit-implement` ran T001–T061 (Claude only). Final code `420efff`.
 - **Feature 002 gate T062 approved by the user on 2026-10-12** (V-25 signed). Merged into `v3/spec-foundation`
   (`dd4f9b9`, post-merge checks PASS); see `.ai/CURRENT_STATE.md` "Feature 002 merged". No push.
-- **Next (Master Plan §H/§K): Feature 003 `specs/003-trackpad-native-ux/` (Phase 4, trackpad UX)**: `/speckit-specify`
-  → plan → checklists → `tasks.md`, then STOP for the user's approval of `tasks.md` before `/speckit-implement`.
+- **Feature 003 `specs/003-trackpad-native-ux/` (Phase 4, trackpad UX)**: spec, plan, contracts and `tasks.md`
+  (T001–T048) written; `tasks.md` approved by the user on 2026-10-12; `/speckit-implement` in progress (Claude), with
+  WO-01 (T005–T006, `GestureModel`) delegated to Antigravity under DV3-17. Next gate: T048 (Feature 003 gate, incl. the
+  L6 session with the user at T045).
 - Antigravity experiment (user, 2026-10-12): independent clone `/home/towfienes/Projects/HyprVX-v3-agy`, branch
   `v3/agy-experiment`, push disabled; see `.ai/CURRENT_STATE.md` "Antigravity experiment". Claude stays the
   integrator; Antigravity only gets small, approved Feature 003 tasks.
