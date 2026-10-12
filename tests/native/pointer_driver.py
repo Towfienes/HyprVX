@@ -4,7 +4,7 @@
   python3 -I tests/native/pointer_driver.py --vpointer FIFO:LOG --client NAME:FIFO:LOG [--client ...] \
       --commands FILE --out JSON [--timeout S]
 
-For every command line in FILE ("move X Y", "down", "up", "click"): send it to the vpointer FIFO, wait for its
+For every command line in FILE ("move X Y", "down", "up", "click", "scroll", "fscroll ..."): send it to the vpointer FIFO, wait for its
 "done" line (the compositor has processed it and sent any pointer events), then send "sync" to every client and wait
 for that commit's frame_done. Pointer lines a client logged before that frame_done and after the previous barrier
 belong to the command. Output JSON: {"steps": [{"cmd": ..., "events": {NAME: [event, ...]}}, ...]}.
@@ -25,6 +25,10 @@ from pathlib import Path
 
 # Feature 002 adds axis (scroll) and key events, logged by hyprvx-testclient and hyprvx-x11client (test-tooling 1.4).
 POINTER_EVENTS = {"enter", "leave", "motion", "button", "warp", "axis", "key"}
+# Feature 003 (test-tooling 1.5 section 4): axis source/stop/value120 and pointer gestures, so finger scrolls and gestures
+# delivered to a client are attributed to the command that caused them.
+POINTER_EVENTS |= {"axis_source", "axis_stop", "axis_value120", "swipe_begin", "swipe_update", "swipe_end",
+                   "pinch_begin", "pinch_update", "pinch_end"}
 
 
 class Blocked(Exception):
