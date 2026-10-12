@@ -22,12 +22,23 @@
 - `tasks.md` approved by the user (2026-10-11); `/speckit-implement` ran T001–T061 (Claude only). Final code `420efff`.
 - **Feature 002 gate T062 approved by the user on 2026-10-12** (V-25 signed). Merged into `v3/spec-foundation`
   (`dd4f9b9`, post-merge checks PASS); see `.ai/CURRENT_STATE.md` "Feature 002 merged". No push.
-- **Next (Master Plan §H/§K): Feature 003 `specs/003-trackpad-native-ux/` (Phase 4, trackpad UX)**: `/speckit-specify`
-  → plan → checklists → `tasks.md`, then STOP for the user's approval of `tasks.md` before `/speckit-implement`.
-- Antigravity experiment (user, 2026-10-12): independent clone `/home/towfienes/Projects/HyprVX-v3-agy`, branch
-  `v3/agy-experiment`, push disabled; see `.ai/CURRENT_STATE.md` "Antigravity experiment". Claude stays the
-  integrator; Antigravity only gets small, approved Feature 003 tasks.
+- **Feature 003 `specs/003-trackpad-native-ux/` (Phase 4, trackpad UX)**: spec, plan, contracts and `tasks.md`
+  (T001–T048) written; `tasks.md` approved by the user on 2026-10-12; `/speckit-implement` in progress (Claude), Claude only
+  (the Antigravity trial DV3-17 was ended before WO-01 started). Next gate: T048 (Feature 003 gate, incl. the
+  L6 session with the user at T045).
+- Antigravity experiment: ended by the user on 2026-10-12 before any work; Claude Code is the only agent for all of
+  V3 (Features 003–009). The clone `HyprVX-v3-agy` is kept untouched as a reference.
 - V-20 / SC-005: PASS, signed by the user (Towfienes) on 2026-10-11 in `checklists/verification.md`.
+
+## Feature 003 resume point (2026-10-12): T001–T046 done; T047 review, then STOP at T048
+
+- Done with archived evidence: T001–T046. V-01..V-23 PASS; V-24 L6 signed PARTIAL by the user (H9 PASS; finger-scroll
+  items BLOCKED because nested scrolls are source WHEEL in aquamarine 0.15.1; Super combinations taken by the host;
+  B1–B6 BLOCKED). research R2 corrected. All 16 cited archives and 248 child runs pass `sha256sum -c`.
+- Next: T047 merge-readiness review (commits since `142d2d0`, `dev == 15f75b0`, nothing pushed, no `AGY_EXPERIMENT.md`),
+  then **T048 Feature 003 gate: STOP for the user's approval** before merging or starting Feature 004.
+- Carried to a hardware session where HyprVX owns the trackpad: every finger-scroll/glide item, pinch, 3/4-finger, U4.
+- DV3-18 (user): continue HyprVX; phantomat is a reference only (the user is its author; no attribution needed).
 
 ## Sprint 1 goal
 

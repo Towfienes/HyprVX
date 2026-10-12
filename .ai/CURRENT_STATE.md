@@ -465,3 +465,39 @@ Production safety: host Hyprland and Caelestia untouched; no plugin loaded; no p
   fetches from outside the clone (never runs git inside it), reviews, rebuilds and re-runs tests before integrating.
 - Known prerequisite: the tooling accepts only `HYPRVX_AGENT=claude|codex`; a separate lane for native runs by
   Antigravity needs a small tooling change, to be planned inside Feature 003 `tasks.md` if a delegated task needs it.
+- Orientation (2026-10-12, Antigravity conversation `019ed250`, artifacts under `~/.gemini/antigravity-cli/brain/`):
+  read the required documents and restated roles, hard limits, handoff trailers and §O5 correctly; reproduced lint
+  (13 patches), analyzer 11/11, ctest 326/326 and the build-script tests; no change to tracked files, no push, no
+  native run, nothing written to Claude's cache or evidence (checked from outside the clone). Deviations: it built
+  `build-v3` (gitignored) although the prompt said read-only/no build; it did not answer the four requested questions
+  (camera equation and invariants, task → evidence flow, BLOCKED cases, Phase 4 scope), so its grasp of the
+  transform contract is unverified; it ran the build-script tests with `HYPRVX_AGENT=claude` (tests only, no cache
+  writes). The clone's `.git/config` gained `push.autoSetupRemote = true` at 06:26:26, 10 s after an `agy` CLI start
+  and not from any command in its transcript; push stays blocked (`pushurl = DISABLED`, `pre-push` hook unchanged).
+  Verdict: ready for one small, unit-test-only task with an explicit work order; first handoff reviewed line by line.
+- Ended (user, 2026-10-12): the trial was stopped before WO-01 started (clone branch still `4d4aaac`). Claude Code is
+  the only agent for all remaining V3 work (DV3-15 in full); DV3-17 is marked ended in the master plan.
+
+## Feature 003 at T045 (2026-10-12)
+
+- Branch `v3/003-trackpad-native-ux`; plugin code final at `789c75c` (glide steps on `render.preChecks`; R6
+  corrected). T001–T041 and T043 done with archived evidence; V-01..V-22 PASS. `dev` still `15f75b0`; nothing pushed.
+- Product defect found and fixed during implementation: glide stalled on `render.pre` (emitted after Hyprland's
+  damage check). Test defects fixed: a vacuous socket2 negative check (t_arbitrate; all archives re-checked), hidden
+  clients captured, a setup point in a border grab area, the output round-trip comparison, a closed client's FIFO,
+  and a pointer-driver read race (1/88 BLOCKED in the first Feature 002 regression run).
+- Waiting for the user at T045 (L6 with the real trackpad). Pinch, 3/4-finger and U4 items are BLOCKED by the
+  nested environment by design (user decision 2026-10-12); their automated evidence is V-10..V-12.
+- External evaluation reported to the user (read only, nothing installed): phantomat (plugin, 0.56, mutates
+  floating/workspace and restores: the §C5 fallback HyprVX rejected), hypr-canvas (alpha, single camera, no tests),
+  infinity-land (Hyprland 0.51.1 fork, one day of commits). Recommendation: continue HyprVX, reference phantomat.
+  Decided by the user (DV3-18): continue HyprVX; phantomat is a reference only.
+
+## Feature 003 at T047 (2026-10-12)
+
+- T045 L6 signed PARTIAL by the user (Towfienes): H9 PASS; H1–H8, H10 BLOCKED (nested scroll is source WHEEL:
+  aquamarine 0.15.1 drops `axis_source`/`axis_stop`; host takes Super combinations); B1–B6 BLOCKED. The interactive
+  session keeps the hardware cursor with `use_cpu_buffer = 1` (pointer invisible; a software cursor froze the window).
+- T044 V-23 PASS: marker audit (4 sessions after the 12:46 reboot wiped /tmp) plus a new archive audit (531 sessions).
+- T046 records and quickstart validated (ctest 367/367, 5 builds, lint, analyzer); constitution re-check in plan.md.
+

@@ -203,6 +203,36 @@ hvx_dispatch() {
     hvx_hyprctl_form dispatch "$@"
 }
 
+# ---- Feature 003 (test-tooling 1.5) -------------------------------------------------------------------------------
+# hvx_testinput_path: the form's test-only plugin (scripts/build-plugin.sh --testinput --form P|S).
+hvx_testinput_path() {
+    echo "$HOME/.cache/hyprvx/$HYPRVX_AGENT/plugin/testinput-$HVX_FORM/hyprvx-testinput-$HVX_FORM.so"
+}
+# hvx_load_testinput: loads the test-only plugin after the policy plugin; its sha256 and build-info are recorded apart
+# from the policy plugin's. Never part of a delivery form (FR-020).
+hvx_load_testinput() {
+    local so reply
+    so=$(hvx_testinput_path)
+    [[ -f $so ]] || { echo "no test plugin at $so; run scripts/build-plugin.sh --testinput --form $HVX_FORM" >&2; return 1; }
+    reply=$(hvx_nested plugin load "$so" 2>&1) || { printf '%s\n' "$reply" >> "$HVX_EVID/testinput-load.log"; return 1; }
+    printf '%s\n' "$reply" >> "$HVX_EVID/testinput-load.log"
+    sha256sum "$so" > "$HVX_EVID/testinput.sha256"
+    [[ -f $(dirname -- "$so")/build-info.json ]] && cp "$(dirname -- "$so")/build-info.json" "$HVX_EVID/build-info-testinput.json"
+    return 0
+}
+# hvx_gesture ARGS...: one synthetic gesture event through `hvxtest gesture` (sent with `nested.sh run`, so identity is
+# re-verified); a reply other than "ok" is BLOCKED. Every call is logged to gestures.log.
+hvx_gesture() {
+    local reply
+    reply=$(hvx_hyprctl_form hvxtest gesture "$@" 2>&1)
+    printf '%s -> %s\n' "$*" "$reply" >> "$HVX_EVID/gestures.log"
+    [[ $reply == ok ]] || hvx_die_blocked "hvxtest gesture $* replied: $reply"
+}
+# hvx_frames MONITOR: render.pre count of MONITOR since the test plugin was loaded (a measurement, never a pass by itself).
+hvx_frames() {
+    hvx_hyprctl_form hvxtest frames "$1"
+}
+
 # hvx_vkeyboard_start NAME: hyprvx-vkeyboard on the nested display with control FIFO NAME.fifo and log NAME.jsonl.
 hvx_vkeyboard_start() {
     local name=$1 fifo="$HVX_EVID/$1.fifo" log="$HVX_EVID/$1.jsonl" vk

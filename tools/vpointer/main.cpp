@@ -3,7 +3,9 @@
 //   hyprvx-vpointer --layout WxH --log PATH (--control FIFO | --script FILE)
 //
 // Commands, one per line: "move X Y" (absolute, logical px), "down [BUTTON]", "up [BUTTON]", "click [BUTTON]",
-// "scroll DX DY" (wheel units: one detent = value120 120; positive DY scrolls down; test-tooling 1.4 4a), "quit".
+// "scroll DX DY" (wheel units: one detent = value120 120; positive DY scrolls down; test-tooling 1.4 4a),
+// "fscroll T0 DT N DX DY [stop]" and "fstop T v|h|vh" (finger source, explicit event times; Feature 003 test-tooling
+// 1.5 4a), "quit".
 // Each command is followed by a frame request and a roundtrip, then a "done" log line, so the compositor has
 // processed it (and sent any pointer events) before the line is written. Launch it only through scripts/nested.sh run;
 // it refuses any display that is not a private /tmp/hvx-* runtime dir served by an agent-prefix Hyprland binary.
@@ -144,6 +146,60 @@ void handleCommand(State& s, const std::string& line) {
             button(s, code, !std::strcmp(word, "down"));
         }
         logLine(s, "\"seq\": %" PRIu64 ", \"ev\": \"done\", \"cmd\": \"%s\", \"button\": %u", ++s.seq, word, code);
+    } else if (line.rfind("fstop ", 0) == 0) {
+        // A separate finger scroll stop at event time T for the given axes (v, h or vh), e.g. a release after a rest
+        // (Feature 003 test-tooling 1.5 4a). The axes must have moved with fscroll before (the stop keeps their source).
+        unsigned t = 0;
+        char     axesArg[4] = {};
+        if (std::sscanf(line.c_str(), "fstop %u %3s", &t, axesArg) != 2 ||
+            (std::strcmp(axesArg, "v") && std::strcmp(axesArg, "h") && std::strcmp(axesArg, "vh"))) {
+            logLine(s, "\"ev\": \"error\", \"message\": \"fstop needs a time and v, h or vh\"");
+            return;
+        }
+        if (std::strchr(axesArg, 'v'))
+            zwlr_virtual_pointer_v1_axis_stop(s.pointer, t, WL_POINTER_AXIS_VERTICAL_SCROLL);
+        if (std::strchr(axesArg, 'h'))
+            zwlr_virtual_pointer_v1_axis_stop(s.pointer, t, WL_POINTER_AXIS_HORIZONTAL_SCROLL);
+        finish(s);
+        logLine(s, "\"seq\": %" PRIu64 ", \"ev\": \"done\", \"cmd\": \"fstop\", \"t\": %u, \"axes\": \"%s\"", ++s.seq, t, axesArg);
+    } else if (line.rfind("fscroll ", 0) == 0) {
+        // Finger-source scroll sequence with explicit event times (Feature 003 test-tooling 1.5 §4a):
+        //   fscroll T0 DT N DX DY [stop]
+        // Hyprland's virtual pointer rebuilds the pending axis event (default source wheel) on every axis request and
+        // applies axis_source to the most recent axis, so each axis is followed by its own axis_source(finger).
+        // axis_stop keeps that axis's last source, so stops are sent only for axes that moved (finger events).
+        unsigned t0 = 0, dt = 0, n = 0;
+        double   dx = 0, dy = 0;
+        char     tail[16] = {};
+        const int fields = std::sscanf(line.c_str(), "fscroll %u %u %u %lf %lf %15s", &t0, &dt, &n, &dx, &dy, tail);
+        const bool stop  = fields == 6 && !std::strcmp(tail, "stop");
+        if ((fields != 5 && !stop) || n < 1 || n > 200 || dt > 1000 || !std::isfinite(dx) || !std::isfinite(dy) ||
+            std::fabs(dx) > 500 || std::fabs(dy) > 500) {
+            logLine(s, "\"ev\": \"error\", \"message\": \"fscroll out of range\"");
+            return;
+        }
+        const double   values[2] = {dy, dx};
+        const uint32_t axes[2]   = {WL_POINTER_AXIS_VERTICAL_SCROLL, WL_POINTER_AXIS_HORIZONTAL_SCROLL};
+        for (unsigned i = 0; i < n; ++i) {
+            const uint32_t t = t0 + i * dt;
+            for (int a = 0; a < 2; ++a) {
+                if (values[a] == 0)
+                    continue;
+                zwlr_virtual_pointer_v1_axis(s.pointer, t, axes[a], wl_fixed_from_double(values[a]));
+                zwlr_virtual_pointer_v1_axis_source(s.pointer, WL_POINTER_AXIS_SOURCE_FINGER);
+            }
+            finish(s);
+        }
+        if (stop) {
+            const uint32_t t = t0 + n * dt;
+            for (int a = 0; a < 2; ++a) {
+                if (values[a] != 0)
+                    zwlr_virtual_pointer_v1_axis_stop(s.pointer, t, axes[a]);
+            }
+            finish(s);
+        }
+        logLine(s, "\"seq\": %" PRIu64 ", \"ev\": \"done\", \"cmd\": \"fscroll\", \"t0\": %u, \"dt\": %u, \"n\": %u, \"dx\": %.4f, \"dy\": %.4f, \"stop\": %d",
+                ++s.seq, t0, dt, n, dx, dy, stop ? 1 : 0);
     } else if (std::sscanf(line.c_str(), "scroll %lf %lf", &x, &y) == 2) {
         if (!std::isfinite(x) || !std::isfinite(y) || std::fabs(x) > 100 || std::fabs(y) > 100) {
             logLine(s, "\"ev\": \"error\", \"message\": \"scroll out of range\"");

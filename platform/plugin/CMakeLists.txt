@@ -31,7 +31,10 @@ pkg_check_modules(HYPRLAND REQUIRED IMPORTED_TARGET hyprland pixman-1 libdrm lib
 
 set(HYPRVX_REPO ${CMAKE_CURRENT_SOURCE_DIR}/../..)
 file(GLOB HYPRVX_POLICY_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/policy/*.cpp)
-set(HYPRVX_SOURCES ${HYPRVX_POLICY_SOURCES} ${HYPRVX_REPO}/core/src/DriftModel.cpp)
+# Core sources the policy compiles: DriftModel (Feature 002); GestureModel with the V1 Camera/CameraController it builds
+# on (Feature 003).
+set(HYPRVX_SOURCES ${HYPRVX_POLICY_SOURCES} ${HYPRVX_REPO}/core/src/DriftModel.cpp ${HYPRVX_REPO}/core/src/GestureModel.cpp
+    ${HYPRVX_REPO}/core/src/Camera.cpp ${HYPRVX_REPO}/core/src/CameraMotion.cpp)
 
 if(HYPRVX_PLUGIN_FORM STREQUAL "S")
     file(GLOB HYPRVX_MECHANISM_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/mechanism/*.cpp

@@ -5,6 +5,7 @@
 // offsets to the mechanism (Mechanism.hpp) and owns the Drift controls (contracts/drift-control.md 1.0).
 
 #include "hyprvx/core/DriftModel.hpp"
+#include "hyprvx/core/GestureModel.hpp"
 
 #include <src/plugins/PluginAPI.hpp>
 
@@ -62,4 +63,23 @@ namespace HyprVXPolicy {
     // ---- built-in inputs (Input.cpp) ----
     void initInput();
     void shutdownInput();
+    bool superHeld();
+    // What the pointer is over on a monitor: a top/overlay layer surface or layer popup, a window, or empty canvas.
+    struct SPointerTarget {
+        bool      layer = false;
+        PHLWINDOW window;
+    };
+    SPointerTarget pointerTarget(const PHLMONITOR& monitor, const Vector2D& pos);
+
+    // ---- trackpad inputs (Gesture.cpp, Feature 003, drift-control 1.1) ----
+    void initGesture(HANDLE handle);
+    void shutdownGesture();
+    // plugin:hyprvx:pan_factor (> 0; 1.0 if invalid, one log line).
+    double panFactor();
+    // plugin:hyprvx:glide and glide_min_speed as a GlideConfig (defaults if invalid, one log line each).
+    hyprvx::drift::GlideConfig glideConfig();
+    // FR-016: stops a running glide at once (inputs, mode changes, workspace change, monitor removal).
+    void stopGlide();
+    // True while a glide runs on the monitor (bookkeeping for `hyprctl hyprvx state`).
+    bool glideActive(MONITORID monitor);
 }

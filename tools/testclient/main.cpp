@@ -31,6 +31,7 @@
 
 // The generated layer-shell header names a parameter "namespace", a C++ keyword (same workaround as NativeSession).
 #define namespace namespace_
+#include "pointer-gestures-client-protocol.h"
 #include "wlr-layer-shell-client-protocol.h"
 #undef namespace
 #include "xdg-shell-client-protocol.h"
@@ -100,6 +101,9 @@ struct Client {
     wl_subcompositor*      subcompositor = nullptr;
     wl_seat*               seat = nullptr;
     wl_pointer*            pointer = nullptr;
+    zwp_pointer_gestures_v1*      gestures = nullptr; // Feature 003 test-tooling 1.5 §4
+    zwp_pointer_gesture_swipe_v1* swipe = nullptr;
+    zwp_pointer_gesture_pinch_v1* pinch = nullptr;
     wl_keyboard*           keyboard = nullptr;
     const char*            pointerSurface = "none"; // surface of the last pointer enter
     wl_surface*            surface = nullptr;
@@ -451,10 +455,27 @@ void pointerAxis(void* data, wl_pointer*, uint32_t, uint32_t axis, wl_fixed_t va
             axis == WL_POINTER_AXIS_HORIZONTAL_SCROLL ? "h" : "v", wl_fixed_to_double(value), c.pointerSurface);
 }
 void pointerFrame(void*, wl_pointer*) {}
-void pointerAxisSource(void*, wl_pointer*, uint32_t) {}
-void pointerAxisStop(void*, wl_pointer*, uint32_t, uint32_t) {}
+// Feature 003 test-tooling 1.5 §4: axis source, stop and value120, so finger scrolls and their stops are visible.
+void pointerAxisSource(void* data, wl_pointer*, uint32_t source) {
+    auto&       c    = *static_cast<Client*>(data);
+    const char* name = source == WL_POINTER_AXIS_SOURCE_WHEEL ? "wheel" :
+        source == WL_POINTER_AXIS_SOURCE_FINGER                ? "finger" :
+        source == WL_POINTER_AXIS_SOURCE_CONTINUOUS            ? "continuous" :
+        source == WL_POINTER_AXIS_SOURCE_WHEEL_TILT            ? "tilt" :
+                                                                 "unknown";
+    logLine(c, "\"ev\": \"axis_source\", \"source\": \"%s\", \"surface\": \"%s\"", name, c.pointerSurface);
+}
+void pointerAxisStop(void* data, wl_pointer*, uint32_t, uint32_t axis) {
+    auto& c = *static_cast<Client*>(data);
+    logLine(c, "\"ev\": \"axis_stop\", \"axis\": \"%s\", \"surface\": \"%s\"", axis == WL_POINTER_AXIS_HORIZONTAL_SCROLL ? "h" : "v",
+            c.pointerSurface);
+}
 void pointerAxisDiscrete(void*, wl_pointer*, uint32_t, int32_t) {}
-void pointerAxisValue120(void*, wl_pointer*, uint32_t, int32_t) {}
+void pointerAxisValue120(void* data, wl_pointer*, uint32_t axis, int32_t value120) {
+    auto& c = *static_cast<Client*>(data);
+    logLine(c, "\"ev\": \"axis_value120\", \"axis\": \"%s\", \"value120\": %d, \"surface\": \"%s\"",
+            axis == WL_POINTER_AXIS_HORIZONTAL_SCROLL ? "h" : "v", value120, c.pointerSurface);
+}
 void pointerAxisRelative(void*, wl_pointer*, uint32_t, uint32_t) {}
 void pointerWarp(void* data, wl_pointer*, wl_fixed_t x, wl_fixed_t y) {
     logLine(*static_cast<Client*>(data), "\"ev\": \"warp\", \"x\": %.4f, \"y\": %.4f", wl_fixed_to_double(x), wl_fixed_to_double(y));
@@ -492,6 +513,45 @@ void keyboardModifiers(void* data, wl_keyboard*, uint32_t, uint32_t depressed, u
     logLine(*static_cast<Client*>(data), "\"ev\": \"modifiers\", \"depressed\": %u", depressed);
 }
 void keyboardRepeatInfo(void*, wl_keyboard*, int32_t, int32_t) {}
+// Pointer gestures (zwp_pointer_gestures_v1 v1): swipe and pinch reach the surface under the pointer at begin.
+void swipeBegin(void* data, zwp_pointer_gesture_swipe_v1*, uint32_t, uint32_t, wl_surface* surface, uint32_t fingers) {
+    auto& c = *static_cast<Client*>(data);
+    logLine(c, "\"ev\": \"swipe_begin\", \"fingers\": %u, \"surface\": \"%s\"", fingers, surfaceName(c, surface));
+}
+void swipeUpdate(void* data, zwp_pointer_gesture_swipe_v1*, uint32_t, wl_fixed_t dx, wl_fixed_t dy) {
+    auto& c = *static_cast<Client*>(data);
+    logLine(c, "\"ev\": \"swipe_update\", \"dx\": %.4f, \"dy\": %.4f, \"surface\": \"%s\"", wl_fixed_to_double(dx), wl_fixed_to_double(dy),
+            c.pointerSurface);
+}
+void swipeEnd(void* data, zwp_pointer_gesture_swipe_v1*, uint32_t, uint32_t, int32_t cancelled) {
+    auto& c = *static_cast<Client*>(data);
+    logLine(c, "\"ev\": \"swipe_end\", \"cancelled\": %d, \"surface\": \"%s\"", cancelled ? 1 : 0, c.pointerSurface);
+}
+const zwp_pointer_gesture_swipe_v1_listener kSwipeListener = {.begin = swipeBegin, .update = swipeUpdate, .end = swipeEnd};
+void pinchBegin(void* data, zwp_pointer_gesture_pinch_v1*, uint32_t, uint32_t, wl_surface* surface, uint32_t fingers) {
+    auto& c = *static_cast<Client*>(data);
+    logLine(c, "\"ev\": \"pinch_begin\", \"fingers\": %u, \"surface\": \"%s\"", fingers, surfaceName(c, surface));
+}
+void pinchUpdate(void* data, zwp_pointer_gesture_pinch_v1*, uint32_t, wl_fixed_t dx, wl_fixed_t dy, wl_fixed_t scale, wl_fixed_t rotation) {
+    auto& c = *static_cast<Client*>(data);
+    logLine(c, "\"ev\": \"pinch_update\", \"dx\": %.4f, \"dy\": %.4f, \"scale\": %.4f, \"rotation\": %.4f, \"surface\": \"%s\"",
+            wl_fixed_to_double(dx), wl_fixed_to_double(dy), wl_fixed_to_double(scale), wl_fixed_to_double(rotation), c.pointerSurface);
+}
+void pinchEnd(void* data, zwp_pointer_gesture_pinch_v1*, uint32_t, uint32_t, int32_t cancelled) {
+    auto& c = *static_cast<Client*>(data);
+    logLine(c, "\"ev\": \"pinch_end\", \"cancelled\": %d, \"surface\": \"%s\"", cancelled ? 1 : 0, c.pointerSurface);
+}
+const zwp_pointer_gesture_pinch_v1_listener kPinchListener = {.begin = pinchBegin, .update = pinchUpdate, .end = pinchEnd};
+// Gesture objects need both the pointer and the gestures global; whichever arrives last creates them.
+void installGestures(Client& c) {
+    if (!c.pointer || !c.gestures || c.swipe)
+        return;
+    c.swipe = zwp_pointer_gestures_v1_get_swipe_gesture(c.gestures, c.pointer);
+    zwp_pointer_gesture_swipe_v1_add_listener(c.swipe, &kSwipeListener, &c);
+    c.pinch = zwp_pointer_gestures_v1_get_pinch_gesture(c.gestures, c.pointer);
+    zwp_pointer_gesture_pinch_v1_add_listener(c.pinch, &kPinchListener, &c);
+}
+
 const wl_keyboard_listener kKeyboardListener = {.keymap = keyboardKeymap,
                                                 .enter = keyboardEnter,
                                                 .leave = keyboardLeave,
@@ -504,6 +564,7 @@ void seatCapabilities(void* data, wl_seat* seat, uint32_t caps) {
     if ((caps & WL_SEAT_CAPABILITY_POINTER) && !c.pointer) {
         c.pointer = wl_seat_get_pointer(seat);
         wl_pointer_add_listener(c.pointer, &kPointerListener, &c);
+        installGestures(c);
     }
     if ((caps & WL_SEAT_CAPABILITY_KEYBOARD) && !c.keyboard) {
         c.keyboard = wl_seat_get_keyboard(seat);
@@ -533,6 +594,9 @@ void registryGlobal(void* data, wl_registry* registry, uint32_t name, const char
     } else if (std::strcmp(interface, wl_seat_interface.name) == 0 && !c.seat) {
         c.seat = static_cast<wl_seat*>(wl_registry_bind(registry, name, &wl_seat_interface, std::min<uint32_t>(version, 9)));
         wl_seat_add_listener(c.seat, &kSeatListener, &c);
+    } else if (std::strcmp(interface, zwp_pointer_gestures_v1_interface.name) == 0 && !c.gestures) {
+        c.gestures = static_cast<zwp_pointer_gestures_v1*>(wl_registry_bind(registry, name, &zwp_pointer_gestures_v1_interface, 1));
+        installGestures(c);
     }
 }
 void registryRemove(void*, wl_registry*, uint32_t) {}

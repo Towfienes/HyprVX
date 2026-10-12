@@ -1,0 +1,27 @@
+{
+  "run_id": "20261012-133415-patched-883b697-l6_session",
+  "test": "L6 physical trackpad session (bookkeeping only; the signed checklist is the result)",
+  "result": "PARTIAL",
+  "agent": "claude",
+  "git_sha": "883b69755c8c0475b857ceca39ac5df18ccff185",
+  "note": "form P; interactive; clients a b c; output 1280x800 scale 1",
+  "artifacts": [
+    "a.jsonl",
+    "b.jsonl",
+    "baseline.axis-counts",
+    "baseline.state.json",
+    "build-info-patched.json",
+    "build-info-plugin.json",
+    "c.jsonl",
+    "on.reply",
+    "plugin-load.log",
+    "plugin.sha256",
+    "preflight.log",
+    "session.log",
+    "start.state.json",
+    "steps.log",
+    "user-try.axis-counts",
+    "user-try.state.json"
+  ],
+  "not_run": []
+}

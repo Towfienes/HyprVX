@@ -1,0 +1,29 @@
+{
+  "run_id": "20261012-125342-patched-039c972-l6_session",
+  "test": "L6 physical trackpad session (bookkeeping only; the signed checklist is the result)",
+  "result": "BLOCKED",
+  "agent": "claude",
+  "git_sha": "039c972c5a27a222882d6d274472798f02dadbc2",
+  "note": "form P; interactive; clients a b c; output 1280x800 scale 1",
+  "artifacts": [
+    "a.jsonl",
+    "b.jsonl",
+    "baseline.axis-counts",
+    "baseline.state.json",
+    "build-info-patched.json",
+    "build-info-plugin.json",
+    "c.jsonl",
+    "clean.axis-counts",
+    "clean.state.json",
+    "on.reply",
+    "plugin-load.log",
+    "plugin.sha256",
+    "preflight.log",
+    "reset.axis-counts",
+    "reset.state.json",
+    "session.log",
+    "start.state.json",
+    "steps.log"
+  ],
+  "not_run": []
+}

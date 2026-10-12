@@ -105,6 +105,7 @@ namespace {
     }
 
     void workspaceActive(const PHLWORKSPACE& workspace) {
+        HyprVXPolicy::stopGlide();  // Feature 003 FR-016: a workspace change stops a glide
         if (!workspace || workspace->m_isSpecialWorkspace)
             return;
         const auto MONITOR = workspace->m_monitor.lock();
@@ -148,6 +149,7 @@ namespace {
     SDispatchResult disableOn(const PHLMONITOR& monitor) {
         if (!monitor)
             return {};
+        HyprVXPolicy::stopGlide();  // Feature 003 FR-016
         auto& model = g_session->model;
         if (model.disable(monitor->m_id) == drift::Status::NoOp)
             return {};
@@ -173,6 +175,7 @@ namespace {
     }
 
     SDispatchResult panic(std::string) {
+        HyprVXPolicy::stopGlide();
         g_session->model.panic();
         syncMechanism();
         Log::logger->log(Log::INFO, "[hyprvx] panic: Drift OFF on every monitor");
@@ -182,6 +185,8 @@ namespace {
     void monitorGone(const PHLMONITOR& monitor) {
         if (!monitor)
             return;
+        if (HyprVXPolicy::glideActive(monitor->m_id))
+            HyprVXPolicy::stopGlide();
         const bool WAS_ON = g_session->model.mode(monitor->m_id) != drift::Mode::Off;
         g_session->model.monitorRemoved(monitor->m_id);
         syncMechanism();
@@ -197,8 +202,9 @@ namespace {
             const auto WS     = m->m_activeWorkspace ? m->m_activeWorkspace->m_id : WORKSPACE_INVALID;
             if (!monitors.empty())
                 monitors += ",";
-            monitors += std::format(R"({{"monitor":"{}","state":"{}","workspace":{},"P":[{:.17g},{:.17g}],"z":{:.17g}}})", escapeJSONStrings(m->m_name),
-                                    modeName(model.mode(m->m_id)), WS, CAMERA.origin.x, CAMERA.origin.y, CAMERA.zoom);
+            monitors += std::format(R"({{"monitor":"{}","state":"{}","workspace":{},"P":[{:.17g},{:.17g}],"z":{:.17g},"glide":{}}})",
+                                    escapeJSONStrings(m->m_name), modeName(model.mode(m->m_id)), WS, CAMERA.origin.x, CAMERA.origin.y, CAMERA.zoom,
+                                    HyprVXPolicy::glideActive(m->m_id) ? "true" : "false");
         }
         std::string windows;
         for (auto const& [address, offset] : model.offsets()) {
@@ -283,6 +289,7 @@ void HyprVXPolicy::initSession(HANDLE handle) {
     initCamera(handle);
     initWindows();
     initInput();
+    initGesture(handle);
     Log::logger->log(Log::INFO, "[hyprvx] Drift policy loaded (form {}); Drift is OFF", HYPRVX_FORM_NAME);
 }
 
@@ -291,6 +298,7 @@ void HyprVXPolicy::shutdownSession() {
         return;
     // Unload acts as panic while the mechanism is still in place: every camera identity, every offset 0 (dev offsets
     // included, mechanism-api resetWindowOffsets).
+    shutdownGesture();
     shutdownInput();
     shutdownWindows();
     shutdownCamera();

@@ -6,6 +6,7 @@
 # (a Python process, so its /proc/<pid>/exe is not under ~/.cache/hyprvx/<agent>/prefix/). Each must exit 3 and the
 # fake server must receive no bytes (wl_display_connect sends nothing; the registry is only requested after the peer
 # check). No real compositor is started and the host session is never contacted.
+# Feature 003 (test-tooling 1.5 §4a): the script also holds an `fscroll` sequence, which must never be sent either.
 # Usage: test_vpointer_refusal.sh /path/to/hyprvx-vpointer
 set -euo pipefail
 readonly vpointer="${1:?usage: test_vpointer_refusal.sh /path/to/hyprvx-vpointer}"
@@ -17,7 +18,7 @@ vpointer = sys.argv[1]
 failures = []
 work = Path(tempfile.mkdtemp(prefix="hyprvx-vpointer-test-"))
 script = work / "script"
-script.write_text("move 1 1\n")
+script.write_text("move 1 1\nfscroll 1000 10 3 0 5 stop\n")
 
 def check(name, ok, detail=""):
     print(("PASS " if ok else "FAIL ") + name + (f" ({detail})" if detail and not ok else ""))

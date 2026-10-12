@@ -7,6 +7,10 @@
 #        sources (platform/plugin/src/{policy,mechanism}, not the generated copied/ bodies, which are the patched
 #        bodies already linted as patches) fed as all-added diffs; and a planted `x * camera.zoom` line that must be
 #        reported, so the lint is not vacuous.
+#  V-22  (Feature 003, T044) the same lint over core/include/hyprvx/core/GestureModel.hpp and core/src/GestureModel.cpp.
+#        Its findings must equal the reviewed list below exactly (a new finding, or a listed one that disappeared,
+#        fails): the lint is a pattern heuristic with no exemption syntax, and the listed line computes a zoom level
+#        (a scalar product), not a camera equation; the camera itself comes from cammath::anchorZoom.
 # From fish: env HYPRVX_AGENT=claude bash tests/native/static_evidence.sh
 set -euo pipefail
 source "$(dirname -- "${BASH_SOURCE[0]}")/lib.sh"
@@ -47,6 +51,19 @@ else
         || fail "V-28 planted lint run failed without a finding"
 fi
 
+# V-22 (Feature 003)
+reviewed='core/src/GestureModel.cpp: camera arithmetic outside src/hyprvx/CameraMath.hpp:     const double targetZoom = start.zoom * scale;'
+gm="$diffs/gesture-model"; mkdir -p "$gm"
+for rel in core/include/hyprvx/core/GestureModel.hpp core/src/GestureModel.cpp; do
+    (cd "$HVX_REPO" && git diff --no-index /dev/null "$rel" > "$gm/${rel//\//_}.patch") || true
+done
+bash "$lint" "$gm"/*.patch > "$HVX_EVID/v22-gesture-model.log" 2>&1 || true
+sed -E 's/^[^:]*\.patch: //' "$HVX_EVID/v22-gesture-model.log" | sort > "$HVX_EVID/v22-findings.txt"
+printf '%s\n' "$reviewed" | sort > "$HVX_EVID/v22-reviewed.txt"
+cmp -s "$HVX_EVID/v22-findings.txt" "$HVX_EVID/v22-reviewed.txt" \
+    && ok "V-22 lint GestureModel: findings = the reviewed list ($(wc -l < "$HVX_EVID/v22-reviewed.txt") zoom-level line)" \
+    || fail "V-22 lint GestureModel: findings differ from the reviewed list (v22-findings.txt vs v22-reviewed.txt)"
+
 cat "$HVX_EVID/checks.txt"
-hvx_finish "$result" "Feature 002 V-03 identity refusal and V-28 single-transform lint" "$(grep -c '^ok' "$HVX_EVID/checks.txt") checks ok"
+hvx_finish "$result" "Feature 002 V-03 identity refusal and V-28 single-transform lint; Feature 003 V-22 GestureModel lint" "$(grep -c '^ok' "$HVX_EVID/checks.txt") checks ok"
 [[ $result == PASS ]]
