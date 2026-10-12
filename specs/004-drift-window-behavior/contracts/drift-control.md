@@ -8,7 +8,8 @@ and 1.0; everything there stays valid. Implemented by the policy plugin in both 
 - Super + left drag on a window (1.0) now snaps (`window-behavior.md` `snapMove`) while snapping is enabled.
 - Shift + Super + left drag on a window moves its whole group (`groupOf`) and snaps as one. Shift is read at drag
   begin. Cancellation restores every member's offset (1.0 rules).
-- Pinned windows are never moved by a drag, never snap targets and never group members.
+- Pinned windows are never moved by a drag, never snap targets and never group members. Shift + Super + drag on a
+  window in no group moves it alone. A member closed during a drag leaves it; a closed snap target releases that axis.
 
 ## Built-in keys (consumed only on a monitor in DRIFT; with Drift off they reach Hyprland unchanged)
 
@@ -25,7 +26,9 @@ and 1.0; everything there stays valid. Implemented by the policy plugin in both 
 | Super + Shift + P | pin the focused window / unpin it |
 
 Center, frame, home, bookmark recall, focus-reveal and history jumps set the camera at once and record the previous
-camera in the workspace's history (history moves do not record). A running glide stops first.
+camera in the workspace's history when the camera changes (history moves do not record). A running glide stops first.
+Focus-reveal uses the frame margin. Key presses and auto-repeats act once each; releases pass through. Several pinned
+windows: the most recently pinned is drawn on top; a pin follows its window to another workspace.
 
 ## Dispatchers
 

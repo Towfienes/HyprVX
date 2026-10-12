@@ -191,7 +191,8 @@ canvas from where it was.
   pin drawing, no key consumed; the desktop is pixel-identical to stock Hyprland.
 - **FR-002**: During a Super + drag move in Drift, the moved window MUST snap to another window's edge when the
   on-screen distance between the facing edges is at most the snap threshold (default 24 screen px); the snapped gap
-  is a world distance (default 12 world px).
+  is a world distance (default 12 world px). Snap targets are the other non-pinned scene windows of the same
+  workspace, whether visible on screen or not; there are none while the workspace shows a fullscreen window.
 - **FR-003**: When snapped, perpendicular edges within the threshold MUST also align (top with top, bottom with
   bottom, or left with left, right with right).
 - **FR-004**: A snapped window MUST stay snapped until the drag has moved it more than the release distance (default
@@ -199,36 +200,42 @@ canvas from where it was.
   consecutive frames for any slow drag path.
 - **FR-005**: Snapping only changes the moved window's drawn offset; it MUST NOT write Hyprland's window position,
   size, workspace, floating state or layout, and MUST NOT emit Hyprland move-window events.
-- **FR-006**: Windows whose edges are snapped to each other (facing edges at the snap gap within a small tolerance and
+- **FR-006**: Windows whose edges are snapped to each other (facing edges at the snap gap within 1 world px and
   overlapping along the other axis) MUST form a group; groups are transitive and are derived from the arrangement, not
-  stored separately.
+  stored separately, so they exist whether snapping is switched on or off.
 - **FR-007**: Shift + Super + drag started on a grouped window MUST move every member of its group by the same screen
-  distance; the group snaps as one to windows outside it.
+  distance; the group snaps as one to windows outside it. On a window in no group it moves that window alone.
 - **FR-008**: A plain Super + drag of a grouped window MUST move only that window; once it is no longer snapped it
   leaves the group.
 - **FR-009**: Super + arrow in Drift MUST focus the nearest non-pinned window in that direction on the same workspace
-  and move the camera so it is fully visible (changing zoom only if it cannot fit at the current zoom); with no window
-  in that direction, nothing changes and the key is still consumed.
+  and move the camera so it is fully visible with the frame margin (FR-011) around it (smallest pan; zoom changes only
+  if it cannot fit at the current zoom); with no window in that direction, nothing changes and the key is still
+  consumed.
 - **FR-010**: "Center" MUST move the camera so the focused window's center is at the screen center at the current zoom.
 - **FR-011**: "Frame" MUST set zoom and position so the focused window, or its whole group, fits the screen with a margin
   (default 5% of the smaller screen side), zoom clamped to the Drift zoom range [0.1, 2.0].
 - **FR-012**: "Home" MUST return the camera of the current workspace to identity.
 - **FR-013**: Bookmarks 1–4 per workspace MUST store and recall the camera; recalling an empty bookmark changes nothing.
-- **FR-014**: Every camera jump made by FR-009–FR-013 MUST push the previous camera onto a per-workspace history;
+- **FR-014**: Every camera jump made by FR-009–FR-013 that changes the camera MUST push the previous camera onto a
+  per-workspace history (a jump that leaves the camera unchanged records nothing);
   "back" and "forward" MUST move through it like a browser history (a new jump clears forward; at most 32 entries).
 - **FR-015**: Camera jumps MUST either apply at once or finish a short transition within 300 ms; any pan, zoom, drag or
   new jump during a transition MUST end it at once.
 - **FR-016**: A pinned window MUST be drawn at a fixed screen position and size while Drift is on, independent of the
-  camera, above every non-pinned window of the workspace; pointer input on it MUST reach it at that drawn position.
+  camera, above every non-pinned window of the workspace (the most recently pinned window on top); pointer input on it
+  MUST reach it at that drawn position. A pin follows its window to another workspace and applies there in Drift; a
+  pinned box that lies partly or fully off screen (for example after an output change) stays as it is until unpinned.
 - **FR-017**: Unpinning MUST place the window on the canvas so its drawn box at that moment is unchanged; pinning MUST
   keep its drawn box at that moment as its fixed screen box.
 - **FR-018**: Pinned windows MUST take no part in snapping, groups or directional focus.
 - **FR-019**: Every action (snap on/off setting, group move, center, frame, home, bookmark store/recall, history back/
   forward, pin/unpin) MUST be available as a HyprVX dispatcher, and key handling MUST follow the clarification above.
 - **FR-020**: Key handling in Drift MUST consume only the keys this feature defines, only on a monitor in Drift; every
-  other key and every key with Drift off reaches Hyprland unchanged.
+  other key and every key with Drift off reaches Hyprland unchanged. A key press and each of its auto-repeats act once
+  each; key releases are not consumed.
 - **FR-021**: Drag cancellation (Escape, Drift off, panic, monitor loss, workspace change) MUST restore the window or
-  group to its position before the drag (Feature 002 rule) and leave no snap or group half-applied.
+  group to its position before the drag (Feature 002 rule) and leave no snap or group half-applied. A member closed
+  during a drag leaves the drag (the others continue); a snap target closed during a drag releases that axis.
 - **FR-022**: Snap threshold, snap gap, release distance and a snap on/off switch MUST be user settings with the
   defaults above; invalid values fall back to defaults with one log line.
 - **FR-023**: Both delivery forms (patched build with plugin, plugin on stock Hyprland) MUST behave identically
