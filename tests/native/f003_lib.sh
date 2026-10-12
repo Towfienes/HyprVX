@@ -15,13 +15,23 @@ TP_CANVAS_X=60
 TP_CANVAS_Y=420
 TP_TIME=100000   # event time base for fscroll / hvxtest (ms); tp_next_time advances it
 
-# tp_setup [--layer]: the scene above with Drift on at the identity camera and the pointer on empty canvas.
+# tp_setup [--layer] [--no-drift] [--stock]: the scene above with the pointer on empty canvas and Drift on at the
+# identity camera. --no-drift leaves Drift OFF (plugin loaded); --stock starts the stock build without any plugin
+# (reference sessions; logs go to stock.* names chosen by the caller).
 tp_setup() {
-    local layer=0
-    [[ ${1:-} == --layer ]] && layer=1
-    hvx_start_form --policy --size "$SIZE" --scale "$SCALE" > "$HVX_EVID/session.log" 2>&1 \
-        || { cat "$HVX_EVID/session.log" >&2; hvx_die_blocked "form $HVX_FORM session did not start"; }
-    hvx_load_testinput || hvx_die_blocked "test-only plugin did not load"
+    local layer=0 drift=1 stock=0 arg
+    for arg in "$@"; do
+        case $arg in --layer) layer=1 ;; --no-drift) drift=0 ;; --stock) stock=1; drift=0 ;; *) hvx_die_blocked "tp_setup: $arg" ;; esac
+    done
+    if ((stock)); then
+        hvx_copy_build_info stock
+        hvx_nested start --variant stock --size "$SIZE" --scale "$SCALE" > "$HVX_EVID/stock.session.log" 2>&1 \
+            || { cat "$HVX_EVID/stock.session.log" >&2; hvx_die_blocked "stock session did not start"; }
+    else
+        hvx_start_form --policy --size "$SIZE" --scale "$SCALE" > "$HVX_EVID/session.log" 2>&1 \
+            || { cat "$HVX_EVID/session.log" >&2; hvx_die_blocked "form $HVX_FORM session did not start"; }
+        hvx_load_testinput || hvx_die_blocked "test-only plugin did not load"
+    fi
     hvx_client_start a "${TP_W}x${TP_H}"
     hvx_client_start b "${TP_W}x${TP_H}" --app-id hyprvx-testclient-b
     hvx_client_start c "${TP_W}x${TP_H}" --app-id hyprvx-testclient-c
@@ -32,7 +42,26 @@ tp_setup() {
     hvx_vkeyboard_start kb
     hvx_vpointer_start vp
     tp_run home "move $TP_CANVAS_X $TP_CANVAS_Y"
-    hvx_dispatch hyprvx:on > "$HVX_EVID/on.reply" 2>&1 || true
+    ((stock)) && return 0
+    # Glide is off unless the test sets TP_GLIDE (a released pan would otherwise keep moving and change the expected
+    # boxes of pan tests). The keyword reply is recorded; a refused value is BLOCKED.
+    local reply
+    reply=$(hvx_hyprctl_form keyword plugin:hyprvx:glide "${TP_GLIDE:-0}" 2>&1)
+    echo "keyword plugin:hyprvx:glide ${TP_GLIDE:-0} -> $reply" >> "$HVX_EVID/keywords.log"
+    [[ $reply == ok ]] || hvx_die_blocked "keyword plugin:hyprvx:glide refused: $reply"
+    ((drift)) && { hvx_dispatch hyprvx:on > "$HVX_EVID/on.reply" 2>&1 || true; }
+    return 0
+}
+
+# tp_axis_list NAME CLIENT: the CLIENT's scroll events in NAME.steps (axis, axis_source, axis_stop, axis_value120), one
+# per line without per-run fields, for comparisons between sessions or modes.
+tp_axis_list() {
+    python3 -I -c "
+import json, sys
+for s in json.load(open(sys.argv[1]))['steps']:
+    for e in s.get('events', {}).get(sys.argv[2], []):
+        if e.get('ev', '').startswith('axis'):
+            print(json.dumps({k: v for k, v in e.items() if k not in ('seq', 't_ns')}, sort_keys=True))" "$HVX_EVID/$1.steps.json" "$2"
 }
 
 # tp_next_time [GAP_MS]: advances the event time base by 10 s (or GAP_MS) and prints it, so a sequence never falls
