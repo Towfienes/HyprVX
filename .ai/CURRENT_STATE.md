@@ -501,3 +501,8 @@ Production safety: host Hyprland and Caelestia untouched; no plugin loaded; no p
 - T044 V-23 PASS: marker audit (4 sessions after the 12:46 reboot wiped /tmp) plus a new archive audit (531 sessions).
 - T046 records and quickstart validated (ctest 367/367, 5 builds, lint, analyzer); constitution re-check in plan.md.
 
+## Feature 003 merged (2026-10-12)
+
+- T048 approved by the user; merged `v3/003-trackpad-native-ux` into `v3/spec-foundation` (`534388b`, tree identical to
+  the tested branch); post-merge checks PASS. Next: Feature 004 (Phase 5, DriftWM window behavior), Spec Kit planning.
+

@@ -30,15 +30,19 @@
   V3 (Features 003–009). The clone `HyprVX-v3-agy` is kept untouched as a reference.
 - V-20 / SC-005: PASS, signed by the user (Towfienes) on 2026-10-11 in `checklists/verification.md`.
 
-## Feature 003 resume point (2026-10-12): T001–T046 done; T047 review, then STOP at T048
+## Feature 003 closed (2026-10-12)
 
-- Done with archived evidence: T001–T046. V-01..V-23 PASS; V-24 L6 signed PARTIAL by the user (H9 PASS; finger-scroll
-  items BLOCKED because nested scrolls are source WHEEL in aquamarine 0.15.1; Super combinations taken by the host;
-  B1–B6 BLOCKED). research R2 corrected. All 16 cited archives and 248 child runs pass `sha256sum -c`.
-- Next: T047 merge-readiness review (commits since `142d2d0`, `dev == 15f75b0`, nothing pushed, no `AGY_EXPERIMENT.md`),
-  then **T048 Feature 003 gate: STOP for the user's approval** before merging or starting Feature 004.
-- Carried to a hardware session where HyprVX owns the trackpad: every finger-scroll/glide item, pinch, 3/4-finger, U4.
-- DV3-18 (user): continue HyprVX; phantomat is a reference only (the user is its author; no attribution needed).
+- Gate T048 approved by the user (L6 PARTIAL accepted). Merged into `v3/spec-foundation` (`534388b`; post-merge checks
+  PASS: ctest 367/367, analyzer, build scripts, static, 1532 evidence indexes). No push; `dev` = 15f75b0.
+- Outstanding (not PASS): hardware-session L6 items (finger scroll, glide, pinch, 3/4-finger, U4); Caelestia NOT RUN;
+  performance not measured; Feature 002 open items; invisible pointer in interactive nested.
+
+## Next: Feature 004 `specs/004-drift-window-behavior/` (Phase 5)
+
+- Master plan §H Phase 5: snap, implicit cluster (V1 Island), pin, navigation, bookmarks, zoom-to-fit; gate: L2 + L5
+  tests for snap/cluster; risk: snap oscillation. §D rows Move (Shift = whole cluster), Pin, Navigation.
+- DV3-18: phantomat is a reference for navigation/search UX and its window rules (`docs/v3/EXTERNAL_PROJECTS_REVIEW.md`).
+- Spec Kit: specify → plan → checklist → tasks → `/speckit-analyze`, then STOP for the user's `tasks.md` approval.
 
 ## Sprint 1 goal
 
