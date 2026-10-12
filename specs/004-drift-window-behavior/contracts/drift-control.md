@@ -27,7 +27,7 @@ and 1.0; everything there stays valid. Implemented by the policy plugin in both 
 
 Center, frame, home, bookmark recall, focus-reveal and history jumps set the camera at once and record the previous
 camera in the workspace's history when the camera changes (history moves do not record). A running glide stops first.
-Focus-reveal uses the frame margin. Key presses and auto-repeats act once each; releases pass through. Several pinned
+Focus-reveal uses the frame margin. Each key press acts once; holding a key does not repeat the action (the plugin's key listener receives physical press and release events only, efb5099 `InputManager.cpp:1630`; the compositor's key-repeat timer serves repeating binds only, `KeybindManager.cpp:135`); releases pass through. Several pinned
 windows: the most recently pinned is drawn on top; a pin follows its window to another workspace.
 
 ## Dispatchers
@@ -51,5 +51,6 @@ sizes and `"bookmarks":[1..4 set flags]` (bookkeeping only; never a pass conditi
 
 Pin stores the focused window's current drawn top-left (screen, monitor-local) as its fixed screen position through
 the mechanism (`mechanism-api.md` 1.1); unpin sets the window's offset so that its drawn top-left at the current camera
-stays where it is, then clears the pin. With Drift off, panic or fullscreen the mechanism draws identity; the pin is
+stays where it is, then clears the pin. While pinned the window is drawn at its logical size (identity camera); after
+unpin its drawn size is its size times the zoom, so only at zoom 1 is the whole drawn box unchanged. With Drift off, panic or fullscreen the mechanism draws identity; the pin is
 kept and applies again in Drift.

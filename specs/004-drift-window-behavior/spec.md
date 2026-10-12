@@ -138,7 +138,7 @@ or dispatcher; captures, the focused window and the camera show the expected res
 
 The user pins a window (for example a video or a reference document) so that it stays at the same place and size on
 the screen while the canvas is panned and zoomed under it, drawn above the canvas windows. Unpinning puts it back on
-the canvas exactly where it is visible at that moment.
+the canvas at the top-left where it is visible at that moment.
 
 **Why this priority**: Useful, but the canvas is usable without it; it builds on the same per-window state as the
 other stories.
@@ -153,8 +153,8 @@ canvas from where it was.
    size), and the other windows move as usual.
 2. **Given** A is pinned and overlaps B on screen, **When** a capture is taken, **Then** A is drawn above B; a click on
    the overlap reaches A.
-3. **Given** A is pinned, **When** the user unpins it, **Then** its drawn box at that moment is unchanged and from then on
-   it moves and zooms with the canvas.
+3. **Given** A is pinned, **When** the user unpins it, **Then** its drawn top-left at that moment is unchanged and from
+   then on it moves and zooms with the canvas (its drawn size becomes its size times the zoom).
 4. **Given** A is pinned, **When** another window is moved near it, **Then** nothing snaps to A and A belongs to no group.
 5. **Given** A is pinned, **When** Drift is turned off, **Then** A is drawn exactly as Hyprland places it; turning Drift
    on again restores the pin.
@@ -225,14 +225,16 @@ canvas from where it was.
   camera, above every non-pinned window of the workspace (the most recently pinned window on top); pointer input on it
   MUST reach it at that drawn position. A pin follows its window to another workspace and applies there in Drift; a
   pinned box that lies partly or fully off screen (for example after an output change) stays as it is until unpinned.
-- **FR-017**: Unpinning MUST place the window on the canvas so its drawn box at that moment is unchanged; pinning MUST
-  keep its drawn box at that moment as its fixed screen box.
+- **FR-017**: Pinning MUST keep the window's drawn top-left at that moment as its fixed screen position; while pinned it
+  is drawn at its own size, not zoomed. Unpinning MUST place the window on the canvas so its drawn top-left at that
+  moment is unchanged; its drawn size then follows the zoom. (At zoom 1 the whole drawn box is unchanged both ways.)
 - **FR-018**: Pinned windows MUST take no part in snapping, groups or directional focus.
-- **FR-019**: Every action (snap on/off setting, group move, center, frame, home, bookmark store/recall, history back/
-  forward, pin/unpin) MUST be available as a HyprVX dispatcher, and key handling MUST follow the clarification above.
+- **FR-019**: Every action (group move, center, frame, home, bookmark store/recall, history back/forward, pin/unpin)
+  MUST be available as a HyprVX dispatcher, and key handling MUST follow the clarification above. The snap on/off
+  switch is a user setting (FR-022), not a dispatcher.
 - **FR-020**: Key handling in Drift MUST consume only the keys this feature defines, only on a monitor in Drift; every
-  other key and every key with Drift off reaches Hyprland unchanged. A key press and each of its auto-repeats act once
-  each; key releases are not consumed.
+  other key and every key with Drift off reaches Hyprland unchanged. Each key press acts once; holding a key does not
+  repeat the action; key releases are not consumed.
 - **FR-021**: Drag cancellation (Escape, Drift off, panic, monitor loss, workspace change) MUST restore the window or
   group to its position before the drag (Feature 002 rule) and leave no snap or group half-applied. A member closed
   during a drag leaves the drag (the others continue); a snap target closed during a drag releases that axis.
