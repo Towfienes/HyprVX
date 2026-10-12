@@ -44,6 +44,25 @@
 - DV3-18: phantomat is a reference for navigation/search UX and its window rules (`docs/v3/EXTERNAL_PROJECTS_REVIEW.md`).
 - Spec Kit: specify → plan → checklist → tasks → `/speckit-analyze`, then STOP for the user's `tasks.md` approval.
 
+### PAUSED by the user (2026-10-12 ~15:05) — checkpoint to resume from
+
+The user asked to stop and remember this checkout while they review a few things. Do not continue until they say so.
+
+- Checkout: `/home/towfienes/Projects/HyprVX-v3`, branch `v3/004-drift-window-behavior`, code at `f76a329`
+  (this handoff commit on top). Nothing pushed; `dev` = `15f75b0`; host untouched.
+- `tasks.md` approved (conditional, met; `759f089`). Done and ticked: T001–T005.
+  - T003/T004: `WindowBehavior` core + 25 unit tests; contract window-behavior **1.1** (hold within
+    `max(release, release/zoom)`, alignments recorded/held and only beside a gap snap) — logged as a contract change.
+  - T005: `DriftModel` group move drags, `dragMotion(screen, SnapInput)`, `dragCancel`; end conditions now restore
+    move drags (FR-021; spec parenthetical corrected: Feature 002 kept the last offset).
+- **T006 (V-01) is open, last run FAIL**: `20261012-150404-unit-f76a329-f004_unit` — ctest 403/403 and both seeds pass;
+  mutants 10/11, the survivor "an alignment follows another alignment" (`if (!other.attached || other.aligned)` →
+  `if (!other.attached)`). Likely an equivalent mutant: the gap step never stores an aligned state, so `other.aligned`
+  is always false there. To resume: confirm that, then either drop the redundant condition (and replace the mutant
+  with one that changes behaviour) or add a test that kills it; re-run `run_unit_evidence.sh f004`; tick T006 only
+  after an archived PASS. The FAIL run stays archived.
+- Then T007–T010 (vkeyboard keys, f004 test helpers, V-02, policy skeleton), US1… per `tasks.md`.
+
 ## Sprint 1 goal
 
 Prove that a real window surface is scaled and panned pixel-correctly in a nested, patched Hyprland while the

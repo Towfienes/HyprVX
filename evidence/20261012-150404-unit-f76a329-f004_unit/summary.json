@@ -1,0 +1,19 @@
+{
+  "run_id": "20261012-150404-unit-f76a329-f004_unit",
+  "test": "Feature 004 V-01 WindowBehavior and DriftModel group-drag unit tests",
+  "result": "FAIL",
+  "agent": "claude",
+  "git_sha": "f76a329e9db573a9980dbbb26643dc903c3a81c5",
+  "note": "100% tests passed out of 403; seeds default and 987654321; mutants 10/11",
+  "artifacts": [
+    "build.log",
+    "configure.log",
+    "core_tests_seed_987654321.log",
+    "core_tests_seed_default.log",
+    "ctest.log",
+    "mutation.log",
+    "preflight.log",
+    "source-status.txt"
+  ],
+  "not_run": []
+}
