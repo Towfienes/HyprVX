@@ -1,0 +1,24 @@
+{
+  "run_id": "20261012-133121-static-883b697-f002_static",
+  "test": "Feature 002 V-03 identity refusal and V-28 single-transform lint; Feature 003 V-22 GestureModel lint",
+  "result": "PASS",
+  "agent": "claude",
+  "git_sha": "883b69755c8c0475b857ceca39ac5df18ccff185",
+  "note": "7 checks ok",
+  "artifacts": [
+    "checks.txt",
+    "preflight.log",
+    "source-status.txt",
+    "v03-identity-refusal.log",
+    "v03-vpointer-refusal.log",
+    "v22-findings.txt",
+    "v22-gesture-model.log",
+    "v22-reviewed.txt",
+    "v28-patches.log",
+    "v28-planted.log",
+    "v28-plugin-files.txt",
+    "v28-plugin.log",
+    "v28-self-test.log"
+  ],
+  "not_run": []
+}

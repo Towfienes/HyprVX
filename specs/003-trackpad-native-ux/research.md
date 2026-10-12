@@ -32,6 +32,12 @@ All source references are Hyprland `efb50993780079460b0cbed1363e2166a2de1d9f` (t
     of the DRM backend (`libinput_event_gesture_*`).
   - Result: two-finger scrolls on the real trackpad reach a nested session as finger-source axis events with a
     stop; pinches, swipes and holds never do.
+  - **Correction (T045, 2026-10-12)**: wrong for the finger source. The interface list only shows what the binary
+    binds; its handler (`aquamarine v0.15.1 src/backend/Wayland.cpp:316-322`) forwards `wl_pointer.axis` with the axis
+    and the delta only, so `axis_source` and `axis_stop` are dropped and every nested scroll is source WHEEL (L6 client
+    logs: `axis_source wheel`, `value120`). A nested session therefore gets no finger scroll and no stop either: the L6
+    finger-scroll items (H1, H2, H4–H8, H10) are BLOCKED and move to the hardware session with B1–B6. The automated
+    evidence is unaffected (vpointer `fscroll` sends finger source and stop through the virtual-pointer protocol).
   - Host config (read-only): `~/.config/hypr/config/inputs.lua:14-17` (4 fingers horizontal = workspace;
     3 down = close; 3 up = fullscreen; 3 left = float), `~/.config/hypr/hyprland/gestures.lua:15-27` (3 up = special,
     3 down = toggle special, 4 down = `systemctl suspend-then-hibernate`), `hyprland/input.lua:12` natural scroll on.
