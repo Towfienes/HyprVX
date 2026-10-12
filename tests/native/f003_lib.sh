@@ -27,6 +27,8 @@ tp_setup() {
         hvx_copy_build_info stock
         hvx_nested start --variant stock --size "$SIZE" --scale "$SCALE" > "$HVX_EVID/stock.session.log" 2>&1 \
             || { cat "$HVX_EVID/stock.session.log" >&2; hvx_die_blocked "stock session did not start"; }
+        # The test-only plugin built for stock Hyprland, so reference sessions can receive the same synthetic gestures.
+        HVX_FORM=S hvx_load_testinput || hvx_die_blocked "test-only plugin (form S build) did not load into the stock session"
     else
         hvx_start_form --policy --size "$SIZE" --scale "$SCALE" > "$HVX_EVID/session.log" 2>&1 \
             || { cat "$HVX_EVID/session.log" >&2; hvx_die_blocked "form $HVX_FORM session did not start"; }

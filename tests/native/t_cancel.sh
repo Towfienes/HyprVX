@@ -3,6 +3,7 @@
 #  Pinch: on empty canvas, begin and update to scale 0.5 (the capture mid-gesture must differ from the one before, else
 #  the check is vacuous: BLOCKED), then end with cancelled = 1: the capture equals the one before the gesture (0 px) and
 #  the frame count of HVX-1 does not grow over 500 ms afterwards (no glide, no camera motion).
+#  3-finger swipe (T029): the same with one update of (30, 0) (a pan) ended with cancelled = 1.
 set -euo pipefail
 source "$(dirname -- "${BASH_SOURCE[0]}")/lib.sh"
 source "$(dirname -- "${BASH_SOURCE[0]}")/f003_lib.sh"
@@ -37,10 +38,9 @@ cancelled() {
 }
 
 cancelled pinch pinch "2" "2 0 0 0.5 0"
-
-# 3-finger swipe part: T029.
+cancelled swipe swipe3 "3" "3 30 0"
 
 hvx_stop >> "$HVX_EVID/session.log" 2>&1 || hvx_die_blocked "session did not stop"
 hvx_finish "$result" "T-CANCEL a cancelled gesture restores the camera at begin; no motion afterwards (V-11)" \
-    "form $HVX_FORM; pinch 0.5 cancelled; output $SIZE scale $SCALE"
+    "form $HVX_FORM; pinch 0.5 and 3-finger swipe (30,0) cancelled; output $SIZE scale $SCALE"
 [[ $result == PASS ]]
