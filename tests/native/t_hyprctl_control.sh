@@ -4,7 +4,8 @@
 # reach the hyprvx:* dispatchers). Pixel evidence: after `on`, a `hyprvx:zoom 0.5` (legacy nested config) changes the
 # capture; after `off` the capture equals the reference; `toggle` twice does the same; `panic` returns identity;
 # `hyprctl hyprvx bogus` is refused; `hyprctl hyprvx-dev state` is still an unknown request (FR-016). Replies are
-# bookkeeping only (Constitution II); `hyprctl clients` must not change.
+# bookkeeping only (Constitution II); `hyprctl clients` must not change. HVX_BINARY (optional) runs another stock-labelled
+# binary from the agent prefix, e.g. the host's distribution build copied by scripts/mirror-host-hyprland.sh.
 set -euo pipefail
 source "$(dirname -- "${BASH_SOURCE[0]}")/lib.sh"
 HVX_FORM=S
@@ -13,9 +14,15 @@ SCALE="${HVX_OUTPUT_SCALE:-1}"
 SO="$HOME/.cache/hyprvx/$HYPRVX_AGENT/plugin/S/hyprvx-drift-S.so"
 
 hvx_init_run formS t_hyprctl_control
-hvx_copy_build_info stock
+binary_args=()
+if [[ -n ${HVX_BINARY:-} ]]; then
+    binary_args=(--binary "$HVX_BINARY")
+    cp "$(dirname -- "$(dirname -- "$HVX_BINARY")")/build-info.json" "$HVX_EVID/build-info-binary.json"
+else
+    hvx_copy_build_info stock
+fi
 [[ -f $SO ]] || hvx_die_blocked "no plugin at $SO; run scripts/build-plugin.sh --form S"
-hvx_nested start --variant stock --size "$SIZE" --scale "$SCALE" > "$HVX_EVID/session.log" 2>&1 \
+hvx_nested start --variant stock "${binary_args[@]}" --size "$SIZE" --scale "$SCALE" > "$HVX_EVID/session.log" 2>&1 \
     || { cat "$HVX_EVID/session.log" >&2; hvx_die_blocked "nested stock session did not start"; }
 HVX_OWN_SESSION=1
 SESSION_DIR=$(hvx_session_dir)
@@ -77,5 +84,5 @@ cmp -s "$HVX_EVID/reference.clients.json" "$HVX_EVID/final.clients.json" || { ec
 hvx_plugin_unload "$SO" >> "$HVX_EVID/plugin-load.log" 2>&1 || { echo "unload failed" >&2; result=FAIL; }
 hvx_stop >> "$HVX_EVID/session.log" 2>&1 || hvx_die_blocked "session did not stop"
 cp "$SESSION_DIR/hyprland.log" "$HVX_EVID/nested-hyprland.log" 2> /dev/null || hvx_die_blocked "nested log not kept"
-hvx_finish "$result" "T-HYPRCTL-CONTROL hyprctl hyprvx on/off/toggle/panic with the delivered form S plugin" "output $SIZE scale $SCALE"
+hvx_finish "$result" "T-HYPRCTL-CONTROL hyprctl hyprvx on/off/toggle/panic with the delivered form S plugin" "binary ${HVX_BINARY:-stock prefix}; output $SIZE scale $SCALE"
 [[ $result == PASS ]]

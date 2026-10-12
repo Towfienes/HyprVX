@@ -369,7 +369,10 @@ if(BUILD_TESTING AND HYPRVX_BUILD_TESTS)
         tests/unit/test_output_topology.cpp
         tests/unit/test_world.cpp
         tests/unit/test_world_ownership.cpp
+        tests/unit/test_build_identity.cpp
     )
+
+    target_include_directories(hyprvx_core_tests PRIVATE platform/include)
 
     target_link_libraries(
         hyprvx_core_tests
