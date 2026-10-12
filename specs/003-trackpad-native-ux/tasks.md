@@ -60,11 +60,11 @@ description: "Task list for Feature 003 — Trackpad-Native Drift UX, Claude Cod
 
 ### Test tools and harness (test-tooling 1.5)
 
-- [ ] T008 [P] Add `fscroll T0 DT N DX DY [stop]` to `tools/vpointer/main.cpp` per test-tooling 1.5 §4a (axis → axis_source(finger) → frame per axis, explicit times, optional stop, limits with an `error` line)
+- [X] T008 [P] Add `fscroll T0 DT N DX DY [stop]` to `tools/vpointer/main.cpp` per test-tooling 1.5 §4a (axis → axis_source(finger) → frame per axis, explicit times, optional stop, limits with an `error` line)
 - [ ] T009 [P] Add pointer-gestures binding and the swipe/pinch, `axis_source`, `axis_stop` and `axis_value120` log lines to `tools/testclient/main.cpp` per test-tooling 1.5 §4 (existing lines unchanged)
 - [ ] T010 [P] Implement the test-only plugin in `tools/testinput/src/main.cpp`: hyprctl command `hvxtest` (`gesture swipe|pinch begin|update|end …` calling `g_pInputManager->onSwipe*/onPinch*` with the given fields and range checks; `frames <monitor>` from a `render.pre` counter), per test-tooling 1.5 §8
-- [ ] T011 Add `start --interactive` to `tools/hyprvx_nested.py` / `scripts/nested.sh`: same verified session, but the Wayland output (the visible nested window) stays enabled and no headless output is created, for L6 only; captures are refused in this mode. Let `plugin load` accept `plugin/testinput-*` paths. Keep every identity rule
-- [ ] T012 Extend `tests/native/harness/test_identity_refusal.sh` and `tests/native/static_evidence.sh`: `fscroll` and `hvxtest` refused outside a verified session, `--interactive` refuses captures; run it (V-02)
+- [X] T011 Add `start --interactive` to `tools/hyprvx_nested.py` / `scripts/nested.sh`: same verified session, but the Wayland output (the visible nested window) stays enabled and no headless output is created, for L6 only; captures are refused in this mode. Let `plugin load` accept `plugin/testinput-*` paths. Keep every identity rule
+- [X] T012 Extend `tests/native/harness/test_identity_refusal.sh` and `tests/native/static_evidence.sh`: `fscroll` and `hvxtest` refused outside a verified session, `--interactive` refuses captures; run it (V-02)
 - [ ] T013 Add the gesture bindings of test-tooling 1.5 §5 to `tests/native/config/hyprland.conf.in` (`gesture = 3, down, close`, `gesture = 3, up, fullscreen`, `gesture = 3, left, float`, `gesture = 4, horizontal, workspace`; never a command binding) and re-run `tests/native/gate_a_stock_determinism.sh`; the baseline hash must be unchanged (V-03)
 - [ ] T014 [P] Add test helpers: `tests/native/f003_geom.py` (expected pan `−(ΣDX, ΣDY)·f`, swipe pan, `pinchCamera`, `ReleaseVelocity` and `expectedGlide` re-implemented from the contract, cross-checked against the unit-test vectors) and `lib.sh` helpers `hvx_fscroll`, `hvx_gesture`, `hvx_frames`, `hvx_load_testinput`
 

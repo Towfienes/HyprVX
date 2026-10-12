@@ -93,3 +93,12 @@ bindm = , mouse:275, movewindow
 # Hyprland's own resize bind for T-RESIZE (Feature 002 FR-009), on BTN_EXTRA (276) for the same reason; only t_resize.sh
 # presses it.
 bindm = , mouse:276, resizewindow
+
+# Feature 003 (test-tooling 1.5 section 5): the user's window-action trackpad bindings, so that arbitration is tested
+# against the real conflict (host config read-only: config/inputs.lua, hyprland/gestures.lua). Command bindings (the
+# host's 4-finger suspend, special-workspace toggles bound to functions) are never copied. Only the Feature 003 tests
+# send gestures (synthetic, through the test-only plugin); no earlier test is affected.
+gesture = 3, down, close
+gesture = 3, up, fullscreen
+gesture = 3, left, float
+gesture = 4, horizontal, workspace
