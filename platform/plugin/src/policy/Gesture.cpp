@@ -3,8 +3,7 @@
 // (contracts/gesture-model.md) and consumed through the cancellable event bus before keybinds, `gesture =` bindings
 // and client delivery. Camera changes go only through DriftModel and CameraMath (Constitution IV).
 //
-// Implemented: finger-source scroll sequences (T022), pinch gestures (T026). Swipes pass through until T030; glide is
-// T036.
+// Implemented: finger-source scroll sequences (T022), pinch gestures (T026), swipe gestures (T030). Glide is T036.
 
 #include "policy/Plugin.hpp"
 #include "policy/Mechanism.hpp"
@@ -168,6 +167,29 @@ namespace {
             HyprVXPolicy::sync(true);
     }
 
+    void onSwipeBegin(const IPointer::SSwipeBeginEvent& event, Event::SCallbackInfo& info) {
+        beginGesture(drift::InputKind::Swipe, event.fingers, info);
+    }
+
+    // 3-finger swipes pan by the finger motion times the pan factor; content follows the fingers (FR-007, research R4).
+    void onSwipeUpdate(const IPointer::SSwipeUpdateEvent& event, Event::SCallbackInfo& info) {
+        if (!consumed(drift::InputKind::Swipe, info) || g_gesture.session.target != drift::Target::Pan || !stillLive(g_gesture.session))
+            return;
+        const double F = HyprVXPolicy::panFactor();
+        const cammath::Vec D{event.delta.x * F, event.delta.y * F};
+        if (!std::isfinite(D.x) || !std::isfinite(D.y))
+            return;
+        if (HyprVXPolicy::model().pan(g_gesture.session.monitor, D) == drift::Status::Ok)
+            HyprVXPolicy::sync(true);
+    }
+
+    void onSwipeEnd(const IPointer::SSwipeEndEvent& event, Event::SCallbackInfo& info) {
+        if (consumed(drift::InputKind::Swipe, info) && event.cancelled && g_gesture.session.target == drift::Target::Pan &&
+            stillLive(g_gesture.session))
+            setSceneCamera(g_gesture.start);  // FR-012
+        g_gesture = {};
+    }
+
     void onPinchBegin(const IPointer::SPinchBeginEvent& event, Event::SCallbackInfo& info) {
         beginGesture(drift::InputKind::Pinch, event.fingers, info);
     }
@@ -204,10 +226,6 @@ namespace {
         if (STEP == drift::ScrollStep::End)
             g_scroll = {};
     }
-    void onGesture(Event::SCallbackInfo& info) {
-        if (!HyprVXPolicy::anyDrift())
-            return;
-    }
 }
 
 double HyprVXPolicy::panFactor() {
@@ -232,9 +250,9 @@ void HyprVXPolicy::initGesture(HANDLE handle) {
 
     auto& bus = Event::bus()->m_events;
     g_listeners.push_back(bus.input.mouse.axis.listen([](IPointer::SAxisEvent e, Event::SCallbackInfo& info) { onAxis(e, info); }));
-    g_listeners.push_back(bus.gesture.swipe.begin.listen([](IPointer::SSwipeBeginEvent, Event::SCallbackInfo& info) { onGesture(info); }));
-    g_listeners.push_back(bus.gesture.swipe.update.listen([](IPointer::SSwipeUpdateEvent, Event::SCallbackInfo& info) { onGesture(info); }));
-    g_listeners.push_back(bus.gesture.swipe.end.listen([](IPointer::SSwipeEndEvent, Event::SCallbackInfo& info) { onGesture(info); }));
+    g_listeners.push_back(bus.gesture.swipe.begin.listen([](IPointer::SSwipeBeginEvent e, Event::SCallbackInfo& info) { onSwipeBegin(e, info); }));
+    g_listeners.push_back(bus.gesture.swipe.update.listen([](IPointer::SSwipeUpdateEvent e, Event::SCallbackInfo& info) { onSwipeUpdate(e, info); }));
+    g_listeners.push_back(bus.gesture.swipe.end.listen([](IPointer::SSwipeEndEvent e, Event::SCallbackInfo& info) { onSwipeEnd(e, info); }));
     g_listeners.push_back(bus.gesture.pinch.begin.listen([](IPointer::SPinchBeginEvent e, Event::SCallbackInfo& info) { onPinchBegin(e, info); }));
     g_listeners.push_back(bus.gesture.pinch.update.listen([](IPointer::SPinchUpdateEvent e, Event::SCallbackInfo& info) { onPinchUpdate(e, info); }));
     g_listeners.push_back(bus.gesture.pinch.end.listen([](IPointer::SPinchEndEvent e, Event::SCallbackInfo& info) { onPinchEnd(e, info); }));
