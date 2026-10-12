@@ -128,15 +128,18 @@ try:
     r = harness_run("capture", str(shot))
     check("interactive session: capture refused (exit 1, no file)", r.returncode == 1 and not shot.exists() and "interactive" in r.stderr,
           f"exit {r.returncode}: {r.stderr.strip()}")
-    # start --interactive renders the template with only the WAYLAND-1 rule changed.
+    # start --interactive renders the template with only the WAYLAND-1 rule changed: that one line becomes the visible
+    # output rule plus the cursor block of the L6 session (CPU cursor buffer, T045), and nothing else differs.
     import importlib.util
     spec = importlib.util.spec_from_file_location("hn", repo / "tools/hyprvx_nested.py")
     hn = importlib.util.module_from_spec(spec); spec.loader.exec_module(hn)
     normal, inter = root / "normal.conf", root / "inter.conf"
     hn.render_config(normal, (1280, 800), "1"); hn.render_config(inter, (1280, 800), "1", True)
-    a, b = normal.read_text().splitlines(), inter.read_text().splitlines()
-    diff = [(x, y) for x, y in zip(a, b) if x != y]
-    check("render_config --interactive changes only the WAYLAND-1 rule", len(a) == len(b) and diff == [(hn.INTERACTIVE_RULE_OFF, hn.INTERACTIVE_RULE_ON)], repr(diff))
+    a, b = normal.read_text(), inter.read_text()
+    expected_on = "monitor = WAYLAND-1, preferred, auto, 1\ncursor {\n    use_cpu_buffer = 1\n}"
+    check("render_config --interactive changes only the WAYLAND-1 rule",
+          a.count(hn.INTERACTIVE_RULE_OFF) == 1 and hn.INTERACTIVE_RULE_ON == expected_on
+          and b == a.replace(hn.INTERACTIVE_RULE_OFF, expected_on), repr(hn.INTERACTIVE_RULE_ON))
     write(good)
 
     check("nothing ran for any refused command", not marker_file.exists())
