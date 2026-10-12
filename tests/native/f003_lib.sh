@@ -127,7 +127,7 @@ print('%.6g,%.6g,%.6g,%.6g' % ((x - px) * z, (y - py) * z, w * z, h * z))" "$x" 
 # under (P, z); windows
 # partly off the output are recorded as not judged. Exit 1 if a judged window is off.
 tp_scene_ok() {
-    local name=$1 px=$2 py=$3 z=$4 tol=$5 win box ok=0 vis
+    local name=$1 px=$2 py=$3 z=$4 tol=$5 win box ok=0 vis judged=0
     for win in a b c; do
         box=$(tp_drawn "$win" "$px" "$py" "$z")
         vis=$(python3 -I -c "
@@ -135,10 +135,16 @@ import sys
 x, y, w, h = map(float, sys.argv[1].split(',')); W, H = (float(v) / float(sys.argv[3]) for v in sys.argv[2].split('x'))
 print(1 if x >= 2 and y >= 2 and x + w <= W - 2 and y + h <= H - 2 else 0)" "$box" "$SIZE" "$SCALE")
         if [[ $vis == 1 ]]; then
+            judged=$((judged + 1))
             tp_box "$name" "$win" "$box" "$tol" || ok=1
         else
             echo "$name $win not fully visible at $box (not judged)" >> "$HVX_EVID/boxes.txt"
         fi
     done
+    # A step where no window is fully visible would pass without judging anything.
+    if ((judged == 0)); then
+        echo "$name: no window fully visible; nothing judged" >> "$HVX_EVID/boxes.txt"
+        return 1
+    fi
     return $ok
 }
