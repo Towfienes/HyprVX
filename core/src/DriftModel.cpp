@@ -1,5 +1,6 @@
 #include "hyprvx/core/DriftModel.hpp"
 
+#include <algorithm>
 #include <cmath>
 
 namespace hyprvx::drift {
@@ -101,7 +102,7 @@ Status DriftModel::exited(MonitorId monitor) {
 }
 
 void DriftModel::panic() {
-    drag_.reset();
+    dragCancel();
     for (auto& [monitor, s] : sessions_)
         s = offSession(s.origin);
 }
@@ -198,8 +199,18 @@ void DriftModel::windowClosed(WindowId window) {
 }
 
 void DriftModel::windowLeftScene(WindowId window) {
-    if (drag_ && drag_->kind == DragKind::Move && drag_->window == window)
+    if (!drag_ || drag_->kind != DragKind::Move)
+        return;
+    auto& members = drag_->members;
+    std::erase_if(members, [window](const DragMember& m) { return m.window == window; });
+    if (members.empty()) {
         drag_.reset();
+        return;
+    }
+    if (drag_->window == window) {
+        drag_->window      = members.front().window;
+        drag_->startOffset = members.front().startOffset;
+    }
 }
 
 cammath::Vec DriftModel::mechanismOffset(WindowId window, WorkspaceId workspace, MonitorId monitor, bool mapped) const {
@@ -213,7 +224,7 @@ bool DriftModel::beginPan(MonitorId monitor, cammath::Vec screen) {
     const auto scene = sceneWorkspace(monitor);
     if (!scene || drag_ || !finite(screen))
         return false;
-    drag_ = Drag{.kind = DragKind::Pan, .monitor = monitor, .startScreen = screen, .startOffset = {}, .startCamera = camera(*scene, originOf(monitor)), .workspace = *scene};
+    drag_ = Drag{.kind = DragKind::Pan, .monitor = monitor, .startScreen = screen, .startOffset = {}, .startCamera = camera(*scene, originOf(monitor)), .workspace = *scene, .members = {}, .snap = {}};
     return true;
 }
 
@@ -227,28 +238,76 @@ bool DriftModel::beginMove(MonitorId monitor, WindowId window, cammath::Vec scre
                  .startScreen = screen,
                  .startOffset = offset(window),
                  .startCamera = camera(*scene, originOf(monitor)),
-                 .workspace = *scene};
+                 .workspace = *scene,
+                 .members = {DragMember{window, offset(window)}},
+                 .snap = {}};
     return true;
+}
+
+bool DriftModel::beginGroupMove(MonitorId monitor, WindowId pressed, const std::vector<WindowId>& members, cammath::Vec screen) {
+    const auto scene = sceneWorkspace(monitor);
+    if (!scene || drag_ || !finite(screen) || members.empty() || std::find(members.begin(), members.end(), pressed) == members.end())
+        return false;
+    std::vector<DragMember> list;
+    for (const WindowId w : members) {
+        if (std::any_of(list.begin(), list.end(), [w](const DragMember& m) { return m.window == w; }))
+            return false;
+        list.push_back({w, offset(w)});
+    }
+    drag_ = Drag{.kind = DragKind::Move,
+                 .monitor = monitor,
+                 .window = pressed,
+                 .startScreen = screen,
+                 .startOffset = offset(pressed),
+                 .startCamera = camera(*scene, originOf(monitor)),
+                 .workspace = *scene,
+                 .members = std::move(list),
+                 .snap = {}};
+    return true;
+}
+
+bool DriftModel::applyMoveDelta(cammath::Vec world) {
+    bool ok = true;
+    for (const auto& m : drag_->members)
+        ok = setOffset(m.window, {m.startOffset.x + world.x, m.startOffset.y + world.y}) && ok;
+    return ok;
 }
 
 bool DriftModel::dragMotion(cammath::Vec screen) {
     if (!drag_ || !finite(screen))
         return false;
     const cammath::Vec delta{screen.x - drag_->startScreen.x, screen.y - drag_->startScreen.y};
-    if (drag_->kind == DragKind::Move) {
-        const auto world = cammath::worldDelta(drag_->startCamera, delta);
-        return setOffset(drag_->window, {drag_->startOffset.x + world.x, drag_->startOffset.y + world.y});
-    }
+    if (drag_->kind == DragKind::Move)
+        return applyMoveDelta(cammath::worldDelta(drag_->startCamera, delta));
     return setCamera(drag_->workspace, cammath::panByScreen(drag_->startCamera, delta));
+}
+
+bool DriftModel::dragMotion(cammath::Vec screen, const SnapInput& snap) {
+    if (!drag_ || drag_->kind != DragKind::Move)
+        return dragMotion(screen);
+    if (!finite(screen))
+        return false;
+    const cammath::Vec delta{screen.x - drag_->startScreen.x, screen.y - drag_->startScreen.y};
+    const auto         result = snapMove(snap.moving, cammath::worldDelta(drag_->startCamera, delta), snap.others, snap.zoom, snap.settings, drag_->snap);
+    drag_->snap               = result.state;
+    return applyMoveDelta(result.delta);
 }
 
 void DriftModel::dragEnd() {
     drag_.reset();
 }
 
+void DriftModel::dragCancel() {
+    if (drag_ && drag_->kind == DragKind::Move) {
+        for (const auto& m : drag_->members)
+            setOffset(m.window, m.startOffset);
+    }
+    drag_.reset();
+}
+
 void DriftModel::endDragOn(MonitorId monitor) {
     if (drag_ && drag_->monitor == monitor)
-        drag_.reset();
+        dragCancel();
 }
 
 // ---- spawn placement ----------------------------------------------------------------------------------------------

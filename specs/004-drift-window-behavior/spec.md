@@ -171,7 +171,7 @@ canvas from where it was.
 - A group member is closed, moved to another workspace or becomes fullscreen: it leaves the group; the rest stays
   grouped if still snapped to each other.
 - A drag is cancelled (Escape, Drift off, panic, monitor loss, workspace change): the window or group returns to where
-  it was before the drag, as for Feature 002 drags.
+  it was before the drag (FR-021; Feature 002 ended a drag without restoring it).
 - Directional focus with overlapping windows, windows in line and diagonal neighbours: the rules choose one window
   deterministically (nearest in the pressed direction, ties broken by the smaller cross-direction distance).
 - Framing a window larger than the screen at the minimum zoom, or a very small window at the maximum zoom: the zoom is
@@ -236,7 +236,7 @@ canvas from where it was.
   other key and every key with Drift off reaches Hyprland unchanged. Each key press acts once; holding a key does not
   repeat the action; key releases are not consumed.
 - **FR-021**: Drag cancellation (Escape, Drift off, panic, monitor loss, workspace change) MUST restore the window or
-  group to its position before the drag (Feature 002 rule) and leave no snap or group half-applied. A member closed
+  group to its position before the drag (new in Feature 004: Feature 002 ended such drags keeping the last offset) and leave no snap or group half-applied. A member closed
   during a drag leaves the drag (the others continue); a snap target closed during a drag releases that axis.
 - **FR-022**: Snap threshold, snap gap, release distance and a snap on/off switch MUST be user settings with the
   defaults above; invalid values fall back to defaults with one log line.

@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <limits>
 #include <optional>
+#include <vector>
 
 #include <gtest/gtest.h>
 
@@ -393,6 +394,207 @@ TEST(DriftModelTest, DragEndsOnEveryEndCondition) {
     ASSERT_TRUE(model.beginPan(kMon, {0.0, 0.0}));
     model.monitorRemoved(kMon);
     EXPECT_FALSE(model.drag().has_value());
+}
+
+// ---- group drags and snapping (Feature 004 T005, research R4, data-model "Drag", FR-021) -----------------------------
+
+namespace {
+
+constexpr hyprvx::drift::WindowId kWinC = 0xc0;
+
+hyprvx::drift::WorldBox wbox(hyprvx::drift::WindowId id, double x, double y) {
+    return {id, {{x, y}, {100.0, 100.0}}};
+}
+
+// A (100x100 at L = 0) moving towards B (L = 200, offset 0); identity camera at zoom 1 (kM = 0).
+hyprvx::drift::SnapInput snapTowardsB() {
+    hyprvx::drift::SnapInput in;
+    in.moving = {wbox(kWinA, 0.0, 0.0)};
+    in.others = {wbox(kWinB, 200.0, 0.0)};
+    in.zoom   = 1.0;
+    return in;
+}
+
+} // namespace
+
+TEST(DriftModelGroupDrag, SingleMoveHasOneMember) {
+    DriftModel model = inDrift();
+    ASSERT_TRUE(model.setOffset(kWinA, {5.0, 6.0}));
+    ASSERT_TRUE(model.beginMove(kMon, kWinA, {0.0, 0.0}));
+    ASSERT_EQ(model.drag()->members.size(), 1u);
+    EXPECT_EQ(model.drag()->members[0].window, kWinA);
+    expectVec(model.drag()->members[0].startOffset, {5.0, 6.0});
+}
+
+TEST(DriftModelGroupDrag, EveryMemberGetsTheSameWorldDelta) {
+    DriftModel model = inDrift();
+    ASSERT_TRUE(model.setCamera(kWs1, {{0.0, 0.0}, 0.5}));
+    ASSERT_TRUE(model.setOffset(kWinA, {10.0, 20.0}));
+    ASSERT_TRUE(model.setOffset(kWinC, {-3.0, 4.0}));
+    ASSERT_TRUE(model.beginGroupMove(kMon, kWinA, {kWinA, kWinB, kWinC}, {100.0, 100.0}));
+    EXPECT_EQ(model.drag()->kind, DragKind::Move);
+    EXPECT_EQ(model.drag()->window, kWinA);
+    EXPECT_EQ(model.drag()->members.size(), 3u);
+    ASSERT_TRUE(model.dragMotion({130.0, 90.0}));
+    // delta / z = (30, -10) / 0.5 = (60, -20) for each member
+    expectVec(model.offset(kWinA), {70.0, 0.0});
+    expectVec(model.offset(kWinB), {60.0, -20.0});
+    expectVec(model.offset(kWinC), {57.0, -16.0});
+    model.dragEnd();
+    EXPECT_FALSE(model.drag().has_value());
+    expectVec(model.offset(kWinB), {60.0, -20.0}); // kept on release
+}
+
+TEST(DriftModelGroupDrag, GroupBeginRejectsBadInput) {
+    DriftModel off;
+    EXPECT_FALSE(off.beginGroupMove(kMon, kWinA, {kWinA, kWinB}, {0.0, 0.0})); // not in DRIFT
+    DriftModel model = inDrift();
+    EXPECT_FALSE(model.beginGroupMove(kMon, kWinA, {}, {0.0, 0.0}));
+    EXPECT_FALSE(model.beginGroupMove(kMon, kWinA, {kWinB, kWinC}, {0.0, 0.0}));        // pressed not a member
+    EXPECT_FALSE(model.beginGroupMove(kMon, kWinA, {kWinA, kWinB, kWinA}, {0.0, 0.0})); // duplicate
+    EXPECT_FALSE(model.beginGroupMove(kMon, kWinA, {kWinA}, {std::nan(""), 0.0}));
+    EXPECT_FALSE(model.drag().has_value());
+}
+
+TEST(DriftModelGroupDrag, SnapStateIsCarriedInTheDrag) {
+    DriftModel model = inDrift();
+    ASSERT_TRUE(model.beginMove(kMon, kWinA, {0.0, 0.0}));
+    const auto in = snapTowardsB();
+    // Candidate 63: free; 64: snapped to 200 - 12 - 100 = 88 (window-behavior 1.1).
+    ASSERT_TRUE(model.dragMotion({63.0, 0.0}, in));
+    expectVec(model.offset(kWinA), {63.0, 0.0});
+    ASSERT_TRUE(model.dragMotion({64.0, 0.0}, in));
+    expectVec(model.offset(kWinA), {88.0, 0.0});
+    EXPECT_TRUE(model.drag()->snap.x.attached);
+    EXPECT_EQ(model.drag()->snap.x.target, kWinB);
+    // Held within 32, released beyond.
+    ASSERT_TRUE(model.dragMotion({120.0, 0.0}, in));
+    expectVec(model.offset(kWinA), {88.0, 0.0});
+    ASSERT_TRUE(model.dragMotion({121.0, 0.0}, in));
+    expectVec(model.offset(kWinA), {121.0, 0.0});
+    EXPECT_FALSE(model.drag()->snap.x.attached);
+}
+
+TEST(DriftModelGroupDrag, SnapAddsToTheStartOffsetsOfAllMembers) {
+    DriftModel model = inDrift();
+    ASSERT_TRUE(model.setOffset(kWinA, {0.0, 0.0}));
+    ASSERT_TRUE(model.setOffset(kWinC, {0.0, 0.0}));
+    ASSERT_TRUE(model.beginGroupMove(kMon, kWinA, {kWinA, kWinC}, {0.0, 0.0}));
+    hyprvx::drift::SnapInput in = snapTowardsB();
+    in.moving = {wbox(kWinA, 0.0, 0.0), wbox(kWinC, 0.0, 112.0)}; // bounding box 100 x 212
+    ASSERT_TRUE(model.dragMotion({70.0, 0.0}, in));
+    // The set snaps as one: its left edge at 88 (gap 12 to B); C follows by the same delta.
+    expectVec(model.offset(kWinA), {88.0, 0.0});
+    expectVec(model.offset(kWinC), {88.0, 0.0});
+}
+
+TEST(DriftModelGroupDrag, SnapThresholdUsesTheGivenZoom) {
+    DriftModel model = inDrift();
+    ASSERT_TRUE(model.beginMove(kMon, kWinA, {0.0, 0.0}));
+    hyprvx::drift::SnapInput in = snapTowardsB();
+    in.zoom = 2.0; // the zoom changed during the drag: band 12 world px
+    ASSERT_TRUE(model.dragMotion({75.0, 0.0}, in));
+    expectVec(model.offset(kWinA), {75.0, 0.0});
+    ASSERT_TRUE(model.dragMotion({76.0, 0.0}, in));
+    expectVec(model.offset(kWinA), {88.0, 0.0});
+}
+
+TEST(DriftModelGroupDrag, ClosedSnapTargetReleasesTheAxis) {
+    DriftModel model = inDrift();
+    ASSERT_TRUE(model.beginMove(kMon, kWinA, {0.0, 0.0}));
+    hyprvx::drift::SnapInput in = snapTowardsB();
+    ASSERT_TRUE(model.dragMotion({70.0, 0.0}, in));
+    expectVec(model.offset(kWinA), {88.0, 0.0});
+    in.others.clear(); // B closed
+    ASSERT_TRUE(model.dragMotion({71.0, 0.0}, in));
+    expectVec(model.offset(kWinA), {71.0, 0.0});
+    EXPECT_FALSE(model.drag()->snap.x.attached);
+}
+
+TEST(DriftModelGroupDrag, CancelRestoresEveryStartOffset) {
+    DriftModel model = inDrift();
+    ASSERT_TRUE(model.setOffset(kWinA, {10.0, 20.0}));
+    ASSERT_TRUE(model.setOffset(kWinB, {-5.0, 0.0}));
+    ASSERT_TRUE(model.beginGroupMove(kMon, kWinB, {kWinA, kWinB}, {0.0, 0.0}));
+    ASSERT_TRUE(model.dragMotion({300.0, 40.0}));
+    model.dragCancel();
+    EXPECT_FALSE(model.drag().has_value());
+    expectVec(model.offset(kWinA), {10.0, 20.0});
+    expectVec(model.offset(kWinB), {-5.0, 0.0});
+}
+
+TEST(DriftModelGroupDrag, EndConditionsRestoreMoveDrags) {
+    auto dragged = [] {
+        DriftModel model = inDrift();
+        EXPECT_TRUE(model.setOffset(kWinA, {10.0, 20.0}));
+        EXPECT_TRUE(model.beginGroupMove(kMon, kWinA, {kWinA, kWinB}, {0.0, 0.0}));
+        EXPECT_TRUE(model.dragMotion({50.0, 50.0}));
+        return model;
+    };
+    auto restored = [](const DriftModel& model) {
+        EXPECT_FALSE(model.drag().has_value());
+        expectVec(model.offset(kWinA), {10.0, 20.0});
+        expectVec(model.offset(kWinB), {0.0, 0.0});
+    };
+    DriftModel m = dragged();
+    ASSERT_EQ(m.disable(kMon), Status::Ok);
+    restored(m);
+    m = dragged();
+    m.panic();
+    restored(m);
+    m = dragged();
+    m.workspaceActivated(kMon, kWs2, false);
+    restored(m);
+    m = dragged();
+    m.monitorRemoved(kMon);
+    restored(m);
+    m = dragged();
+    ASSERT_EQ(m.invalidCamera(kMon), Status::Ok);
+    restored(m);
+    // A pan drag ended by panic keeps its camera (Feature 002).
+    DriftModel pan = inDrift();
+    ASSERT_TRUE(pan.beginPan(kMon, {0.0, 0.0}));
+    ASSERT_TRUE(pan.dragMotion({20.0, 0.0}));
+    pan.panic();
+    expectCamera(pan.camera(kWs1, kM), {{-20.0, 0.0}, 1.0});
+}
+
+TEST(DriftModelGroupDrag, ClosedMemberLeavesTheDragOthersContinue) {
+    DriftModel model = inDrift();
+    ASSERT_TRUE(model.beginGroupMove(kMon, kWinA, {kWinA, kWinB}, {0.0, 0.0}));
+    ASSERT_TRUE(model.dragMotion({10.0, 0.0}));
+    model.windowClosed(kWinB);
+    ASSERT_TRUE(model.drag().has_value());
+    ASSERT_EQ(model.drag()->members.size(), 1u);
+    expectVec(model.offset(kWinB), {0.0, 0.0}); // its offset is dropped
+    ASSERT_TRUE(model.dragMotion({30.0, 0.0}));
+    expectVec(model.offset(kWinA), {30.0, 0.0});
+    EXPECT_FALSE(model.offsets().contains(kWinB));
+    // The pressed window closing with another member left: the drag continues on the rest.
+    DriftModel other = inDrift();
+    ASSERT_TRUE(other.beginGroupMove(kMon, kWinA, {kWinA, kWinB}, {0.0, 0.0}));
+    other.windowClosed(kWinA);
+    ASSERT_TRUE(other.drag().has_value());
+    ASSERT_TRUE(other.dragMotion({7.0, 0.0}));
+    expectVec(other.offset(kWinB), {7.0, 0.0});
+    // The last member closing ends the drag.
+    other.windowClosed(kWinB);
+    EXPECT_FALSE(other.drag().has_value());
+}
+
+TEST(DriftModelGroupDrag, MemberLeavingTheSceneKeepsItsOffset) {
+    DriftModel model = inDrift();
+    ASSERT_TRUE(model.beginGroupMove(kMon, kWinA, {kWinA, kWinB}, {0.0, 0.0}));
+    ASSERT_TRUE(model.dragMotion({10.0, 0.0}));
+    model.windowLeftScene(kWinB);
+    ASSERT_TRUE(model.drag().has_value());
+    ASSERT_TRUE(model.dragMotion({30.0, 0.0}));
+    expectVec(model.offset(kWinA), {30.0, 0.0});
+    expectVec(model.offset(kWinB), {10.0, 0.0});
+    // Cancelling now restores only the remaining member.
+    model.dragCancel();
+    expectVec(model.offset(kWinA), {0.0, 0.0});
+    expectVec(model.offset(kWinB), {10.0, 0.0});
 }
 
 // ---- spawn placement ----------------------------------------------------------------------------------------------

@@ -7,10 +7,12 @@
 // mechanism. Coordinates are Hyprland global logical units.
 
 #include "hyprvx/core/CameraMath.hpp"
+#include "hyprvx/core/WindowBehavior.hpp"
 
 #include <cstdint>
 #include <map>
 #include <optional>
+#include <vector>
 
 namespace hyprvx::drift {
 
@@ -27,6 +29,22 @@ enum class Status { Ok, NoOp, State, Invalid, Incompatible };
 
 enum class DragKind { Pan, Move };
 
+// Feature 004: a move drag carries every member with its offset at the press (one for Super + drag, the group for
+// Shift + Super + drag) and its snap state.
+struct DragMember {
+    WindowId     window = 0;
+    cammath::Vec startOffset;
+};
+
+// What a snapping drag motion needs from the adapter (window-behavior 1.1 snapMove): the members' world boxes at the
+// press (L + start offset), the boxes they can snap to, the current zoom and the settings.
+struct SnapInput {
+    std::vector<WorldBox> moving;
+    std::vector<WorldBox> others;
+    double                zoom = 1.0;
+    SnapSettings          settings;
+};
+
 struct Drag {
     DragKind kind = DragKind::Pan;
     MonitorId monitor = 0;
@@ -35,6 +53,8 @@ struct Drag {
     cammath::Vec startOffset;         // MOVE: O(w) at press
     cammath::CameraState startCamera; // camera at press (PAN moves it; MOVE divides by its zoom)
     WorkspaceId workspace = 0;
+    std::vector<DragMember> members; // MOVE: every moving window (members[0..] includes `window`)
+    SnapState               snap;    // MOVE with snapping
 };
 
 // MVP zoom range (data-model.md WorkspaceCamera).
@@ -95,9 +115,10 @@ public:
     // Finite values only; rejected values leave the offset unchanged.
     bool setOffset(WindowId window, cammath::Vec offset);
     [[nodiscard]] const std::map<WindowId, cammath::Vec>& offsets() const { return offsets_; }
-    // Drops the window's offset; ends a move drag of that window.
+    // Drops the window's offset; the window leaves a move drag (the drag ends with its last member).
     void windowClosed(WindowId window);
-    // The window left its monitor's scene (another workspace): ends a move drag of that window.
+    // The window left its monitor's scene (another workspace): it leaves a move drag, keeping its current offset (the
+    // drag ends with its last member).
     void windowLeftScene(WindowId window);
     // O(w) for mapped windows of a DRIFT scene, 0 for every other window.
     [[nodiscard]] cammath::Vec mechanismOffset(WindowId window, WorkspaceId workspace, MonitorId monitor, bool mapped) const;
@@ -105,10 +126,19 @@ public:
     // ---- drags (at most one) ----
     bool beginPan(MonitorId monitor, cammath::Vec screen);
     bool beginMove(MonitorId monitor, WindowId window, cammath::Vec screen);
-    // Applies the drag for the pointer at `screen`: MOVE O = startOffset + worldDelta(startCamera, S - startScreen);
-    // PAN P = panByScreen(startCamera, S - startScreen).P. False without a drag or for a rejected value.
+    // Feature 004: a move drag of several windows (pressed must be a member, no duplicates, at least one member).
+    bool beginGroupMove(MonitorId monitor, WindowId pressed, const std::vector<WindowId>& members, cammath::Vec screen);
+    // Applies the drag for the pointer at `screen`: MOVE O = startOffset + worldDelta(startCamera, S - startScreen) for
+    // every member; PAN P = panByScreen(startCamera, S - startScreen).P. False without a drag or for a rejected value.
     bool dragMotion(cammath::Vec screen);
+    // MOVE with snapping: the same world delta, adjusted by snapMove (the drag keeps the snap state), for every member.
+    // A PAN drag ignores `snap`.
+    bool dragMotion(cammath::Vec screen, const SnapInput& snap);
+    // Normal end (button release): offsets are kept.
     void dragEnd();
+    // Cancellation (FR-021): a move drag restores every member's start offset; a pan drag keeps its camera. The end
+    // conditions disable, invalidCamera, panic, monitorRemoved and workspaceActivated cancel this way.
+    void dragCancel();
     [[nodiscard]] const std::optional<Drag>& drag() const { return drag_; }
 
     // ---- spawn placement (R6) ----
@@ -126,6 +156,7 @@ private:
     [[nodiscard]] static Session offSession(cammath::Vec origin);
     [[nodiscard]] const Session* session(MonitorId monitor) const;
     void endDragOn(MonitorId monitor);
+    bool applyMoveDelta(cammath::Vec worldDelta);
 
     std::map<MonitorId, Session> sessions_;
     std::map<WorkspaceId, cammath::CameraState> cameras_;
