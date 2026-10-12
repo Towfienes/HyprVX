@@ -1,5 +1,12 @@
 # HyprVX Next Task
 
+## PROJECT STOPPED (2026-10-12)
+
+The user stopped HyprVX after the first real-hardware run (Drift on/off, zoom and trackpad worked; zoomed-out picture
+quality is rough) and asked to publish the repository publicly with a README for possible contributors. Do not resume
+development unless the user asks. `v3/spec-foundation` holds Features 001–003 plus the host-trial fixes; Feature 004
+stays paused on its branch.
+
 ## V3 status (2026-10-12, Claude-only since DV3-15)
 
 `specs/001-native-spatial-camera/tasks.md` was approved at `966e6b6`. Claude Code is the only implementation agent
