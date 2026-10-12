@@ -102,7 +102,8 @@ repo, out, form, dev, prefix_id, patchset_id, build, prefix, artifact, src_rel =
 so = Path(out, artifact)
 # Sources that go into the plugin: the plugin tree and the core headers/sources it compiles (the test plugin: its tree).
 roots = ([Path(repo, src_rel)] if src_rel != "platform/plugin" else
-         [Path(repo, "platform/plugin"), Path(repo, "core/include"), Path(repo, "core/src/DriftModel.cpp")])
+         [Path(repo, "platform/plugin"), Path(repo, "core/include")]
+         + [Path(repo, "core/src", f) for f in ("DriftModel.cpp", "GestureModel.cpp", "Camera.cpp", "CameraMotion.cpp")])
 digest = hashlib.sha256()
 for root in roots:
     files = [root] if root.is_file() else sorted(p for p in root.rglob("*") if p.is_file() and "__pycache__" not in p.parts)
