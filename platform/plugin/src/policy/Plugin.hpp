@@ -63,6 +63,13 @@ namespace HyprVXPolicy {
     // ---- built-in inputs (Input.cpp) ----
     void initInput();
     void shutdownInput();
+    bool superHeld();
+    // What the pointer is over on a monitor: a top/overlay layer surface or layer popup, a window, or empty canvas.
+    struct SPointerTarget {
+        bool      layer = false;
+        PHLWINDOW window;
+    };
+    SPointerTarget pointerTarget(const PHLMONITOR& monitor, const Vector2D& pos);
 
     // ---- trackpad inputs (Gesture.cpp, Feature 003, drift-control 1.1) ----
     void initGesture(HANDLE handle);

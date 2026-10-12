@@ -39,38 +39,19 @@ namespace {
     // The window of a move drag.
     PHLWINDOWREF g_dragWindow;
 
-    bool superHeld() {
-        return g_pInputManager->getModsFromAllKBs() & HL_MODIFIER_META;
-    }
 
     hyprvx::cammath::Vec pointer() {
         const auto POS = g_pInputManager->getMouseCoordsInternal();
         return {POS.x, POS.y};
     }
 
-    // What a Super + left press hits: a top/overlay layer surface or layer popup (neither drag), a window (move, hit
-    // through the camera and offsets, patch 0011) or empty canvas (pan, FR-007).
-    struct SPressTarget {
-        bool      layer = false;
-        PHLWINDOW window;
-    };
-    SPressTarget pressTarget(const PHLMONITOR& monitor, const Vector2D& pos) {
-        const auto& hit = Desktop::viewState()->hitTest();
-        Vector2D    local;
-        PHLLS       layer;
-        if (hit.layerPopupSurfaceAt(pos, monitor, &local, &layer) ||
-            hit.layerSurfaceAt(pos, &monitor->m_layerSurfaceLayers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY], &local, &layer) ||
-            hit.layerSurfaceAt(pos, &monitor->m_layerSurfaceLayers[ZWLR_LAYER_SHELL_V1_LAYER_TOP], &local, &layer))
-            return {.layer = true};
-        return {.window = hit.windowAt(pos, Desktop::View::RESERVED_EXTENTS | Desktop::View::INPUT_EXTENTS | Desktop::View::ALLOW_FLOATING)};
-    }
 
     void onKey(const IKeyboard::SKeyEvent& event, Event::SCallbackInfo& info) {
         if (!HyprVXPolicy::anyDrift())
             return;
         if (event.keycode != KEY_ESC || event.state != WL_KEYBOARD_KEY_STATE_PRESSED)
             return;
-        if (!superHeld() || !HyprVXPolicy::driftUnderPointer())
+        if (!HyprVXPolicy::superHeld() || !HyprVXPolicy::driftUnderPointer())
             return;
         info.cancelled = true;
         HyprVXPolicy::disableFocused();
@@ -79,7 +60,7 @@ namespace {
     void onAxis(const IPointer::SAxisEvent& event, Event::SCallbackInfo& info) {
         if (!HyprVXPolicy::anyDrift())
             return;
-        if (event.axis != WL_POINTER_AXIS_VERTICAL_SCROLL || event.source != WL_POINTER_AXIS_SOURCE_WHEEL || !superHeld())
+        if (event.axis != WL_POINTER_AXIS_VERTICAL_SCROLL || event.source != WL_POINTER_AXIS_SOURCE_WHEEL || !HyprVXPolicy::superHeld())
             return;
         const auto MONITOR = HyprVXPolicy::driftMonitorUnderPointer();
         if (!MONITOR)
@@ -103,12 +84,12 @@ namespace {
             info.cancelled = true;
             return;
         }
-        if (!HyprVXPolicy::anyDrift() || !superHeld())
+        if (!HyprVXPolicy::anyDrift() || !HyprVXPolicy::superHeld())
             return;
         const auto MONITOR = HyprVXPolicy::driftMonitorUnderPointer();
         if (!MONITOR)
             return;
-        const auto TARGET = pressTarget(MONITOR, g_pInputManager->getMouseCoordsInternal());
+        const auto TARGET = HyprVXPolicy::pointerTarget(MONITOR, g_pInputManager->getMouseCoordsInternal());
         if (TARGET.layer)
             return;
         bool started = false;
@@ -141,6 +122,24 @@ namespace {
             HyprVX::setWindowOffset(WINDOW, Vector2D{OFFSET.x, OFFSET.y});
         }
     }
+}
+
+bool HyprVXPolicy::superHeld() {
+    return g_pInputManager->getModsFromAllKBs() & HL_MODIFIER_META;
+}
+
+// What the pointer is over: a top/overlay layer surface or layer popup, a window (hit through the camera and offsets,
+// patch 0011) or empty canvas. Super + left uses it for pan/move (FR-007); trackpad sequences decide their target
+// with it at their start (Feature 003 R3/R4).
+HyprVXPolicy::SPointerTarget HyprVXPolicy::pointerTarget(const PHLMONITOR& monitor, const Vector2D& pos) {
+    const auto& hit = Desktop::viewState()->hitTest();
+    Vector2D    local;
+    PHLLS       layer;
+    if (hit.layerPopupSurfaceAt(pos, monitor, &local, &layer) ||
+        hit.layerSurfaceAt(pos, &monitor->m_layerSurfaceLayers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY], &local, &layer) ||
+        hit.layerSurfaceAt(pos, &monitor->m_layerSurfaceLayers[ZWLR_LAYER_SHELL_V1_LAYER_TOP], &local, &layer))
+        return {.layer = true};
+    return {.window = hit.windowAt(pos, Desktop::View::RESERVED_EXTENTS | Desktop::View::INPUT_EXTENTS | Desktop::View::ALLOW_FLOATING)};
 }
 
 void HyprVXPolicy::initInput() {

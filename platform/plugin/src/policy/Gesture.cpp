@@ -3,17 +3,22 @@
 // (contracts/gesture-model.md) and consumed through the cancellable event bus before keybinds, `gesture =` bindings
 // and client delivery. Camera changes go only through DriftModel and CameraMath (Constitution IV).
 //
-// T015 skeleton: listeners, config values and shutdown; every sequence passes through unchanged.
+// Implemented: finger-source scroll sequences (T022). Gestures pass through until T026/T030; glide is T036.
 
 #include "policy/Plugin.hpp"
 #include "policy/Mechanism.hpp"
 
 #include "hyprvx/core/GestureModel.hpp"
 
+#include <src/config/ConfigValue.hpp>
 #include <src/config/values/types/FloatValue.hpp>
 #include <src/debug/log/Logger.hpp>
 #include <src/devices/IPointer.hpp>
+#include <src/desktop/Workspace.hpp>
 #include <src/event/EventBus.hpp>
+#include <src/managers/fullscreen/FullscreenController.hpp>
+#include <src/managers/input/InputManager.hpp>
+#include <src/output/Monitor.hpp>
 
 #include <cmath>
 #include <vector>
@@ -53,10 +58,88 @@ namespace {
         return fallback;
     }
 
-    // Skeleton (T015): nothing is consumed yet. Every listener returns at once while no monitor is in Drift.
-    void onAxis(const IPointer::SAxisEvent& event, Event::SCallbackInfo& info) {
-        if (!HyprVXPolicy::anyDrift() || event.source != WL_POINTER_AXIS_SOURCE_FINGER)
+    // A scroll sequence or gesture, decided once at its start (data-model GestureSession).
+    struct SSession {
+        drift::Target target = drift::Target::PassThrough;
+        MONITORID     monitor = MONITOR_INVALID;
+        WORKSPACEID   workspace = WORKSPACE_INVALID;
+        bool          live = false; // camera changes allowed: still in DRIFT on the same scene, no drag started since
+    };
+    drift::ScrollTracker g_tracker;
+    SSession             g_scroll;
+
+    // The BeginContext of decideTarget for the pointer's current position (research R3/R4).
+    drift::BeginContext beginContext(PHLMONITOR& monitorOut) {
+        drift::BeginContext ctx;
+        monitorOut = HyprVXPolicy::driftMonitorUnderPointer();
+        if (!monitorOut)
+            return ctx;
+        ctx.drift            = true;
+        const auto TARGET    = HyprVXPolicy::pointerTarget(monitorOut, g_pInputManager->getMouseCoordsInternal());
+        ctx.layerUnderPointer  = TARGET.layer;
+        ctx.windowUnderPointer = TARGET.window != nullptr;
+        ctx.fullscreenScene    = monitorOut->m_activeWorkspace && Fullscreen::controller()->hasFullscreen(monitorOut->m_activeWorkspace);
+        ctx.dragActive         = HyprVXPolicy::model().drag().has_value();
+        ctx.superHeld          = HyprVXPolicy::superHeld();
+        return ctx;
+    }
+
+    SSession openSession(drift::InputKind kind, unsigned fingers) {
+        PHLMONITOR monitor;
+        const auto CTX = beginContext(monitor);
+        SSession   session;
+        session.target = drift::decideTarget(kind, fingers, CTX);
+        if (monitor) {
+            session.monitor   = monitor->m_id;
+            session.workspace = HyprVXPolicy::model().sceneWorkspace(monitor->m_id).value_or(WORKSPACE_INVALID);
+        }
+        session.live = session.target == drift::Target::Pan || session.target == drift::Target::Zoom;
+        return session;
+    }
+
+    // Once false, a session never changes the camera again (FR-013, FR-014): Drift left, the scene changed, or a Super +
+    // drag started.
+    bool stillLive(SSession& session) {
+        if (session.live) {
+            auto& model  = HyprVXPolicy::model();
+            const auto S = model.sceneWorkspace(session.monitor);
+            session.live = model.mode(session.monitor) == drift::Mode::Drift && S && *S == session.workspace && !model.drag();
+        }
+        return session.live;
+    }
+
+    // Screen pan of the content: -(delta) * touchpad scroll factor * pan factor (research R3). A positive value means
+    // "scroll down", which moves a document's content up; natural scrolling is applied before the event reaches us.
+    void scrollPan(SSession& session, int axis, double delta) {
+        static auto PTOUCHPAD = CConfigValue<Config::FLOAT>("input:touchpad:scroll_factor");
+        double      touchpad  = *PTOUCHPAD;
+        if (!std::isfinite(touchpad) || touchpad <= 0.0)
+            touchpad = 1.0;
+        const double D = -delta * touchpad * HyprVXPolicy::panFactor();
+        if (!stillLive(session) || D == 0.0 || !std::isfinite(D))
             return;
+        const cammath::Vec SCREEN = axis == 0 ? cammath::Vec{0.0, D} : cammath::Vec{D, 0.0};
+        if (HyprVXPolicy::model().pan(session.monitor, SCREEN) == drift::Status::Ok)
+            HyprVXPolicy::sync(true);
+    }
+
+    // Finger-source scroll sequences (FR-002, FR-004..FR-006). Wheel, continuous and tilt sources are Feature 002's.
+    void onAxis(const IPointer::SAxisEvent& event, Event::SCallbackInfo& info) {
+        if (event.source != WL_POINTER_AXIS_SOURCE_FINGER || (!g_tracker.open() && !HyprVXPolicy::anyDrift()))
+            return;
+        const int  AXIS = event.axis == WL_POINTER_AXIS_VERTICAL_SCROLL ? 0 : 1;
+        const auto STEP = g_tracker.feed(AXIS, event.delta, event.timeMs);
+        if (STEP == drift::ScrollStep::Ignore)
+            return;
+        if (STEP == drift::ScrollStep::Begin)
+            g_scroll = openSession(drift::InputKind::Scroll, 2);
+        if (g_scroll.target == drift::Target::PassThrough)
+            return;
+        info.cancelled = true;
+        if (g_scroll.target == drift::Target::Pan)
+            scrollPan(g_scroll, AXIS, event.delta);
+        if (STEP == drift::ScrollStep::End)
+            g_scroll = {};
     }
     void onGesture(Event::SCallbackInfo& info) {
         if (!HyprVXPolicy::anyDrift())
@@ -96,6 +179,8 @@ void HyprVXPolicy::initGesture(HANDLE handle) {
 
 void HyprVXPolicy::shutdownGesture() {
     g_listeners.clear();
+    g_tracker.reset();
+    g_scroll = {};
     g_panFactor.reset();
     g_glide.reset();
     g_glideMinSpeed.reset();

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # T-TP-SURFACES (Feature 003 FR-003, FR-010, V-08; scroll part T020, 3-finger part T029). Scene of f003_lib.sh with a
 # TOP layer client (240x140 at (20,640)), Drift on:
-#  1. A finger scroll sequence over the layer surface is delivered to the layer client and the camera does not move.
+#  1. A finger scroll sequence over the layer surface (10 frames of (4, 5): 20 non-zero axis events) is delivered to
+#     the layer client and the camera does not move.
 #  2. With a fullscreen (click on a, then the `fullscreen` dispatcher), a finger scroll sequence is delivered to a and
 #     the capture does not change.
 set -euo pipefail
@@ -26,11 +27,13 @@ hvx_analyze layer-unchanged diff "$HVX_EVID/after-layer.png" --reference "$HVX_E
     || fail "a finger scroll over the layer surface moved the camera"
 n=$(nonzero_axis layer-scroll layer)
 echo "layer: non-zero axis events $n" >> "$HVX_EVID/counts.txt"
-((n == 10)) || fail "the layer client did not receive the finger scroll ($n axis events)"
+((n == 20)) || fail "the layer client did not receive the finger scroll ($n axis events)"
 
 # 2. fullscreen window
 tp_run focus-a "move 290 200" "click"
 hvx_dispatch fullscreen > "$HVX_EVID/fullscreen.reply" 2>&1 || true
+# While a is fullscreen the other clients are not drawn (no frame_done), so the pointer driver syncs on a alone.
+TP_CLIENTS=(a)
 tp_run fs-pointer "move $TP_CANVAS_X $TP_CANVAS_Y"
 tp_capture before-fs
 T=$(tp_next_time)
@@ -40,8 +43,9 @@ hvx_analyze fs-unchanged diff "$HVX_EVID/after-fs.png" --reference "$HVX_EVID/be
     || fail "a finger scroll with a fullscreen window changed the capture"
 n=$(nonzero_axis fs-scroll a)
 echo "fullscreen a: non-zero axis events $n" >> "$HVX_EVID/counts.txt"
-((n == 10)) || fail "the fullscreen window did not receive the finger scroll ($n axis events)"
+((n == 20)) || fail "the fullscreen window did not receive the finger scroll ($n axis events)"
 hvx_dispatch fullscreen > "$HVX_EVID/fullscreen-off.reply" 2>&1 || true
+TP_CLIENTS=(a b c layer)
 
 # 3-finger part: T029.
 
