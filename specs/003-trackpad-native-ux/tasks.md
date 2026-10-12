@@ -61,7 +61,7 @@ description: "Task list for Feature 003 — Trackpad-Native Drift UX, Claude Cod
 ### Test tools and harness (test-tooling 1.5)
 
 - [X] T008 [P] Add `fscroll T0 DT N DX DY [stop]` to `tools/vpointer/main.cpp` per test-tooling 1.5 §4a (axis → axis_source(finger) → frame per axis, explicit times, optional stop, limits with an `error` line)
-- [ ] T009 [P] Add pointer-gestures binding and the swipe/pinch, `axis_source`, `axis_stop` and `axis_value120` log lines to `tools/testclient/main.cpp` per test-tooling 1.5 §4 (existing lines unchanged)
+- [X] T009 [P] Add pointer-gestures binding and the swipe/pinch, `axis_source`, `axis_stop` and `axis_value120` log lines to `tools/testclient/main.cpp` per test-tooling 1.5 §4 (existing lines unchanged)
 - [ ] T010 [P] Implement the test-only plugin in `tools/testinput/src/main.cpp`: hyprctl command `hvxtest` (`gesture swipe|pinch begin|update|end …` calling `g_pInputManager->onSwipe*/onPinch*` with the given fields and range checks; `frames <monitor>` from a `render.pre` counter), per test-tooling 1.5 §8
 - [X] T011 Add `start --interactive` to `tools/hyprvx_nested.py` / `scripts/nested.sh`: same verified session, but the Wayland output (the visible nested window) stays enabled and no headless output is created, for L6 only; captures are refused in this mode. Let `plugin load` accept `plugin/testinput-*` paths. Keep every identity rule
 - [X] T012 Extend `tests/native/harness/test_identity_refusal.sh` and `tests/native/static_evidence.sh`: `fscroll` and `hvxtest` refused outside a verified session, `--interactive` refuses captures; run it (V-02)
@@ -81,17 +81,17 @@ description: "Task list for Feature 003 — Trackpad-Native Drift UX, Claude Cod
 
 ### Tests
 
-- [ ] T016 [P] [US1] Write `tests/native/t_tp_pan.sh` (T-TP-PAN): three windows, z 1 and 0.5, `fscroll` on canvas; every bbox moves by the expected pan ± 1 px; no client logs an axis event
-- [ ] T017 [P] [US1] Write `tests/native/t_tp_window.sh` (T-TP-WINDOW): `fscroll` over a window without Super; the client logs the same values with source `finger` and both stops; capture unchanged
-- [ ] T018 [P] [US1] Write `tests/native/t_tp_super.sh` (T-TP-SUPER): vkeyboard holds `KEY_LEFTMETA`; `fscroll` over a window pans; the client logs nothing
-- [ ] T019 [P] [US1] Write `tests/native/t_tp_lock.sh` (T-TP-LOCK): a sequence begun on canvas keeps panning after the pointer moves over a window; one begun over a window stays delivered after the pointer moves to canvas
-- [ ] T020 [P] [US1] Write `tests/native/t_tp_surfaces.sh` (T-TP-SURFACES) scroll part: over the test layer surface and with a fullscreen window on the scene, finger scrolls are delivered (client logs) and nothing moves
-- [ ] T021 [P] [US1] Write `tests/native/t_tp_off.sh` (T-TP-OFF) scroll part: Drift off, finger scrolls: captures byte-identical to the stock session and client logs identical to the stock session
+- [X] T016 [P] [US1] Write `tests/native/t_tp_pan.sh` (T-TP-PAN): three windows, z 1 and 0.5, `fscroll` on canvas; every bbox moves by the expected pan ± 1 px; no client logs an axis event
+- [X] T017 [P] [US1] Write `tests/native/t_tp_window.sh` (T-TP-WINDOW): `fscroll` over a window without Super; the client logs the same values with source `finger` and both stops; capture unchanged
+- [X] T018 [P] [US1] Write `tests/native/t_tp_super.sh` (T-TP-SUPER): vkeyboard holds `KEY_LEFTMETA`; `fscroll` over a window pans; the client logs nothing
+- [X] T019 [P] [US1] Write `tests/native/t_tp_lock.sh` (T-TP-LOCK): a sequence begun on canvas keeps panning after the pointer moves over a window; one begun over a window stays delivered after the pointer moves to canvas
+- [X] T020 [P] [US1] Write `tests/native/t_tp_surfaces.sh` (T-TP-SURFACES) scroll part: over the test layer surface and with a fullscreen window on the scene, finger scrolls are delivered (client logs) and nothing moves
+- [X] T021 [P] [US1] Write `tests/native/t_tp_off.sh` (T-TP-OFF) scroll part: Drift off, finger scrolls: captures byte-identical to the stock session and client logs identical to the stock session
 
 ### Implementation
 
-- [ ] T022 [US1] Implement scroll sessions in `platform/plugin/src/policy/Gesture.cpp`: `ScrollTracker` per sequence; at `Begin` build `BeginContext` (Drift under the pointer, layer/layer-popup test shared with `Input.cpp`'s press target, the scene workspace's fullscreen flag, `model().drag()`, Super, window hit test) and `decideTarget`; the owning monitor and workspace are fixed at begin; cancel every event of a consumed sequence until `End`; Pan applies `model().pan(monitor, −(dx, dy)·f)` with `f = input:touchpad:scroll_factor × pan_factor` ("≤ 0 or non-finite → 1.0" for the touchpad factor) and `sync(true)`; no camera change once `live` is false
-- [ ] T023 [US1] Run T016–T021 in form P at scales 1 and 1.25; archive (V-04..V-07, scroll parts of V-08 and V-09)
+- [X] T022 [US1] Implement scroll sessions in `platform/plugin/src/policy/Gesture.cpp`: `ScrollTracker` per sequence; at `Begin` build `BeginContext` (Drift under the pointer, layer/layer-popup test shared with `Input.cpp`'s press target, the scene workspace's fullscreen flag, `model().drag()`, Super, window hit test) and `decideTarget`; the owning monitor and workspace are fixed at begin; cancel every event of a consumed sequence until `End`; Pan applies `model().pan(monitor, −(dx, dy)·f)` with `f = input:touchpad:scroll_factor × pan_factor` ("≤ 0 or non-finite → 1.0" for the touchpad factor) and `sync(true)`; no camera change once `live` is false
+- [X] T023 [US1] Run T016–T021 in form P at scales 1 and 1.25; archive (V-04..V-07, scroll parts of V-08 and V-09)
 
 ---
 

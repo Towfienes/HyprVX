@@ -11,12 +11,12 @@ they run in form P.
 | V-01 | L2 | `GestureModel` unit tests (`tests/unit/test_gesture_model.cpp`, contract gesture-model 1.0), two seeds | PASS | `~/.local/share/hyprvx/evidence/claude/20261012-080650-unit-84ea21b-f003_unit/` (fresh build of a copy; ctest 367/367; 41 GestureModel tests with the default seed and 987654321; mutants 9/9 killed) |
 | V-02 | L1/L4 | Identity refusal of `fscroll`, `hvxtest` and `--interactive` (no capture) outside a verified session | PASS | `~/.local/share/hyprvx/evidence/claude/20261012-081012-static-ac78519-f002_static/` (`static_evidence.sh`, labelled with its Feature 002 IDs: `v03-identity-refusal.log` incl. interactive capture refused and `render_config --interactive` changing only the WAYLAND-1 rule; `hvxtest` is sent only through `run`, refused for every tampered session; `v03-vpointer-refusal.log` with an `fscroll` script never sent) |
 | V-03 | L4 | GATE-A after the gesture-binding config change: stock determinism, baseline hash unchanged | PASS | `~/.local/share/hyprvx/evidence/claude/20261012-081153-stock-f0ee8b0-gate_a/` (3 stock sessions pixel-identical; `stock1..3.png` sha256 `6d7f6bd6bf1bf49e…` = the Feature 002 baseline, so the new `gesture =` lines parse without a config error bar) |
-| V-04 | L5 | T-TP-PAN | NOT RUN | — |
-| V-05 | L5b | T-TP-WINDOW | NOT RUN | — |
-| V-06 | L5b | T-TP-SUPER | NOT RUN | — |
-| V-07 | L5b | T-TP-LOCK | NOT RUN | — |
-| V-08 | L5b | T-TP-SURFACES (scroll and 3-finger parts) | NOT RUN | — |
-| V-09 | L5 | T-TP-OFF (scroll, pinch, 3/4-finger parts) | NOT RUN | — |
+| V-04 | L5 | T-TP-PAN | PASS (form P) | `~/.local/share/hyprvx/evidence/claude/20261012-083722-suite-5d254f9-feature003/` (scales 1 and 1.25; per-test runs in results.txt); form S at T039 |
+| V-05 | L5b | T-TP-WINDOW | PASS (form P) | `~/.local/share/hyprvx/evidence/claude/20261012-083722-suite-5d254f9-feature003/` (scales 1 and 1.25; per-test runs in results.txt); form S at T039 |
+| V-06 | L5b | T-TP-SUPER | PASS (form P) | `~/.local/share/hyprvx/evidence/claude/20261012-083722-suite-5d254f9-feature003/` (scales 1 and 1.25; per-test runs in results.txt); form S at T039 |
+| V-07 | L5b | T-TP-LOCK | PASS (form P) | `~/.local/share/hyprvx/evidence/claude/20261012-083722-suite-5d254f9-feature003/` (scales 1 and 1.25; per-test runs in results.txt); form S at T039 |
+| V-08 | L5b | T-TP-SURFACES (scroll and 3-finger parts) | PARTIAL (scroll part PASS, form P) | `~/.local/share/hyprvx/evidence/claude/20261012-083722-suite-5d254f9-feature003/` (scales 1 and 1.25); gesture part at T029/T031 |
+| V-09 | L5 | T-TP-OFF (scroll, pinch, 3/4-finger parts) | PARTIAL (scroll part PASS, form P) | `~/.local/share/hyprvx/evidence/claude/20261012-083722-suite-5d254f9-feature003/` (scales 1 and 1.25); gesture part at T029/T031 |
 | V-10 | L5 | T-PINCH | NOT RUN | — |
 | V-11 | L5 | T-CANCEL (pinch and 3-finger swipe) | NOT RUN | — |
 | V-12 | L5b | T-ARBITRATE | NOT RUN | — |
