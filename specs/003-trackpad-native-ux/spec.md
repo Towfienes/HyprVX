@@ -240,8 +240,9 @@ produced once the glide ends, and the setting 0 produces no glide.
 - **FR-019**: Automated tests MUST drive scrolls and gestures only into the verified nested session (nested-only
   input; never uinput or ydotool) and MUST include a nested config that reproduces the user's 3- and 4-finger
   bindings, so that arbitration is tested against the real conflict.
-- **FR-020**: Any synthetic gesture input used for tests MUST exist only in dev builds and MUST be refused by
-  non-dev builds, like the dev control of Features 001 and 002.
+- **FR-020**: Any synthetic gesture input used for tests MUST exist only in test-only artifacts that are never part
+  of a delivery form and are loaded only into verified nested sessions; delivery builds MUST refuse it (unknown
+  command), like the dev control of Features 001 and 002.
 - **FR-021**: Physical-hardware validation (L6) MUST be done by a human with the real trackpad in a nested session
   following a written checklist. It covers everything that physically reaches a nested session (two-finger pan over
   canvas and over windows, Super + two-finger pan, glide and its interruption, Drift off = stock scrolling). Physical
