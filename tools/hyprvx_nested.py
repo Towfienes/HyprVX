@@ -231,9 +231,10 @@ def resolve_binary(variant, explicit):
 
 
 INTERACTIVE_RULE_OFF = "monitor = WAYLAND-1, disable"
-# L6 (T045): the nested window's pointer is invisible with Hyprland's hardware cursor through the wayland backend, so
-# the interactive session draws a software cursor (set at start; a runtime keyword did not take effect).
-INTERACTIVE_RULE_ON = "monitor = WAYLAND-1, preferred, auto, 1\ncursor {\n    no_hardware_cursors = true\n}"
+# L6 (T045): with the default GPU cursor buffer the pointer is invisible in the nested window, so the cursor image is
+# handed to the host as a CPU buffer. A software cursor froze the nested window (every motion renders a frame and the
+# host did not release buffers in time: "pending state has a non-released buffer").
+INTERACTIVE_RULE_ON = "monitor = WAYLAND-1, preferred, auto, 1\ncursor {\n    use_cpu_buffer = 1\n}"
 
 
 def render_config(path, size, scale, interactive=False):
